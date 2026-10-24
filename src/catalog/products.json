@@ -1,0 +1,44 @@
+{
+  "version": "2026.10.24",
+  "verifiedAt": "2026-10-24",
+  "fonte": "https://opportunity.ia.br/labs/",
+  "observacao": "Registra apenas o que o site publica (projetos do Opportunity Labs). Estágio = exatamente o rótulo do site. Não há produto com preço, licença ou plano comercial confirmado neste sistema.",
+  "products": [
+    {
+      "id": "opportunity-crm",
+      "nome": "Opportunity CRM",
+      "estagio": "Conceito",
+      "url": "https://opportunity.ia.br/labs/opportunity-crm",
+      "descricao": "Gestão comercial inteligente com organização de contatos, oportunidades, funil de vendas e automações.",
+      "categoria": "Gestão comercial e inteligência artificial",
+      "palavras_chave": ["crm", "comercial", "funil", "contatos", "oportunidades"]
+    },
+    {
+      "id": "cineforma",
+      "nome": "CineForma",
+      "estagio": "Em desenvolvimento",
+      "url": "https://opportunity.ia.br/labs/cineforma",
+      "descricao": "Estúdio que transforma história e referências em roteiro, storyboard, vídeos e montagem final.",
+      "categoria": "Criação digital e produção de vídeo com IA",
+      "palavras_chave": ["vídeo", "roteiro", "storyboard", "cinema", "história", "produção"]
+    },
+    {
+      "id": "kirana",
+      "nome": "Kirana",
+      "estagio": "Em desenvolvimento",
+      "url": "https://opportunity.ia.br/labs/kirana",
+      "descricao": "Agentes autônomos personalizados que conhecem o ambiente digital do cliente, auxiliam usuários e realizam ações autorizadas por meio de integrações.",
+      "categoria": "Agentes de IA e automação",
+      "palavras_chave": ["kirana", "agente", "autônomo", "integração", "navegação assistida"]
+    },
+    {
+      "id": "opportunity-creators",
+      "nome": "Opportunity Creators",
+      "estagio": "Em desenvolvimento",
+      "url": "https://opportunity.ia.br/labs/creators",
+      "descricao": "Personagens digitais, influenciadoras e produção audiovisual com inteligência artificial.",
+      "categoria": "Marketing digital e produção criativa com IA",
+      "palavras_chave": ["personagens", "influenciadora", "audiovisual", "marketing", "criadores"]
+    }
+  ]
+}

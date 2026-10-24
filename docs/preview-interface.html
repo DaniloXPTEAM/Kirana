@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light" />
+    <meta name="description" content="Kirana — assistente virtual da Opportunity AI. Versão local de desenvolvimento." />
+    <title>Prévia da interface · Kirana</title>
+    
+    <style>
+/* Kirana — interface local. Sem dependências externas (CSP self). */
+:root {
+  --ink: #12162a;
+  --ink-soft: #3b4260;
+  --muted: #6b7280;
+  --line: #e5e7f0;
+  --surface: #ffffff;
+  --surface-2: #f7f8fc;
+  --bg: #eef0f8;
+  --brand: #6d4aff;
+  --brand-2: #22b8a6;
+  --brand-soft: #efeaff;
+  --danger: #d92d20;
+  --danger-soft: #fef3f2;
+  --ok: #0f9f6e;
+  --warn: #b54708;
+  --radius: 18px;
+  --radius-sm: 12px;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 12px 32px rgba(20, 24, 60, 0.1);
+  --font: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background:
+    radial-gradient(1100px 520px at 8% -8%, #e8e2ff 0%, transparent 60%),
+    radial-gradient(900px 520px at 100% 0%, #dff7f2 0%, transparent 55%),
+    var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, textarea { font: inherit; color: inherit; }
+h1, h2, h3, p { margin: 0; }
+ul { margin: 0; padding: 0; list-style: none; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.skip-link {
+  position: absolute; left: 12px; top: -48px; z-index: 100;
+  background: var(--ink); color: #fff; padding: 10px 14px; border-radius: 10px;
+  text-decoration: none; transition: top 0.15s ease;
+}
+.skip-link:focus { top: 12px; }
+
+/* ------------------------------- layout --------------------------------- */
+.app {
+  display: grid;
+  grid-template-columns: 288px minmax(0, 1fr);
+  height: 100dvh;
+  max-height: 100dvh;
+}
+
+/* ------------------------------- sidebar -------------------------------- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 16px;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(14px);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-mark { width: 38px; height: 38px; flex: 0 0 auto; }
+.brand-mark svg { width: 100%; height: 100%; display: block; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.2; }
+.brand-text strong { font-size: 1.05rem; letter-spacing: -0.01em; }
+.brand-text span { font-size: 0.74rem; color: var(--muted); }
+.sidebar-close { display: none; margin-left: auto; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid transparent; border-radius: 999px;
+  padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
+  cursor: pointer; transition: transform 0.12s ease, background 0.15s, box-shadow 0.15s, border-color 0.15s;
+  background: #fff;
+}
+.btn:active { transform: translateY(1px); }
+.btn svg { width: 17px; height: 17px; }
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand) 0%, #8a63ff 55%, var(--brand-2) 140%);
+  color: #fff; box-shadow: 0 8px 18px rgba(109, 74, 255, 0.28);
+}
+.btn-primary:hover { box-shadow: 0 10px 24px rgba(109, 74, 255, 0.36); }
+.btn-ghost {
+  width: 100%; justify-content: flex-start; color: var(--ink-soft);
+  background: transparent; border-color: var(--line);
+}
+.btn-ghost:hover { background: #fff; border-color: #d6d9e6; }
+.btn-danger-soft { color: var(--danger); background: var(--danger-soft); border-color: #fecdca; }
+.btn-danger-soft:hover { background: #fee4e2; }
+.btn-stop {
+  margin-left: auto; padding: 6px 12px; font-size: 0.8rem;
+  color: var(--ink); background: #fff; border-color: var(--line);
+}
+.btn-stop svg { width: 14px; height: 14px; }
+
+.new-chat { width: 100%; justify-content: center; }
+
+.sidebar-section h2 {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--muted); font-weight: 700; margin-bottom: 8px;
+}
+
+.history { display: flex; flex-direction: column; gap: 4px; }
+.history-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 9px 10px; border-radius: 10px; border: 1px solid transparent;
+  background: transparent; text-align: left; cursor: pointer;
+  color: var(--ink-soft); font-size: 0.85rem;
+}
+.history-item:hover { background: #fff; border-color: var(--line); }
+.history-item[aria-current="true"] {
+  background: #fff; border-color: #dcd6ff; color: var(--ink); font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+.history-item .title {
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.history-item .dot-pending {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--warn); flex: 0 0 auto;
+}
+.history-item .del {
+  border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  padding: 2px; border-radius: 6px; display: none; line-height: 0;
+}
+.history-item:hover .del, .history-item[aria-current="true"] .del { display: block; }
+.history-item .del:hover { color: var(--danger); background: var(--danger-soft); }
+
+.empty-hint { font-size: 0.8rem; color: var(--muted); padding: 4px 2px; }
+
+.tool-list { display: flex; flex-direction: column; gap: 6px; }
+.tool-list li {
+  font-size: 0.78rem; color: var(--ink-soft); display: flex; gap: 8px; align-items: baseline;
+  background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px;
+}
+.tool-list .kind {
+  font-size: 0.63rem; text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 2px 6px; border-radius: 6px; font-weight: 700; flex: 0 0 auto;
+}
+.kind.read { color: #0b7a5b; background: #e6f7f1; }
+.kind.write { color: #a15c07; background: #fdf2e2; }
+
+.sidebar-footer { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+.badge {
+  margin-left: auto; font-size: 0.7rem; font-weight: 700; color: var(--brand);
+  background: var(--brand-soft); border-radius: 999px; padding: 1px 8px; min-width: 22px; text-align: center;
+}
+.status { display: flex; align-items: center; gap: 8px; font-size: 0.76rem; color: var(--muted); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #c3c7d4; flex: 0 0 auto; }
+.dot.ok { background: var(--ok); box-shadow: 0 0 0 3px rgba(15, 159, 110, 0.15); }
+.dot.warn { background: #f79009; box-shadow: 0 0 0 3px rgba(247, 144, 9, 0.18); }
+.dot.err { background: var(--danger); box-shadow: 0 0 0 3px rgba(217, 45, 32, 0.15); }
+.fineprint { font-size: 0.7rem; color: #9aa1b1; line-height: 1.45; }
+
+/* -------------------------------- main ---------------------------------- */
+.main {
+  display: flex; flex-direction: column; min-width: 0;
+  height: 100dvh;
+}
+
+.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
+}
+.topbar-title { flex: 1; min-width: 0; }
+.topbar-title h1 { font-size: 1rem; letter-spacing: -0.01em; }
+.topbar-title p {
+  font-size: 0.76rem; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.topbar-actions { display: flex; align-items: center; gap: 8px; }
+.model-pill {
+  font-size: 0.72rem; font-weight: 600; color: var(--brand);
+  background: var(--brand-soft); border-radius: 999px; padding: 5px 11px;
+  max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.icon-btn {
+  display: none; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line);
+  background: #fff; color: var(--ink-soft); cursor: pointer;
+}
+.icon-btn:hover { background: var(--surface-2); }
+.icon-btn svg { width: 18px; height: 18px; }
+.topbar .icon-btn { display: inline-flex; }
+.topbar #sidebar-open { display: none; }
+
+/* --------------------------------- chat --------------------------------- */
+.chat-scroll { flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+.chat {
+  max-width: 820px; margin: 0 auto; padding: 26px 20px 8px;
+  display: flex; flex-direction: column; gap: 18px;
+}
+
+.welcome {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--line); border-radius: 22px;
+  padding: 26px 24px; box-shadow: var(--shadow-sm);
+  text-align: left;
+}
+.welcome-avatar { width: 54px; height: 54px; margin-bottom: 14px; }
+.welcome-avatar svg { width: 100%; height: 100%; }
+.welcome h2 { font-size: 1.28rem; margin-bottom: 8px; letter-spacing: -0.02em; }
+.welcome p { color: var(--ink-soft); font-size: 0.94rem; line-height: 1.6; }
+.suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.chip {
+  border: 1px solid var(--line); background: #fff; color: var(--ink-soft);
+  border-radius: 999px; padding: 8px 14px; font-size: 0.83rem; cursor: pointer;
+  transition: all 0.15s ease;
+}
+.chip:hover { border-color: #cfc6ff; background: var(--brand-soft); color: var(--brand); }
+
+.msg { display: flex; gap: 10px; align-items: flex-start; animation: rise 0.22s ease both; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.msg-avatar {
+  width: 34px; height: 34px; border-radius: 11px; flex: 0 0 auto;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 0.78rem; font-weight: 700; letter-spacing: 0.02em;
+}
+.msg-body { min-width: 0; max-width: 100%; }
+.bubble {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+  padding: 13px 16px; box-shadow: var(--shadow-sm); font-size: 0.94rem; line-height: 1.62;
+  overflow-wrap: anywhere;
+}
+.bubble p + p { margin-top: 10px; }
+.bubble ul, .bubble ol { margin: 8px 0 0 18px; list-style: revert; }
+.bubble li { margin-top: 4px; }
+.bubble strong { font-weight: 650; }
+.bubble code {
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 6px; padding: 1px 5px; font-size: 0.86em;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+.bubble a { color: var(--brand); }
+
+.msg.user { flex-direction: row-reverse; }
+.msg.user .msg-body { max-width: min(88%, 640px); }
+.msg.user .bubble {
+  background: linear-gradient(135deg, #6d4aff, #8a63ff);
+  color: #fff; border-color: transparent; border-bottom-right-radius: 6px;
+}
+.msg.assistant .bubble { border-bottom-left-radius: 6px; }
+.msg-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-top: 6px; font-size: 0.72rem; color: var(--muted);
+}
+.msg-meta .pill {
+  background: #fff; border: 1px solid var(--line); border-radius: 999px;
+  padding: 2px 8px; font-weight: 600;
+}
+.msg-meta .pill.tool-ok { color: #0b7a5b; border-color: #c8ecdf; background: #f1fbf7; }
+.msg-meta .pill.tool-warn { color: var(--warn); border-color: #f5ddbb; background: #fffbf3; }
+
+.cursor::after {
+  content: ""; display: inline-block; width: 7px; height: 1.05em;
+  margin-left: 2px; vertical-align: -0.18em; border-radius: 2px;
+  background: var(--brand); animation: blink 1s steps(2, start) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+.typing { display: flex; gap: 5px; padding: 4px 2px; }
+.typing span {
+  width: 7px; height: 7px; border-radius: 50%; background: #b8b3e6;
+  animation: bounce 1.15s infinite ease-in-out;
+}
+.typing span:nth-child(2) { animation-delay: 0.14s; }
+.typing span:nth-child(3) { animation-delay: 0.28s; }
+@keyframes bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+
+.alert {
+  border-radius: 14px; padding: 12px 14px; font-size: 0.88rem; line-height: 1.55;
+  border: 1px solid #fecdca; background: var(--danger-soft); color: #912018;
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.alert.info { border-color: #d6d3ff; background: #f4f2ff; color: #3a2f8f; }
+.alert svg { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 1px; }
+.alert .alert-body { flex: 1; }
+.alert .retry { margin-top: 8px; }
+
+/* ---------------------------- confirmação ------------------------------- */
+.confirm-card {
+  border: 1px solid #f5ddbb; background: #fffcf5; border-radius: 16px;
+  padding: 16px; box-shadow: var(--shadow-sm); max-width: min(100%, 620px);
+}
+.confirm-card h3 {
+  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--warn); margin-bottom: 8px; font-weight: 800;
+}
+.confirm-card .summary { font-size: 0.92rem; color: var(--ink); line-height: 1.55; }
+.confirm-card .note { font-size: 0.78rem; color: var(--muted); margin-top: 8px; }
+.confirm-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.confirm-card.resolved { border-color: var(--line); background: var(--surface-2); }
+.confirm-card.resolved .confirm-actions { display: none; }
+.confirm-card .outcome { font-size: 0.82rem; color: var(--ink-soft); margin-top: 8px; font-weight: 600; }
+
+/* ------------------------------ composer -------------------------------- */
+.composer-wrap {
+  border-top: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(12px);
+  padding: 12px 20px max(14px, env(safe-area-inset-bottom));
+}
+.composer-status {
+  max-width: 820px; margin: 0 auto 10px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 0.8rem; color: var(--ink-soft);
+}
+.spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid #d9d5f7; border-top-color: var(--brand);
+  animation: spin 0.8s linear infinite; flex: 0 0 auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.composer {
+  max-width: 820px; margin: 0 auto;
+  display: flex; align-items: flex-end; gap: 8px;
+  background: #fff; border: 1px solid var(--line); border-radius: 22px;
+  padding: 8px 8px 8px 16px; box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.composer:focus-within { border-color: #cdc2ff; box-shadow: 0 0 0 4px rgba(109, 74, 255, 0.1); }
+.composer textarea {
+  flex: 1; border: 0; outline: 0; resize: none; background: transparent;
+  padding: 9px 0; max-height: 168px; font-size: 0.95rem; line-height: 1.5;
+}
+.composer textarea::placeholder { color: #9aa1b1; }
+.send {
+  width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; transition: opacity 0.15s, transform 0.12s;
+}
+.send svg { width: 19px; height: 19px; }
+.send:disabled { opacity: 0.45; cursor: not-allowed; }
+.send:not(:disabled):hover { transform: scale(1.05); }
+.composer-help {
+  max-width: 820px; margin: 8px auto 0; font-size: 0.72rem; color: #9aa1b1; text-align: center;
+}
+
+/* -------------------------------- modal --------------------------------- */
+.scrim {
+  position: fixed; inset: 0; background: rgba(18, 22, 42, 0.35);
+  backdrop-filter: blur(2px); z-index: 40;
+}
+.modal {
+  border: 0; border-radius: 20px; padding: 0; width: min(560px, calc(100vw - 32px));
+  box-shadow: var(--shadow-md); color: var(--ink); z-index: 50;
+}
+.modal::backdrop { background: rgba(18, 22, 42, 0.4); }
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px 10px;
+}
+.modal-head h2 { font-size: 1.05rem; }
+.modal-head .icon-btn { display: inline-flex; }
+.modal-intro { padding: 0 20px; font-size: 0.83rem; color: var(--muted); line-height: 1.55; }
+.memory-list { padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; max-height: 40dvh; overflow-y: auto; }
+.memory-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--surface-2);
+}
+.memory-item .key { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; }
+.memory-item .value { font-size: 0.88rem; overflow-wrap: anywhere; }
+.memory-item button {
+  margin-left: auto; border: 0; background: transparent; color: var(--muted);
+  cursor: pointer; border-radius: 8px; padding: 4px; line-height: 0;
+}
+.memory-item button:hover { color: var(--danger); background: var(--danger-soft); }
+.memory-form { padding: 4px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+.field-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.field-row label { flex: 1 1 160px; display: flex; flex-direction: column; gap: 5px; font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+.field-row input {
+  border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px;
+  font-size: 0.9rem; outline: none; background: #fff;
+}
+.field-row input:focus { border-color: #cdc2ff; box-shadow: 0 0 0 3px rgba(109, 74, 255, 0.1); }
+.checkbox { display: flex; gap: 9px; align-items: flex-start; font-size: 0.8rem; color: var(--ink-soft); line-height: 1.45; }
+.checkbox input { margin-top: 2px; accent-color: var(--brand); }
+.modal-actions { display: flex; justify-content: flex-end; }
+.form-error { color: var(--danger); font-size: 0.8rem; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  background: var(--ink); color: #fff; padding: 11px 18px; border-radius: 999px;
+  font-size: 0.84rem; box-shadow: var(--shadow-md); z-index: 60; max-width: min(90vw, 520px);
+}
+
+/* ------------------------------ responsivo ------------------------------ */
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar {
+    position: fixed; inset: 0 auto 0 0; width: min(86vw, 320px); z-index: 45;
+    transform: translateX(-102%); transition: transform 0.22s ease;
+    box-shadow: var(--shadow-md);
+  }
+  body.sidebar-open .sidebar { transform: none; }
+  .sidebar-close { display: inline-flex; }
+  .brand { position: sticky; top: 0; }
+  .topbar #sidebar-open { display: inline-flex; }
+  .chat { padding: 18px 14px 4px; gap: 14px; }
+  .welcome { padding: 20px 18px; border-radius: 18px; }
+  .welcome h2 { font-size: 1.15rem; }
+  .msg.user .msg-body { max-width: 92%; }
+  .composer-wrap { padding: 10px 12px max(12px, env(safe-area-inset-bottom)); }
+  .composer-help { display: none; }
+  .model-pill { max-width: 130px; font-size: 0.68rem; }
+  .topbar { padding: 10px 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  .chat-scroll { scroll-behavior: auto; }
+}
+
+@media print {
+  .sidebar, .composer-wrap, .topbar-actions { display: none; }
+}
+
+</style>
+  </head>
+  <body>
+    <a class="skip-link" href="#composer-input">Ir para o campo de mensagem</a>
+
+    <div class="app" id="app">
+      <!-- ---------------------------------------------------------------- -->
+      <aside class="sidebar" id="sidebar" aria-label="Conversas, memória e status">
+        <header class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 40 40" role="img" aria-label="Kirana">
+              <defs>
+                <linearGradient id="kg" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#7c5cff" />
+                  <stop offset="100%" stop-color="#22b8a6" />
+                </linearGradient>
+              </defs>
+              <rect x="2" y="2" width="36" height="36" rx="12" fill="url(#kg)" />
+              <path d="M14 11v18M14 20l8.5-9M14 20l9 9" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+              <circle cx="28" cy="13" r="2.1" fill="#fff" opacity=".9" />
+            </svg>
+          </div>
+          <div class="brand-text">
+            <strong>Kirana</strong>
+            <span>Opportunity AI · local</span>
+          </div>
+          <button class="icon-btn sidebar-close" id="sidebar-close" aria-label="Fechar menu" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+          </button>
+        </header>
+
+        <button class="btn btn-primary new-chat" id="new-chat" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+          Nova conversa
+        </button>
+
+        <section class="sidebar-section" aria-labelledby="history-title">
+          <h2 id="history-title">Conversas</h2>
+          <ul class="history" id="history"></ul>
+          <p class="empty-hint" id="history-empty">Nenhuma conversa ainda.</p>
+        </section>
+
+        <section class="sidebar-section" aria-labelledby="tools-title">
+          <h2 id="tools-title">Ferramentas</h2>
+          <ul class="tool-list" id="tool-list"></ul>
+        </section>
+
+        <footer class="sidebar-footer">
+          <button class="btn btn-ghost" id="open-memory" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a4 4 0 0 0-4 4v1a3 3 0 0 0 0 6v1a4 4 0 0 0 8 0v-1a3 3 0 0 0 0-6V7a4 4 0 0 0-4-4Z" stroke="currentColor" stroke-width="1.7" fill="none" /></svg>
+            Memória
+            <span class="badge" id="memory-count">0</span>
+          </button>
+          <div class="status" id="status" role="status" aria-live="polite">
+            <span class="dot" id="status-dot"></span>
+            <span class="status-text" id="status-text">Verificando gateway…</span>
+          </div>
+          <p class="fineprint">Versão local de desenvolvimento. A chave do gateway fica apenas no backend.</p>
+        </footer>
+      </aside>
+
+      <!-- ---------------------------------------------------------------- -->
+      <main class="main">
+        <header class="topbar">
+          <button class="icon-btn" id="sidebar-open" aria-label="Abrir menu" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+          </button>
+          <div class="topbar-title">
+            <h1>Kirana</h1>
+            <p id="session-title">Conversa nova</p>
+          </div>
+          <div class="topbar-actions">
+            <span class="model-pill" id="model-pill" title="Modelo em uso">—</span>
+            <button class="icon-btn" id="refresh-status" aria-label="Atualizar status" type="button" title="Atualizar status">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="chat-scroll" id="chat-scroll">
+          <div class="chat" id="chat" aria-live="polite" aria-relevant="additions text">
+            <section class="welcome" id="welcome">
+              <div class="welcome-avatar" aria-hidden="true">
+                <svg viewBox="0 0 64 64"><use href="#kirana-face" /></svg>
+              </div>
+              <h2>Oi! Eu sou a Kirana.</h2>
+              <p>
+                Sou a assistente virtual da <strong>Opportunity AI</strong>. Posso explicar nossas soluções,
+                consultar o catálogo de serviços e produtos, verificar o andamento de um projeto e registrar
+                um interesse de contato.
+              </p>
+              <div class="suggestions" id="suggestions">
+                <button type="button" class="chip">O que a Opportunity AI faz?</button>
+                <button type="button" class="chip">Preciso melhorar meu atendimento no WhatsApp</button>
+                <button type="button" class="chip">Qual o status do projeto PRJ-001?</button>
+                <button type="button" class="chip">Quero falar com a equipe sobre um projeto</button>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div class="composer-wrap">
+          <div class="composer-status" id="composer-status" hidden>
+            <span class="spinner" aria-hidden="true"></span>
+            <span id="composer-status-text">Kirana está escrevendo…</span>
+            <button class="btn btn-stop" id="stop" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" /></svg>
+              Interromper
+            </button>
+          </div>
+
+          <form class="composer" id="composer" autocomplete="off">
+            <label class="sr-only" for="composer-input">Mensagem para a Kirana</label>
+            <textarea
+              id="composer-input"
+              name="message"
+              rows="1"
+              maxlength="8000"
+              placeholder="Escreva sua mensagem para a Kirana…"
+              aria-describedby="composer-help"
+            ></textarea>
+            <button class="send" id="send" type="submit" aria-label="Enviar mensagem" title="Enviar (Enter)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 8 6 8-16-8Z" fill="currentColor" /></svg>
+            </button>
+          </form>
+          <p class="composer-help" id="composer-help">
+            Enter envia · Shift + Enter quebra linha · Kirana pode cometer erros; confirme informações importantes.
+          </p>
+        </div>
+      </main>
+    </div>
+
+    <div class="scrim" id="scrim" hidden></div>
+
+    <!-- Memória ---------------------------------------------------------- -->
+    <dialog class="modal" id="memory-modal" aria-labelledby="memory-title">
+      <header class="modal-head">
+        <h2 id="memory-title">Memória autorizada</h2>
+        <button class="icon-btn" id="memory-close" aria-label="Fechar" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+        </button>
+      </header>
+      <p class="modal-intro">
+        Só guardo o que você autorizar aqui. Você pode ver, corrigir e apagar a qualquer momento.
+        Não guardo senhas, documentos, cartões ou dados sensíveis.
+      </p>
+      <ul class="memory-list" id="memory-list"></ul>
+      <form class="memory-form" id="memory-form">
+        <div class="field-row">
+          <label>
+            <span>Chave</span>
+            <input name="key" maxlength="80" placeholder="ex.: nome" required />
+          </label>
+          <label>
+            <span>Valor</span>
+            <input name="value" maxlength="400" placeholder="ex.: Ana" required />
+          </label>
+        </div>
+        <label class="checkbox">
+          <input type="checkbox" name="consent" required />
+          <span>Autorizo a Kirana a guardar esta informação nesta instalação.</span>
+        </label>
+        <div class="modal-actions">
+          <button class="btn btn-primary" type="submit">Guardar</button>
+        </div>
+        <p class="form-error" id="memory-error" role="alert" hidden></p>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+    <svg width="0" height="0" aria-hidden="true" style="position: absolute">
+      <symbol id="kirana-face" viewBox="0 0 64 64">
+        <defs>
+          <linearGradient id="kf" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#7c5cff" />
+            <stop offset="100%" stop-color="#22b8a6" />
+          </linearGradient>
+        </defs>
+        <rect x="2" y="2" width="60" height="60" rx="20" fill="url(#kf)" />
+        <circle cx="24" cy="29" r="3.2" fill="#fff" />
+        <circle cx="40" cy="29" r="3.2" fill="#fff" />
+        <path d="M24 42c4.5 3.5 11.5 3.5 16 0" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" />
+      </symbol>
+    </svg>
+
+    <style>
+  .preview-banner {
+    position: fixed; z-index: 80; left: 50%; bottom: 16px; transform: translateX(-50%);
+    background: #12162a; color: #fff; font: 600 12px/1.4 "Segoe UI", system-ui, sans-serif;
+    padding: 9px 16px; border-radius: 999px; box-shadow: 0 10px 24px rgba(18, 22, 42, .28);
+    opacity: .94; white-space: nowrap;
+  }
+  @media (max-width: 640px) { .preview-banner { white-space: normal; text-align: center; width: calc(100vw - 32px); } }
+</style>
+<script>
+  (function () {
+    const chat = document.getElementById('chat');
+    const welcome = document.getElementById('welcome');
+    if (welcome) welcome.remove();
+
+    const history = [
+      { title: 'Atendimento no WhatsApp', active: true, pending: true },
+      { title: 'Status do projeto PRJ-001' },
+      { title: 'Como funciona o Opportunity CRM' },
+      { title: 'Sobre agentes de voz' },
+    ];
+    const list = document.getElementById('history');
+    list.innerHTML = history
+      .map(
+        (item) =>
+          '<li><button class="history-item" type="button" aria-current="' + (item.active ? 'true' : 'false') + '">' +
+          '<span class="title">' + item.title + '</span>' +
+          (item.pending ? '<span class="dot-pending"></span>' : '') +
+          '<span class="del"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>' +
+          '</button></li>',
+      )
+      .join('');
+    document.getElementById('history-empty').hidden = true;
+
+    const tools = [
+      ['leitura', 'Consultar serviços'],
+      ['leitura', 'Consultar produtos'],
+      ['leitura', 'Consultar status de projeto'],
+      ['leitura', 'Consultar memória'],
+      ['escrita', 'Registrar interesse comercial'],
+      ['escrita', 'Guardar informação autorizada'],
+    ];
+    document.getElementById('tool-list').innerHTML = tools
+      .map(
+        (pair) =>
+          '<li><span class="kind ' + (pair[0] === 'escrita' ? 'write' : 'read') + '">' + pair[0] + '</span><span>' + pair[1] + '</span></li>',
+      )
+      .join('');
+
+    document.getElementById('status-dot').className = 'dot ok';
+    document.getElementById('status-text').textContent = 'Gateway conectado (exemplo)';
+    document.getElementById('model-pill').textContent = 'gpt-6-luna';
+    document.getElementById('session-title').textContent = 'Atendimento no WhatsApp';
+    document.getElementById('memory-count').textContent = '2';
+    document.getElementById('composer-status').hidden = true;
+    document.getElementById('composer-input').value = '';
+
+    function avatar(text) {
+      return '<div class="msg-avatar" aria-hidden="true">' + text + '</div>';
+    }
+    function userMsg(text) {
+      return '<article class="msg user">' + avatar('Você') +
+        '<div class="msg-body"><div class="bubble"><p>' + text + '</p></div></div></article>';
+    }
+    function botMsg(html, meta) {
+      return '<article class="msg assistant">' + avatar('K') +
+        '<div class="msg-body"><div class="bubble">' + html + '</div>' +
+        '<div class="msg-meta">' + (meta || '') + '</div></div></article>';
+    }
+
+    const transcript = [
+      userMsg('Oi! Preciso responder as mesmas dúvidas no WhatsApp todos os dias, fora do horário. Vocês ajudam com isso?'),
+      botMsg(
+        '<p>Oi! Ajudamos sim — esse é justamente o cenário de <strong>Atendimento digital e WhatsApp</strong>.</p>' +
+        '<p>Na prática, a Opportunity AI monta uma triagem que responde dúvidas comuns, organiza os interessados e passa para uma pessoa quando necessário. O escopo é definido caso a caso, a partir do seu processo.</p>' +
+        '<p>Quer que eu detalhe como seria no seu caso ou prefere que eu registre um pedido de contato com a equipe?</p>',
+        '<span class="pill tool-ok">Consultar serviços · ok</span><span class="pill">gpt-6-luna</span>' +
+        '<span class="pill">412 ms até 1º token</span><span class="pill">2,1 s total</span>',
+      ),
+      userMsg('Quero falar com a equipe. Meu nome é Ana, da Clínica Vida, e o melhor contato é ana@clinicavida.com.br'),
+      botMsg(
+        '<p>Perfeito, Ana. Preparei o registro do seu interesse:</p>' +
+        '<p><strong>Ana · Clínica Vida</strong> — e-mail ana@clinicavida.com.br, tema: atendimento no WhatsApp.</p>' +
+        '<p>Nada é gravado antes da sua confirmação — é só confirmar abaixo.</p>',
+        '<span class="pill tool-warn">Registrar interesse · aguardando</span><span class="pill">gpt-6-luna</span>',
+      ),
+    ];
+    chat.innerHTML = transcript.join('');
+
+    const card = document.createElement('article');
+    card.className = 'msg assistant';
+    card.innerHTML =
+      '<div class="msg-avatar" aria-hidden="true">K</div>' +
+      '<div class="msg-body">' +
+      '<div class="confirm-card">' +
+      '<h3>Confirmação necessária</h3>' +
+      '<p class="summary">Registrar interesse comercial de Ana (Clínica Vida). Contato: e-mail ana@clinicavida.com.br. Interesse: Atendimento digital no WhatsApp.</p>' +
+      '<p class="note">Nada é gravado nem enviado antes da sua confirmação.</p>' +
+      '<div class="confirm-actions">' +
+      '<button class="btn btn-primary" type="button" disabled>Sim, confirmar</button>' +
+      '<button class="btn btn-ghost" type="button" disabled>Não, cancelar</button>' +
+      '</div></div></div>';
+    chat.appendChild(card);
+
+    const banner = document.createElement('div');
+    banner.className = 'preview-banner';
+    banner.textContent = 'Prévia estática da interface · a aplicação real roda com npm start';
+    document.body.appendChild(banner);
+  })();
+</script>
+
+  </body>
+</html>

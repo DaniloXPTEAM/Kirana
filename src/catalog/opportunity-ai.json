@@ -1,0 +1,35 @@
+{
+  "version": "2026.10.24",
+  "verifiedAt": "2026-10-24",
+  "fonte": "https://opportunity.ia.br (site oficial, consultado em 24/10/2026)",
+  "organizacao": {
+    "nome": "Opportunity AI",
+    "posicionamento": "Tecnologia aplicada: cria e experimenta soluções de IA, automação comercial, agentes inteligentes e experiências digitais para aproximar tecnologia e resultados concretos.",
+    "site": "https://opportunity.ia.br",
+    "whatsapp": "https://wa.me/5585999462763",
+    "formulario_de_contato": "https://opportunity.ia.br/contato",
+    "politica_de_privacidade": "https://opportunity.ia.br/privacidade",
+    "labs": "https://opportunity.ia.br/labs/"
+  },
+  "como_trabalhamos": [
+    "Entender a necessidade: conversamos sobre o processo e o que precisa melhorar.",
+    "Desenhar a solução: definimos escopo, ferramentas e responsabilidades.",
+    "Prototipar: montamos uma primeira versão para validar a ideia.",
+    "Testar: experimentamos com casos reais e ajustamos.",
+    "Evoluir e integrar: conectamos aos sistemas e melhoramos continuamente."
+  ],
+  "fluxo_de_atendimento": [
+    "Novo contato: mensagem recebida.",
+    "Qualificação: o agente identifica o interesse.",
+    "CRM: registro no funil comercial.",
+    "Atendimento: uma pessoa assume com o resumo."
+  ],
+  "canais_previstos": ["WhatsApp", "Site", "Voz", "E-mail"],
+  "restricoes_de_conhecimento": [
+    "Não há tabela de preços pública confirmada. Escopo e valores são definidos caso a caso pela equipe.",
+    "Não há prazos, SLAs ou garantias de resultado publicados. Não invente nenhum.",
+    "Não há lista pública de clientes, cases ou depoimentos confirmados neste sistema.",
+    "O site informa que modelos como o Claude, da Anthropic, estão em avaliação e planejamento, sem parceria oficial nem integração concluída."
+  ],
+  "observacao": "Informações institucionais extraídas do site oficial em 24/10/2026. Se algo não estiver aqui, a Kirana deve dizer que não tem confirmação e oferecer contato humano."
+}

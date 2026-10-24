@@ -1,0 +1,16 @@
+# credenciais
+.env
+.env.*
+!.env.example
+
+# dados locais (sessões, memória, interesses comerciais)
+data/
+
+# logs
+*.log
+logs/
+
+# dependências e artefatos
+node_modules/
+coverage/
+.DS_Store

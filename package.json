@@ -1,0 +1,27 @@
+{
+  "name": "kirana-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kirana — agente conversacional da Opportunity AI (Fase 1, execução local)",
+  "type": "module",
+  "engines": {
+    "node": ">=20.6.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "mock": "node scripts/mock-gateway.js",
+    "doctor": "node scripts/doctor.mjs",
+    "bench": "node scripts/benchmark.mjs",
+    "test": "node --test test/"
+  },
+  "keywords": [
+    "kirana",
+    "opportunity-ai",
+    "agente",
+    "chatgpt-gateway"
+  ],
+  "license": "UNLICENSED",
+  "dependencies": {},
+  "devDependencies": {}
+}
