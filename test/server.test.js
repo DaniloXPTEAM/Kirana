@@ -71,6 +71,15 @@ test('conversa completa com streaming preserva contexto', async () => {
     assert.equal(secondRequest.messages[0].role, 'system');
     assert.match(secondRequest.messages[0].content, /Kirana/);
 
+    // Regressão do Gateway v0.2.0: nenhum campo fora do contrato pode sair.
+    for (const request of gateway.requests) {
+      assert.equal('temperature' in request, false, 'temperature não deve ser enviado ao gateway');
+      assert.equal('parallel_tool_calls' in request, false);
+      assert.equal('max_tokens' in request, false);
+      const allowed = ['model', 'messages', 'stream', 'tools'];
+      for (const field of Object.keys(request)) assert.ok(allowed.includes(field), `campo inesperado no payload: ${field}`);
+    }
+
     const { body } = await getJson(kirana.base, `/api/session/${session.id}`);
     assert.equal(body.messages.length, 4);
     assert.equal(body.messages[0].role, 'user');

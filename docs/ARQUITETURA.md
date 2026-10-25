@@ -91,6 +91,50 @@ Comentários `: ping` a cada 15 s mantêm conexões vivas atrás de proxies.
   `model_unavailable`, timeouts). Assim não há risco de duplicar texto, ferramentas ou ações.
 - `aborted`, `gateway_auth` e erros de validação nunca acionam fallback.
 
+## 5.1 Payload enviado ao gateway
+
+Montado exclusivamente em `src/payload.js` (allowlist):
+
+| Campo | Quando é enviado |
+|---|---|
+| `model` | sempre |
+| `messages` | sempre (saneadas: sem chaves internas, `content` string) |
+| `stream` | sempre (`true`) |
+| `tools` | quando a rodada tem ferramentas |
+| `temperature` | só com `KIRANA_SEND_TEMPERATURE=true` (**padrão: não**) |
+| `max_tokens` | só com `KIRANA_SEND_MAX_TOKENS=true` (**padrão: não**) |
+| `tool_choice` | só com `KIRANA_SEND_TOOL_CHOICE=true` (**padrão: não**) |
+| `parallel_tool_calls`, `top_p`, penalidades, `seed`, `stop`… | nunca |
+
+`assertAllowedFields()` derruba a requisição no backend se algo fora da allowlist escapar, e
+`extractUnsupportedField()` + remoção com repetição única tratam o HTTP 400
+`unsupported_parameter` do Gateway v0.2.0.
+
+## 5.2 Orquestração (LangGraph)
+
+O turno é um `StateGraph` (`src/graph.js`):
+
+```text
+START → prepare → model ──► finalize → END
+            ▲        ├─ tool_calls e rounds ≤ limite ─► tools ─┘
+            └────────┘
+                     └─ rounds > limite ─► overflow ─► finalize
+```
+
+- **prepare**: monta mensagens + ferramentas da rodada (respeita `allowWrite`).
+- **model**: chama `callModel` (gateway + fallback) e emite `start`/`delta`.
+- **tools**: leitura executa; escrita cria ação pendente (nunca executa).
+- **overflow**: limite de rodadas — responde **todas** as chamadas e encerra.
+- **finalize**: métricas da sessão + evento `done` (inclui `orchestrator`).
+
+O grafo não monta payload nem fala HTTP: recebe primitivas de `src/agent.js`. Contrato do gateway
+continua isolado em `payload.js` + `contract.js`. `KIRANA_ORCHESTRATOR=legacy` volta ao loop
+anterior; `test/orchestrator.test.js` compara os dois modos e exige fluxo idêntico.
+
+Estado por turno (sem checkpointer — a sessão em disco é a fonte de verdade):
+`io, rounds, messages, toolSchemas, activeTools, result, allowWrite, toolCallsTotal, firstTtft,
+activeModel, fallbackUsed, pendingAnnounced, error, trace`.
+
 ## 6. Persistência local
 
 ```text

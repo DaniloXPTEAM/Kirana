@@ -13,6 +13,8 @@
 import { randomUUID } from 'node:crypto';
 import { buildSystemPrompt } from './prompts.js';
 import { buildContextMessages } from './sessions.js';
+import { validateGatewayPayload } from './contract.js';
+import { createTurnGraph, initialTurnState } from './graph.js';
 
 export const EVENTS = {
   session: 'session',
@@ -36,6 +38,8 @@ class TurnError extends Error {
 
 export function createAgent({ config, gateway, registry, sessions, memory, logger, catalog }) {
   const log = logger?.child?.('agent') ?? logger;
+  /** 'langgraph' (padrão) ou 'legacy' — permite rollback e teste de paridade. */
+  const orchestrator = config.agent.orchestrator === 'legacy' ? 'legacy' : 'langgraph';
   let modelCache = { at: 0, value: null };
 
   /* ------------------------------- modelos -------------------------------- */
@@ -77,7 +81,19 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
       catalogMeta: catalog.meta,
     });
     const history = buildContextMessages(session.messages, config.agent.historyLimit);
-    return [{ role: 'system', content: system }, ...history.map(toApiMessage)];
+    const messages = [{ role: 'system', content: system }, ...history.map(toApiMessage)];
+
+    // Invariante do agente: conversa sempre começa pela identidade da Kirana.
+    const problems = validateGatewayPayload(
+      { model: 'validacao-interna', messages, stream: true },
+      { allowOptInFields: true, requireSystemPrompt: true },
+    );
+    if (problems.length) {
+      throw Object.assign(new Error(`Contexto inválido para o gateway: ${problems.map((p) => `${p.path}: ${p.message}`).join(' | ')}`), {
+        code: 'gateway_contract_error',
+      });
+    }
+    return messages;
   }
 
   function toolResultContent(payload) {
@@ -106,6 +122,7 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
           model,
           tools,
           signal,
+          // Só é enviado ao gateway se KIRANA_SEND_TEMPERATURE=true.
           temperature: temperatureOverride ?? config.agent.temperature,
           onDelta: (text) => emit({ type: EVENTS.delta, text }),
         });
@@ -187,7 +204,197 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
     return action;
   }
 
+  /* ---------------------- primitivas do orquestrador ---------------------- */
+
+  /**
+   * Monta as mensagens e as ferramentas de uma rodada.
+   * Chamado pelo nó `prepare` do grafo LangGraph.
+   */
+  function prepareRound(state) {
+    const { session } = state.io;
+    const allowWrite = state.allowWrite !== false;
+    const writeToolNames = new Set(registry.writeTools().map((t) => t.name));
+
+    const tools = registry.openAISchemas().filter((schema) => allowWrite || !writeToolNames.has(schema.function.name));
+    const activeTools = registry
+      .list()
+      .filter((t) => allowWrite || t.kind !== 'write')
+      .map((t) => ({ name: t.name, kind: t.kind, description: t.description.split('. ')[0] }));
+
+    const messages = buildApiMessages(session, { activeToolsDescription: activeTools });
+    return { messages, toolSchemas: tools, activeTools };
+  }
+
+  /** Chamada ao modelo com fallback + evento `start` (usada pelo nó `model`). */
+  async function orchestratorCallModel({ messages, tools, signal, emit, io }) {
+    const result = await callModel({
+      messages,
+      tools,
+      signal,
+      emit,
+      temperatureOverride: io?.temperatureOverride,
+    });
+    emit({ type: EVENTS.start, model: result.model, requested: result.requestedModel, fallbackUsed: result.fallbackUsed });
+    return result;
+  }
+
+  function persistAssistant(result, io) {
+    sessions.append(io.session, {
+      role: 'assistant',
+      content: result.text || '',
+      toolCalls: result.toolCalls.length
+        ? result.toolCalls.map((c) => ({ id: c.id, name: c.function.name, arguments: c.function.arguments }))
+        : undefined,
+      model: result.model,
+      ttftMs: result.ttftMs,
+      usage: result.usage || undefined,
+    });
+  }
+
+  function persistToolMessage(call, content, io) {
+    sessions.append(io.session, { role: 'tool', toolCallId: call.id, name: call.function?.name, content });
+  }
+
+  /**
+   * Executa (ou prepara) uma chamada de ferramenta.
+   * Leitura roda de imediato; escrita só cria ação pendente.
+   */
+  async function handleToolCall({ call, io, allowWrite, pendingActionExists, emit }) {
+    const name = call.function?.name;
+    const tool = registry.get(name);
+
+    if (!tool) {
+      emit({ type: EVENTS.toolResult, name, title: name, ok: false, errorCode: 'unknown_tool' });
+      return { content: toolResultContent({ ok: false, erro: { codigo: 'unknown_tool', mensagem: `Ferramenta desconhecida: ${name}` } }) };
+    }
+
+    if (tool.kind === 'write' && !allowWrite) {
+      return {
+        content: toolResultContent({
+          ok: false,
+          erro: { codigo: 'write_not_allowed', mensagem: 'Ações de escrita não estão disponíveis nesta rodada (já houve uma ação pendente).' },
+        }),
+      };
+    }
+
+    emit({ type: EVENTS.toolStart, name, title: tool.title, kind: tool.kind });
+
+    if (tool.kind === 'read') {
+      const out = await runReadTool(call, io.ctx, io.toolCache);
+      emit({ type: EVENTS.toolResult, name, title: tool.title, ok: out.ok, cached: Boolean(out.cached), errorCode: out.errorCode || null });
+      return { content: out.content };
+    }
+
+    // Ferramenta de escrita: valida agora, executa só após confirmação.
+    const validation = registry.validate(name, call.function?.arguments);
+    if (!validation.ok) {
+      emit({ type: EVENTS.toolResult, name, title: tool.title, ok: false, errorCode: 'invalid_args', details: validation.errors });
+      return {
+        content: toolResultContent({
+          ok: false,
+          erro: { codigo: 'invalid_args', mensagem: 'Argumentos inválidos. Peça ao usuário os dados que faltam ou corrija.', detalhes: validation.errors },
+        }),
+      };
+    }
+
+    if (pendingActionExists || io.session.pendingAction) {
+      return {
+        content: toolResultContent({
+          ok: false,
+          erro: { codigo: 'confirmation_pending', mensagem: 'Já existe uma ação aguardando confirmação. Aguarde a decisão do usuário.' },
+        }),
+      };
+    }
+
+    const action = createPendingAction(io.session, { name, args: validation.args, toolCallId: call.id });
+    emit({ type: EVENTS.toolResult, name, title: tool.title, ok: false, errorCode: 'confirmation_required' });
+    emit({
+      type: EVENTS.confirmation,
+      action: { id: action.id, tool: action.tool, title: action.title, summary: action.summary, expiresAt: action.expiresAt },
+    });
+
+    return {
+      pending: action,
+      content: toolResultContent({
+        ok: false,
+        status: 'aguardando_confirmacao',
+        action_id: action.id,
+        mensagem:
+          'Nada foi executado ainda. A interface mostrou um pedido de confirmação ao usuário. Diga em uma frase que você preparou a ação e que ela só será concluída após a confirmação dele.',
+      }),
+    };
+  }
+
+  /** Métricas + evento `done` (nó `finalize`). */
+  function finalizeTurnState(state) {
+    const { emit, session } = state.io;
+    const responseMs = Date.now() - state.io.startedAt;
+    const pending = state.pendingAnnounced;
+
+    sessions.recordMetrics(session, {
+      ttftMs: state.firstTtft,
+      totalMs: responseMs,
+      toolCalls: state.toolCallsTotal ?? 0,
+    });
+
+    emit({
+      type: EVENTS.done,
+      model: state.activeModel || config.models.primary,
+      fallbackUsed: Boolean(state.fallbackUsed),
+      ttftMs: state.firstTtft,
+      totalMs: responseMs,
+      rounds: state.rounds,
+      toolCalls: state.toolCallsTotal ?? 0,
+      pendingAction: pending ? { id: pending.id, tool: pending.tool, summary: pending.summary, expiresAt: pending.expiresAt } : null,
+      orchestrator,
+    });
+
+    return { responseMs };
+  }
+
+  /* ---------------------------------- grafo -------------------------------- */
+
+  const turnGraph = createTurnGraph({
+    prepareRound,
+    callModel: orchestratorCallModel,
+    handleToolCall,
+    persistAssistant,
+    persistToolMessage,
+    finalize: finalizeTurnState,
+    toolResultContent,
+    maxToolRounds: () => config.agent.maxToolRounds,
+  });
+
   /* -------------------------------- turno --------------------------------- */
+
+  function handleTurnError(error, { session, startedAt, firstTtft, toolCallsTotal, activeModel, emit }) {
+    const aborted = error?.code === 'aborted' || error?.name === 'AbortError';
+    const mapped = mapError(error, config);
+
+    sessions.recordMetrics(session, {
+      ttftMs: firstTtft,
+      totalMs: Date.now() - startedAt,
+      aborted,
+      error: !aborted,
+      toolCalls: toolCallsTotal,
+    });
+
+    if (aborted) {
+      const last = [...session.messages].reverse().find((m) => m.role === 'assistant');
+      if (last) {
+        if (!last.content) last.content = '';
+        last.aborted = true;
+      }
+      sessions.save(session);
+      log.info('Geração interrompida pelo usuário', { sessionId: session.id });
+      emit({ type: EVENTS.done, aborted: true, model: activeModel, totalMs: Date.now() - startedAt });
+      return { ok: false, aborted: true };
+    }
+
+    log.error('Falha no turno', { code: error?.code, message: error?.message });
+    emit({ type: EVENTS.error, ...mapped });
+    return { ok: false, error: mapped };
+  }
 
   async function runTurn({ session, text, emit, signal, temperatureOverride }) {
     const clean = String(text ?? '').trim();
@@ -197,181 +404,42 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
     clearPendingAction(session, 'o usuário continuou a conversa sem confirmar a ação anterior');
     sessions.append(session, { role: 'user', content: clean });
 
-    const turnStartedAt = Date.now();
-    const ctx = { sessionId: session.id, memory, sessions, config, catalog, logger };
-    const toolCache = new Map();
-    const writeToolNames = new Set(registry.writeTools().map((t) => t.name));
-    let allowWriteTools = true;
-    let rounds = 0;
-    let toolCallsTotal = 0;
-    let firstTtft = null;
-    let activeModel = null;
-    let fallbackUsed = false;
-    let aborted = false;
-    let pendingAnnounced = null;
+    const startedAt = Date.now();
+    const io = {
+      emit,
+      signal,
+      session,
+      temperatureOverride,
+      startedAt,
+      ctx: { sessionId: session.id, memory, sessions, config, catalog, logger },
+      toolCache: new Map(),
+    };
 
     try {
-      while (rounds <= config.agent.maxToolRounds) {
-        rounds += 1;
+      const state = await turnGraph.invoke(initialTurnState({ io }));
 
-        const toolsForRound = registry.openAISchemas().filter((schema) => allowWriteTools || !writeToolNames.has(schema.function.name));
-        const activeTools = registry
-          .list()
-          .filter((t) => allowWriteTools || t.kind !== 'write')
-          .map((t) => ({ name: t.name, kind: t.kind, description: t.description.split('. ')[0] }));
+      const responseMs = Date.now() - startedAt;
+      log.debug?.('Turno concluído', { orchestrator, nos: state.trace?.join(' → '), rounds: state.rounds, ms: responseMs });
 
-        const messages = buildApiMessages(session, { activeToolsDescription: activeTools });
-
-        const result = await callModel({ messages, tools: toolsForRound, signal, emit, temperatureOverride });
-        activeModel = result.model;
-        fallbackUsed = fallbackUsed || result.fallbackUsed;
-        if (firstTtft === null && Number.isFinite(result.ttftMs)) firstTtft = result.ttftMs;
-
-        emit({ type: EVENTS.start, model: result.model, requested: result.requestedModel, fallbackUsed: result.fallbackUsed });
-
-        sessions.append(session, {
-          role: 'assistant',
-          content: result.text || '',
-          toolCalls: result.toolCalls.length ? result.toolCalls.map((c) => ({ id: c.id, name: c.function.name, arguments: c.function.arguments })) : undefined,
-          model: result.model,
-          ttftMs: result.ttftMs,
-          usage: result.usage || undefined,
-        });
-
-        if (!result.toolCalls.length) break;
-
-        if (rounds > config.agent.maxToolRounds) {
-          sessions.append(session, {
-            role: 'tool',
-            toolCallId: result.toolCalls[0].id,
-            name: result.toolCalls[0].function.name,
-            content: toolResultContent({ ok: false, erro: { codigo: 'too_many_rounds', mensagem: 'Limite de chamadas de ferramenta atingido nesta mensagem.' } }),
-          });
-          break;
-        }
-
-        for (const call of result.toolCalls) {
-          if (signal?.aborted) break;
-          toolCallsTotal += 1;
-          const name = call.function?.name;
-          const tool = registry.get(name);
-
-          if (!tool) {
-            const content = toolResultContent({ ok: false, erro: { codigo: 'unknown_tool', mensagem: `Ferramenta desconhecida: ${name}` } });
-            sessions.append(session, { role: 'tool', toolCallId: call.id, name, content });
-            continue;
-          }
-
-          emit({ type: EVENTS.toolStart, name, title: tool.title, kind: tool.kind });
-
-          if (tool.kind === 'read') {
-            const out = await runReadTool(call, ctx, toolCache);
-            sessions.append(session, { role: 'tool', toolCallId: call.id, name, content: out.content });
-            emit({
-              type: EVENTS.toolResult,
-              name,
-              title: tool.title,
-              ok: out.ok,
-              cached: Boolean(out.cached),
-              errorCode: out.errorCode || null,
-            });
-            continue;
-          }
-
-          // Ferramenta de escrita: valida agora, executa só após confirmação.
-          const validation = registry.validate(name, call.function?.arguments);
-          if (!validation.ok) {
-            const content = toolResultContent({
-              ok: false,
-              erro: { codigo: 'invalid_args', mensagem: 'Argumentos inválidos. Peça ao usuário os dados que faltam ou corrija.', detalhes: validation.errors },
-            });
-            sessions.append(session, { role: 'tool', toolCallId: call.id, name, content });
-            emit({ type: EVENTS.toolResult, name, title: tool.title, ok: false, errorCode: 'invalid_args', details: validation.errors });
-            continue;
-          }
-
-          if (session.pendingAction) {
-            const content = toolResultContent({
-              ok: false,
-              erro: { codigo: 'confirmation_pending', mensagem: 'Já existe uma ação aguardando confirmação. Aguarde a decisão do usuário.' },
-            });
-            sessions.append(session, { role: 'tool', toolCallId: call.id, name, content });
-            continue;
-          }
-
-          const action = createPendingAction(session, { name, args: validation.args, toolCallId: call.id });
-          sessions.append(session, {
-            role: 'tool',
-            toolCallId: call.id,
-            name,
-            content: toolResultContent({
-              ok: false,
-              status: 'aguardando_confirmacao',
-              action_id: action.id,
-              mensagem:
-                'Nada foi executado ainda. A interface mostrou um pedido de confirmação ao usuário. Diga em uma frase que você preparou a ação e que ela só será concluída após a confirmação dele.',
-            }),
-          });
-          emit({ type: EVENTS.toolResult, name, title: tool.title, ok: false, errorCode: 'confirmation_required' });
-          emit({
-            type: EVENTS.confirmation,
-            action: {
-              id: action.id,
-              tool: action.tool,
-              title: action.title,
-              summary: action.summary,
-              expiresAt: action.expiresAt,
-            },
-          });
-          pendingAnnounced = action;
-          // A partir daqui só ferramentas de leitura, para não criar ações em cascata.
-          allowWriteTools = false;
-        }
-      }
-
-      const responseMs = Date.now() - turnStartedAt;
-      sessions.recordMetrics(session, {
-        ttftMs: firstTtft,
+      return {
+        ok: true,
+        model: state.activeModel,
+        ttftMs: state.firstTtft,
         totalMs: responseMs,
-        toolCalls: toolCallsTotal,
-      });
-
-      emit({
-        type: EVENTS.done,
-        model: activeModel || (await resolveActiveModel()).active,
-        fallbackUsed,
-        ttftMs: firstTtft,
-        totalMs: responseMs,
-        rounds,
-        toolCalls: toolCallsTotal,
-        pendingAction: pendingAnnounced
-          ? { id: pendingAnnounced.id, tool: pendingAnnounced.tool, summary: pendingAnnounced.summary, expiresAt: pendingAnnounced.expiresAt }
-          : null,
-      });
-
-      return { ok: true, model: activeModel, ttftMs: firstTtft, totalMs: responseMs };
+        orchestrator,
+        trace: state.trace,
+      };
     } catch (error) {
-      aborted = error?.code === 'aborted' || error?.name === 'AbortError';
-      const mapped = mapError(error, config);
-      sessions.recordMetrics(session, {
-        ttftMs: firstTtft,
-        totalMs: Date.now() - turnStartedAt,
-        aborted,
-        error: !aborted,
-        toolCalls: toolCallsTotal,
+      // O grafo propaga o erro original (GatewayError, abort, etc.):
+      // o tratamento é o mesmo de antes, sem perda de informação.
+      return handleTurnError(error, {
+        session,
+        startedAt,
+        firstTtft: null,
+        toolCallsTotal: 0,
+        activeModel: null,
+        emit,
       });
-      if (aborted) {
-        const last = [...session.messages].reverse().find((m) => m.role === 'assistant');
-        if (last && !last.content) last.content = '';
-        if (last) last.aborted = true;
-        sessions.save(session);
-        log.info('Geração interrompida pelo usuário', { sessionId: session.id });
-        emit({ type: EVENTS.done, aborted: true, model: activeModel, totalMs: Date.now() - turnStartedAt });
-        return { ok: false, aborted: true };
-      }
-      log.error('Falha no turno', { code: error?.code, message: error?.message });
-      emit({ type: EVENTS.error, ...mapped });
-      return { ok: false, error: mapped };
     }
   }
 
@@ -491,7 +559,9 @@ function toApiMessage(message) {
     return { role: 'tool', tool_call_id: message.toolCallId, content: message.content ?? '' };
   }
   if (message.role === 'assistant') {
-    const base = { role: 'assistant', content: message.content || (message.toolCalls?.length ? null : '') };
+    // `content` sempre string: gateways estritos recusam null em mensagens com
+    // tool_calls (e é o formato que a allowlist de payload garante na saída).
+    const base = { role: 'assistant', content: typeof message.content === 'string' ? message.content : '' };
     if (message.toolCalls?.length) {
       base.tool_calls = message.toolCalls.map((call) => ({
         id: call.id,
@@ -530,6 +600,16 @@ export function mapError(error, config = {}) {
     },
     request_timeout: { message: 'A resposta passou do tempo limite. Tente novamente.', recoverable: true },
     gateway_stream_error: { message: 'O streaming falhou no meio da resposta. Tente novamente.', recoverable: true },
+    gateway_contract_error: {
+      message:
+        'O backend montou uma requisição incompatível com o gateway e bloqueou o envio (proteção local). Envie esta mensagem para a equipe técnica com a saída de diagnostico.bat.',
+      recoverable: false,
+    },
+    unsupported_parameter: {
+      message:
+        'O gateway recusou um campo da requisição que não faz parte do contrato dele. O backend já tentou remover o campo automaticamente; se o erro persistir, rode diagnostico.bat e verifique a versão do gateway.',
+      recoverable: false,
+    },
     gateway_http: { message: 'O gateway retornou um erro. Veja os logs do backend para o detalhe técnico.', recoverable: true },
     rate_limited: { message: 'Muitas mensagens em pouco tempo. Aguarde alguns segundos e tente de novo.', recoverable: true },
   };

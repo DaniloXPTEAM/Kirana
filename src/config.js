@@ -70,7 +70,7 @@ export function loadConfig(env = process.env) {
 
   const config = {
     appName: 'Kirana',
-    version: '0.1.0',
+    version: '0.2.0',
     env: env.KIRANA_ENV || 'local',
     host: env.KIRANA_HOST || '127.0.0.1',
     port: toInt(env.KIRANA_PORT, 3000),
@@ -90,6 +90,16 @@ export function loadConfig(env = process.env) {
       requestTimeoutMs: toInt(env.KIRANA_REQUEST_TIMEOUT_MS, 120_000),
       firstTokenTimeoutMs: toInt(env.KIRANA_FIRST_TOKEN_TIMEOUT_MS, 20_000),
     },
+    /**
+     * Campos opcionais do payload. O Gateway v0.2.0 responde HTTP 400
+     * `unsupported_parameter` para campos fora do contrato dele (temperature foi
+     * o caso real observado em 24/10/2026), por isso o padrão é NÃO enviar.
+     */
+    payload: {
+      sendTemperature: toBool(env.KIRANA_SEND_TEMPERATURE, false),
+      sendMaxTokens: toBool(env.KIRANA_SEND_MAX_TOKENS, false),
+      sendToolChoice: toBool(env.KIRANA_SEND_TOOL_CHOICE, false),
+    },
     models: {
       primary: env.KIRANA_PRIMARY_MODEL || 'gpt-6-luna',
       fallback: env.KIRANA_FALLBACK_MODEL || 'gpt-6.1-sol',
@@ -97,6 +107,8 @@ export function loadConfig(env = process.env) {
       probe: toBool(env.KIRANA_MODEL_PROBE, true),
     },
     agent: {
+      /** 'langgraph' (padrão) ou 'legacy' (loop da Fase 1, mantido para rollback). */
+      orchestrator: (env.KIRANA_ORCHESTRATOR || 'langgraph').toLowerCase() === 'legacy' ? 'legacy' : 'langgraph',
       maxToolRounds: toInt(env.KIRANA_MAX_TOOL_ROUNDS, 4),
       historyLimit: toInt(env.KIRANA_HISTORY_LIMIT, 24),
       toolResultMaxChars: toInt(env.KIRANA_TOOL_RESULT_MAX_CHARS, 4000),

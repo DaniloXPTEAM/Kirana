@@ -29,6 +29,12 @@ const DELAY = Number(getArg('delay', process.env.MOCK_DELAY_MS || 25));
 
 const MODELS = ['gpt-6-luna', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-sol', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'];
 
+// Mesmo contrato do Gateway v0.2.0: campos fora desta lista recebem HTTP 400
+// `unsupported_parameter`. Serve para pegar regressões cedo no modo demonstração.
+const ALLOWED_FIELDS = ['model', 'messages', 'stream', 'tools'];
+const OPTIONAL_FIELDS = ['tool_choice'];
+const REJECT_EXTRA = getArg('strict', 'true') !== 'false';
+
 const readBody = async (req) => {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
@@ -84,6 +90,23 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'POST' && url.pathname === '/v1/chat/completions') {
     const body = await readBody(req);
+
+    if (REJECT_EXTRA) {
+      const rejected = Object.keys(body).filter((field) => !ALLOWED_FIELDS.includes(field) && !OPTIONAL_FIELDS.includes(field));
+      if (rejected.length) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            error: {
+              code: 'unsupported_parameter',
+              message: `Unsupported request field: ${rejected[0]}. This gateway only forwards validated ChatGPT-plan-compatible fields.`,
+            },
+          }),
+        );
+        console.log(`[mock-gateway] 400 unsupported_parameter: ${rejected.join(', ')}`);
+        return;
+      }
+    }
     const messages = Array.isArray(body.messages) ? body.messages : [];
     const userText = lastUserText(messages);
     const tools = Array.isArray(body.tools) ? body.tools.map((t) => t.function?.name) : [];

@@ -1,6 +1,6 @@
 # Kirana — agente conversacional da Opportunity AI
 
-**Versão:** 0.1.0 (Fase 1 — execução local)
+**Versão:** 0.2.0 (Fase 1 validada + orquestração LangGraph)
 **Organização:** Opportunity AI
 **Gateway utilizado:** `Kirana-ChatGPT-Gateway v0.2.0` (não modificado)
 **Data desta entrega:** 24/10/2026
@@ -38,7 +38,9 @@ ao navegador.
 
 ## 2. Requisitos
 
-- **Node.js 20.6 ou superior** (testado com Node 20.20). Nenhuma dependência externa — `npm install` não baixa nada.
+- **Node.js 20.6 ou superior** (testado com 20.20 aqui e 24.15 no Windows).
+- **`npm install` é obrigatório** desde a v0.2.0: o orquestrador usa `@langchain/langgraph@1.5.2`
+  e `@langchain/core@1.3.0` (versões exatas). Até a v0.1.2 o projeto era zero-dependência.
 - Windows 10/11 (as instruções usam `.bat`), macOS ou Linux.
 - O `Kirana-ChatGPT-Gateway v0.2.0` rodando em `http://127.0.0.1:1455` com a `GATEWAY_API_KEY` em mãos.
 
@@ -47,7 +49,11 @@ ao navegador.
 ## 3. Instalação no Windows
 
 1. Copie a pasta `kirana` para o computador (por exemplo `C:\CRiando coisa nova\kirana`).
-2. Confirme que o Node está instalado:
+2. Instale as dependências (uma única vez):
+   ```bat
+   npm install
+   ```
+3. Confirme que o Node está instalado:
    ```bat
    node --version
    ```
@@ -132,7 +138,11 @@ Todas as variáveis são opcionais, exceto a chave do gateway. Valores padrão e
 | `KIRANA_REQUEST_TIMEOUT_MS` | Tempo máximo da requisição (`120000`) |
 | `KIRANA_MAX_TOOL_ROUNDS` | Rodadas de ferramenta por mensagem (`4`) |
 | `KIRANA_HISTORY_LIMIT` | Mensagens de histórico enviadas ao modelo (`24`) |
-| `KIRANA_TEMPERATURE` / `KIRANA_MAX_TOKENS` | Geração (`0.6` / `0` = padrão do gateway) |
+| `KIRANA_ORCHESTRATOR` | `langgraph` (padrão) ou `legacy` (rollback para o loop da Fase 1) |
+| `KIRANA_SEND_TEMPERATURE` | Envia `temperature` ao gateway (`false` — v0.2.0 recusa) |
+| `KIRANA_SEND_MAX_TOKENS` | Envia `max_tokens` ao gateway (`false`) |
+| `KIRANA_SEND_TOOL_CHOICE` | Envia `tool_choice` ao gateway (`false`) |
+| `KIRANA_TEMPERATURE` / `KIRANA_MAX_TOKENS` | Valores usados só se os campos acima forem habilitados |
 | `KIRANA_DATA_DIR` | Onde ficam sessões, memória e interesses (`./data`) |
 
 ---
@@ -165,13 +175,40 @@ arquivos ou rede.
 
 ---
 
+## 5.1 Compatibilidade de payload com o Gateway v0.2.0
+
+O Gateway v0.2.0 aceita apenas campos *ChatGPT-plan-compatible* e responde **HTTP 400
+`unsupported_parameter`** para os demais (caso real: `temperature`). Por isso:
+
+- a requisição envia somente `model`, `messages`, `stream` e, quando há ferramentas, `tools`;
+- `temperature`, `max_tokens` e `tool_choice` ficam desligados por padrão (`KIRANA_SEND_*`);
+- `parallel_tool_calls`, penalidades e afins **nunca** são enviados;
+- se o gateway rejeitar um campo assim mesmo, a Kirana **remove o campo e repete uma vez**,
+  antes de qualquer token (sem duplicar texto ou ações);
+- o payload é montado em um único lugar, `src/payload.js`, com allowlist e teste dedicado.
+
+Detalhes e relatório: [`docs/CORRECAO-GATEWAY-V0.2.0.md`](docs/CORRECAO-GATEWAY-V0.2.0.md).
+
+### Auditoria do payload
+
+```bash
+npm run audit        # sonda de contrato ponta a ponta (0 violações esperadas)
+```
+
+### Se aparecer erro 400
+
+1. A mensagem do cartão de erro indica o campo reclamado.
+2. `diagnostico.bat` mostra Node, `.env`, `/health`, `/v1/models` e modelos disponíveis.
+3. Confira se algum `KIRANA_SEND_*` está `true` no `.env` (o padrão é `false`).
+4. Se persistir, copie a mensagem exata — a recuperação automática já remove um campo por vez.
+
 ## 6. Testes
 
 ```bash
-npm test          # ou testar.bat
+npm test          # ou testar.bat — resolve a lista de arquivos, sem glob do shell
 ```
 
-Resultado desta entrega: **67 testes, 67 aprovados, 0 falhas** (~0,9 s).
+Resultado desta entrega: **102 testes, 102 aprovados, 0 falhas** (~3,5 s).
 
 Cobrem, entre outros:
 
@@ -181,6 +218,11 @@ Cobrem, entre outros:
 - sessões (títulos, exclusão, reparo de contexto, métricas);
 - ferramentas (leitura x escrita, argumentos inválidos, ferramenta desconhecida);
 - cliente do gateway (texto, tool calls fragmentadas, 401, 404, 5xx, abort, timeout);
+- payload do gateway (allowlist, ausência de `temperature`, saneamento de mensagens, recuperação
+  de campo rejeitado);
+- contrato completo do payload (`test/contract.test.js`): validação de formato, bloqueio local de
+  payload inválido e fluxos reais (ferramentas, memória, fallback, interrupção) sem nenhuma
+  violação;
 - integração HTTP real: chat com streaming, contexto entre turnos, ciclo completo de ferramenta
   de leitura, fluxo de confirmação (aprovar/recusar/expirar), fallback de modelo, rate limit,
   token de acesso, bloqueio de origem, erros de entrada e memória via API.
@@ -237,7 +279,11 @@ kirana/
 │  ├─ config.js / logger.js / sse.js / validation.js / ratelimit.js / http-utils.js
 ├─ public/                       # interface (HTML/CSS/JS, sem dependências)
 ├─ scripts/                      # mock-gateway, doctor, benchmark, build-preview
-├─ test/                         # 67 testes automatizados
+├─ src/payload.js                # montagem/allowlist do payload do gateway
+├─ src/contract.js               # contrato do payload (validação local)
+├─ src/graph.js                  # orquestrador LangGraph (prepare→model→tools→finalize)
+├─ scripts/run-tests.mjs         # executor de testes multiplataforma
+├─ test/                         # 102 testes automatizados
 └─ docs/                         # arquitetura, integração, segurança, relatório
 ```
 
