@@ -26,6 +26,23 @@
 - Testes: **+38** (9 limpeza de texto, 16 máquina de estados, 13 rotas HTTP) e
   **34 verificações de navegador** com áudio real (`test/browser/voice-flow.mjs`).
 
+### Dependências e instalação (padronizado em pnpm)
+- **`package-lock.json` removido**: era da v0.2.0, não tinha o CopilotKit nem o AG-UI e
+  induzia uma instalação errada para quem seguia o `npm install` do README.
+- **`pnpm-lock.yaml` é a única fonte da verdade** da árvore de dependências; conferido
+  pacote a pacote contra o `package.json` da v0.4.0 (12 dependências, nenhuma extra).
+- **`packageManager: pnpm@9.15.9`** fixado no `package.json`: sem isso o `corepack` puxa
+  o pnpm 12.x, cuja política de `minimumReleaseAge` rejeita o lockfile gerado pelo 9.x.
+- Instalação padrão documentada: `corepack pnpm install --frozen-lockfile` (falha se o
+  lockfile divergir do `package.json`, em vez de gerar uma árvore diferente da testada).
+- `iniciar.bat`, `testar.bat` e `iniciar-demo.bat` agora **detectam dependências
+  ausentes** e mostram o comando correto (antes o boot falhava em
+  `@langchain/langgraph` sem explicação — bug registrado no handoff do Marco 2).
+- `.gitattributes`: `*.bat text eol=crlf`, para os rótulos (`goto`) funcionarem no
+  cmd.exe independentemente do `core.autocrlf`.
+- README, `docs/ARQUITETURA.md` e `docs/HANDOFF-KIRANA-FASE2.md` sem instruções de
+  `npm install`.
+
 ### Corrigido (defeitos reais encontrados durante a implementação)
 - **`Permissions-Policy: microphone=()` bloqueava o microfone** em toda a
   interface. Agora é `microphone=(self)`; câmera e geolocalização seguem bloqueadas.

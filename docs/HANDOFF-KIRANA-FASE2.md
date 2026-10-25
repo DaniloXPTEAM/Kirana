@@ -182,10 +182,13 @@ nunca no frontend; gateway pessoal **não** pode atender visitantes do site púb
 
 ## 7. Bugs e limitações reproduzíveis
 
-1. **`node --test test/` infla a contagem** (+1 por `test/helpers.js`). Use `npm test`
-   (`scripts/run-tests.mjs`). Não é bug de teste, é regra do runner.
-2. **`npm install` obrigatório** após esta versão; sem ele o `require('@langchain/langgraph')` falha
-   no boot. `iniciar.bat` ainda **não** checa isso — a corrigir no próximo marco.
+1. **`node --test test/` infla a contagem** (+1 por `test/helpers.js`). Use
+   `node scripts/run-tests.mjs` (ou `testar.bat`). Não é bug de teste, é regra do runner.
+2. **Instalação de dependências é obrigatória** desde a v0.2.0; sem ela o boot falha em
+   `@langchain/langgraph`. **Resolvido na v0.4.0:** `iniciar.bat`, `testar.bat` e
+   `iniciar-demo.bat` agora detectam a ausência de `node_modules` e mostram o comando correto.
+   A instalação é feita com **pnpm** (`corepack pnpm install --frozen-lockfile`), a partir do
+   `pnpm-lock.yaml` versionado. O `package-lock.json` do npm (v0.2.0) foi removido.
 3. **Gateway exige reautenticação após reinício** (OAuth em memória). Sintoma: 401 → a interface
    mostra mensagem de chave/autorização.
 4. **Ações pendentes** cancelam ao continuar a conversa (comportamento de projeto, não bug).
@@ -197,7 +200,7 @@ nunca no frontend; gateway pessoal **não** pode atender visitantes do site púb
 
 ## 8. Próximo passo exato (sem recomeçar)
 
-1. No Windows: `npm install` → `diagnostico.bat` → `iniciar.bat` → **uma conversa real** para
+1. No Windows: `corepack pnpm install --frozen-lockfile` → `diagnostico.bat` → `iniciar.bat` → **uma conversa real** para
    confirmar que a v0.2.0 (com LangGraph) continua respondendo pelo gateway.
 2. Se confirmar, iniciar **Marco 2 (CopilotKit)**:
    - `widget/` com Vite + React 19 + `@copilotkit/react-core@1.79.1` + `@copilotkit/react-ui@1.79.1`;
@@ -207,17 +210,18 @@ nunca no frontend; gateway pessoal **não** pode atender visitantes do site púb
 3. Antes do Marco 4 (imagens), definir o provedor e a chave: opções avaliadas — OpenAI Images
    (chave própria, custo por imagem), Stability, Replicate, Gemini. Sem provedor, a capacidade
    aparece **indisponível** e a cota de 3 fica implementada mas inerte.
-4. Ao final de cada marco: `npm test` + `npm run audit` + ZIP + atualização deste handoff.
+4. Ao final de cada marco: `node scripts/run-tests.mjs` + `npm run audit` + ZIP + atualização deste handoff.
 
 ---
 
 ## 9. Comandos de referência
 
 ```bash
-npm install                 # obrigatório nesta versão
-npm test                    # 102 testes, lista explícita
-npm run audit               # sonda de contrato do gateway
-npm run doctor              # diagnóstico de ambiente
+corepack pnpm install --frozen-lockfile   # instala exatamente o pnpm-lock.yaml (obrigatório)
+node scripts/run-tests.mjs                # 219 testes, lista explícita
+npm run audit                             # sonda de contrato do gateway
+npm run doctor                            # diagnóstico de ambiente (inclui a voz)
+npm run voice:bench                       # mede o provedor de voz (latência, ppm)
 node src/server.js          # sobe a Kirana (usa .env)
 node scripts/mock-gateway.js --port 1455 --key local-mock   # gateway simulado estrito
 KIRANA_ORCHESTRATOR=legacy node src/server.js               # rollback do orquestrador

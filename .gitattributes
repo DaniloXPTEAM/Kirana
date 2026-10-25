@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Os .bat do Windows precisam de CRLF no checkout, senão rótulos (goto/label)
+# podem ser mal interpretados pelo cmd.exe — independente do core.autocrlf.
+*.bat text eol=crlf

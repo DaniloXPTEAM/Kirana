@@ -41,8 +41,11 @@ ao navegador.
 ## 2. Requisitos
 
 - **Node.js 20.6 ou superior** (testado com 20.20 aqui e 24.15 no Windows).
-- **`npm install` é obrigatório** desde a v0.2.0: o orquestrador usa `@langchain/langgraph@1.5.2`
-  e `@langchain/core@1.3.0` (versões exatas). Até a v0.1.2 o projeto era zero-dependência.
+- **Instalação de dependências obrigatória com `pnpm`** desde a v0.4.0 (o projeto usa
+  `pnpm-lock.yaml` como fonte da verdade). O orquestrador usa `@langchain/langgraph@1.5.2` e
+  `@langchain/core@1.3.0` (versões exatas). Até a v0.1.2 o projeto era zero-dependência.
+- A versão do gerenciador está fixada em `package.json` (`packageManager: pnpm@9.15.9`), então o
+  `corepack` — que já vem com o Node 20 — usa exatamente essa versão, sem instalação global.
 - Windows 10/11 (as instruções usam `.bat`), macOS ou Linux.
 - O `Kirana-ChatGPT-Gateway v0.2.0` rodando em `http://127.0.0.1:1455` com a `GATEWAY_API_KEY` em mãos.
 
@@ -51,16 +54,20 @@ ao navegador.
 ## 3. Instalação no Windows
 
 1. Copie a pasta `kirana` para o computador (por exemplo `C:\CRiando coisa nova\kirana`).
-2. Instale as dependências (uma única vez):
-   ```bat
-   npm install
-   ```
-3. Confirme que o Node está instalado:
+2. Confirme que o Node está instalado:
    ```bat
    node --version
    ```
    Se não estiver, instale o Node 20 LTS em <https://nodejs.org>.
-3. **Ligue o gateway** (o projeto que já funciona). No diretório dele:
+3. Instale as dependências (uma única vez, dentro da pasta da Kirana):
+   ```bat
+   corepack pnpm install --frozen-lockfile
+   ```
+   O `--frozen-lockfile` garante que a instalação use exatamente o `pnpm-lock.yaml` versionado:
+   se o `package.json` e o lockfile divergirem, a instalação falha em vez de gerar uma árvore
+   diferente da testada. Não use `npm install` nesta versão: o `package-lock.json` do npm foi
+   removido justamente porque era da v0.2.0 e estava incompatível.
+4. **Ligue o gateway** (o projeto que já funciona). No diretório dele:
    ```bat
    cd "C:\CRiando coisa nova\Kirana-ChatGPT-Gateway-v0.2.0"
    ```
@@ -68,7 +75,7 @@ ao navegador.
    ```bat
    curl http://127.0.0.1:1455/health
    ```
-4. **Configure a Kirana.** Na pasta `kirana`, copie o exemplo e preencha a chave:
+5. **Configure a Kirana.** Na pasta `kirana`, copie o exemplo e preencha a chave:
    ```bat
    copy .env.example .env
    notepad .env
@@ -79,13 +86,13 @@ ao navegador.
    KIRANA_GATEWAY_API_KEY=cole_aqui_a_chave_do_gateway
    ```
    A chave é a mesma `GATEWAY_API_KEY` do `.env` do gateway. **Não** use a chave da conta ChatGPT.
-5. **Confira o ambiente:**
+6. **Confira o ambiente:**
    ```bat
    diagnostico.bat
    ```
-   O diagnóstico mostra: versão do Node, `.env`, alcance do `/health`, modelos listados e se o
-   modelo primário existe.
-6. **Inicie a Kirana:**
+   O diagnóstico mostra: versão do Node, `.env`, alcance do `/health`, modelos listados, se o
+   modelo primário existe e se a voz (Thalita) está disponível.
+7. **Inicie a Kirana:**
    ```bat
    iniciar.bat
    ```

@@ -16,6 +16,28 @@ if errorlevel 1 (
   exit /b 1
 )
 
+rem --- dependencias (pnpm) ---------------------------------------------------
+rem O projeto usa pnpm-lock.yaml como fonte da verdade. Nunca use npm install:
+rem o package-lock.json do npm era da v0.2.0 e foi removido na v0.4.0.
+if exist "node_modules\@langchain\langgraph\package.json" goto deps_ok
+
+echo [atencao] Dependencias nao instaladas nesta pasta.
+echo.
+echo           Instale uma unica vez, dentro de "%~dp0", com:
+echo.
+echo               corepack pnpm install --frozen-lockfile
+echo.
+echo           O corepack ja vem com o Node 20 LTS. O --frozen-lockfile garante
+echo           exatamente as versoes testadas (o pnpm usado esta fixado no
+echo           package.json em packageManager).
+echo.
+echo           Nao use "npm install" nesta versao.
+pause
+exit /b 1
+
+:deps_ok
+rem ---------------------------------------------------------------------------
+
 echo Iniciando gateway simulado em http://127.0.0.1:1455 ...
 start "Kirana - gateway simulado" cmd /c "node scripts\mock-gateway.js --port 1455 --key local-mock"
 

@@ -149,7 +149,9 @@ sem concorrência relevante.
 
 ## 7. Decisões de projeto
 
-- **Zero dependências** — reduz superfície de ataque e dispensa `npm install` no Windows.
+- **Zero dependências até a v0.1.2** — desde a v0.2.0 o projeto usa pacotes exatos
+  (`@langchain/*`, `@ag-ui/*`, `@copilotkit/*`, `react`), instalados com `pnpm` a partir do
+  `pnpm-lock.yaml` versionado (`corepack pnpm install --frozen-lockfile`).
 - **ESM puro** (`"type": "module"`) — sem transpilação.
 - **Ferramentas no servidor** — o modelo só escolhe *qual* ferramenta e *com quais argumentos*;
   validade, permissão e execução são do backend.
