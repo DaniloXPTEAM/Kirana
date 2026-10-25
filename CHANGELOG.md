@@ -1,5 +1,49 @@
 # Changelog — Kirana
 
+## 0.4.3 — 25/10/2026 (P1 markdown na fala, P2 interface, P3 transcrição)
+
+Correções dos três problemas do teste real de Windows da v0.4.2. Relatório
+completo em `docs/AUDITORIA-VOZ-V0.4.3.md`.
+
+### Corrigido
+- **P1 — a voz lia asteriscos de markdown.** Causa: a limpeza de texto só existia
+  no servidor; com o motor do navegador (padrão desde a 0.4.2) o texto cru ia
+  para `speechSynthesis.speak()`. A limpeza virou `public/speech-text.js`,
+  **uma implementação usada pelos dois motores** (cliente, servidor e worker
+  Python alinhado). O texto exibido continua intacto: `**Modelo utilizado:**`
+  aparece na tela e é falado como "Modelo utilizado:".
+- **P2 — sensação de dois agentes sobrepostos.** Três causas reproduzidas:
+  (a) a palavra "Você" no avatar de 34 px transbordava e aparecia por cima da
+  bolha — o "selo flutuante" na tela; (b) o cartão de boas-vindas só saía no fim
+  da primeira resposta, ficando empilhado acima da conversa; (c) o painel de voz
+  era um bloco de 181 px (317 px no celular) que empurrava o chat. Agora: avatar
+  do usuário é ícone, o da Kirana é a mesma face do cabeçalho, `.msg-avatar` tem
+  `overflow: hidden`, o cartão sai no primeiro sinal de conversa e o painel é um
+  popover que fecha com Esc/clique fora e não altera a altura do chat.
+- **P3 — transcrição com palavras repetidas.** O merge somava todo resultado
+  final ao acumulado e só evitava o caso "termina com o mesmo texto"; interino e
+  final se somavam. Agora `mergeRecognition()` usa sobreposição por palavras
+  (comparando sem pontuação), o interino é sempre substituído e repetições
+  imediatas são colapsadas.
+- **Defeito colateral do P3, encontrado no caminho:** um interino que nunca
+  recebia `isFinal` rearmava o silêncio para sempre e a fala **nunca era
+  enviada**. Novo `interimGraceMs` (1.200 ms) aceita o interino parado.
+
+### Testes
+- `node scripts/run-tests.mjs`: **267 → 298** (19 de P1, 12 de P3).
+- Navegador de voz: **40 → 48** (8 de P2, incluindo layout e sobreposição).
+- Demo: 15/15.
+- Corrigida uma verificação **instável** (não o produto): a checagem de
+  interrupção esperava o estado transitório `interrompido` e falhava conforme a
+  carga da máquina. Passou a usar o histórico de estados; 48/48 em duas
+  execuções seguidas no diretório extraído.
+
+### Limitações declaradas
+- Nada foi ouvido no Windows: o áudio do `speechSynthesis` e o microfone real
+  dependem do seu teste (roteiro na seção 4 do relatório).
+- Um termo foneticamente errado ("Smiles") é limitação do reconhecedor do
+  navegador; a 0.4.3 impede a multiplicação e permite correção posterior.
+
 ## 0.4.2 — 25/10/2026 (voz: pronúncia, motor do navegador, vozes)
 
 Correção pedida depois do teste real de Windows da v0.4.1. Relatório completo em

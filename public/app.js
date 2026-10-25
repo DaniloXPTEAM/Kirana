@@ -219,6 +219,45 @@ async function consumeSse(response, onEvent) {
 
 /* --------------------------------- render -------------------------------- */
 
+/**
+ * Avatar da Kirana — a MESMA face do cabeçalho e da tela de boas-vindas.
+ *
+ * Antes era um quadrado com a letra "K", diferente do rosto usado no cabeçalho:
+ * ainterface mostrava duas "Kiranas" (rosto em cima, letra nas mensagens).
+ */
+function kiranaAvatar() {
+  return el('div', {
+    class: 'msg-avatar msg-avatar-kirana',
+    'aria-hidden': 'true',
+    html: '<svg viewBox="0 0 64 64" focusable="false"><use href="#kirana-face" /></svg>',
+  });
+}
+
+/**
+ * Avatar do usuário — ícone de pessoa, não a palavra "Você".
+ *
+ * Defeito da v0.4.2: a palavra "Você" em 34 px estourava o círculo e o texto
+ * aparecia por cima/fora da bolha como um selo solto (o "Voz" fantasma que se
+ * via na tela). Ícone não transborda em nenhum tamanho de fonte do sistema.
+ */
+function userAvatar() {
+  return el('div', {
+    class: 'msg-avatar msg-avatar-user',
+    'aria-hidden': 'true',
+    html: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" fill="currentColor"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>',
+  });
+}
+
+/**
+ * Remove o cartão de boas-vindas do fluxo.
+ *
+ * v0.4.3 — antes ele só saía quando a PRIMEIRA RESPOSTA chegava
+ * (`createAssistantShell`). Na prática a tela ficava com o cartão "Oi! Eu sou a
+ * Kirana" (rosto + título + sugestões) logo acima da conversa em andamento: a
+ * impressão era de dois agentes empilhados, um atrás do outro. Agora ele sai no
+ * primeiro sinal de conversa — mensagem do usuário, mensagem da Kirana ou
+ * restauração de uma sessão com histórico.
+ */
 function hideWelcome() {
   if (els.welcome && els.welcome.isConnected) els.welcome.remove();
 }
@@ -233,7 +272,7 @@ function createAssistantShell() {
   const node = el(
     'article',
     { class: 'msg assistant', dataset: { role: 'assistant' } },
-    el('div', { class: 'msg-avatar', 'aria-hidden': 'true', text: 'K' }),
+    kiranaAvatar(),
     body,
   );
   els.chat.appendChild(node);
@@ -247,7 +286,7 @@ function addUserMessage(text) {
   const node = el(
     'article',
     { class: 'msg user', dataset: { role: 'user' } },
-    el('div', { class: 'msg-avatar', 'aria-hidden': 'true', text: 'Você' }),
+    userAvatar(),
     el('div', { class: 'msg-body' }, bubble),
   );
   els.chat.appendChild(node);
@@ -494,6 +533,7 @@ async function sendMessage(text) {
 
   els.input.value = '';
   autogrow();
+  hideWelcome(); // a conversa começou: o cartão de boas-vindas não fica na tela
   addUserMessage(clean);
 
   // Se havia uma ação pendente e o usuário seguiu a conversa, o backend a cancela.
@@ -1037,7 +1077,13 @@ function setupVoiceSettings() {
   const { voiceConfigBtn, voiceSettings, voiceEngine, voiceSelect, voiceRate, voicePreview, voiceSettingsHint } = els;
   if (!voice || !voiceConfigBtn || !voiceSettings) return;
 
-  voiceConfigBtn.addEventListener('click', () => {
+  const fecharPainel = () => {
+    voiceSettings.hidden = true;
+    voiceConfigBtn.setAttribute('aria-expanded', 'false');
+  };
+
+  voiceConfigBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
     const open = voiceSettings.hidden;
     voiceSettings.hidden = !open;
     voiceConfigBtn.setAttribute('aria-expanded', String(open));
@@ -1045,6 +1091,15 @@ function setupVoiceSettings() {
       // O catálogo do servidor custa processo Python + rede: busca ao abrir.
       voice.refreshVoices({ includeServer: true, force: true }).then(renderVoiceSettings).catch(() => {});
     }
+  });
+
+  // Popover fecha ao clicar fora e com Esc (antes ficava aberto ocupando a tela).
+  voiceSettings.addEventListener('click', (event) => event.stopPropagation());
+  document.addEventListener('click', () => {
+    if (!voiceSettings.hidden) fecharPainel();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !voiceSettings.hidden) fecharPainel();
   });
 
   const settings = voice.settings;
@@ -1126,12 +1181,21 @@ function renderVoiceSettings(catalog = null) {
   if (desejada) voiceSelect.value = desejada;
 
   if (voiceSettingsHint) {
-    const total = (voices.browser?.length ?? 0) + (voices.edge?.length ?? 0);
+    const doNavegador = voices.browser?.length ?? 0;
+    const doServidor = voices.edge?.length ?? 0;
     const motor = settings.engine === 'browser' ? 'navegador' : settings.engine === 'edge' ? 'servidor' : 'automático';
-    const voz = settings.voice?.name ? ` · ${settings.voice.name}` : '';
-    voiceSettingsHint.textContent = total
-      ? `Falando pelo ${motor}${voz} — ${voices.browser?.length ?? 0} voz(es) do navegador, ${voices.edge?.length ?? 0} do servidor.`
-      : 'Nenhuma voz encontrada ainda. Toque em “Ouvir prévia” depois de permitir o áudio.';
+    const voz = settings.voice?.name ? ` — ${settings.voice.name}` : '';
+    if (doNavegador || doServidor) {
+      voiceSettingsHint.textContent = `Falando pelo ${motor}${voz}. ${doNavegador} voz(es) no navegador, ${doServidor} no servidor.`;
+    } else if (settings.engine === 'edge') {
+      // Distingue "ainda buscando" de "o servidor respondeu sem vozes": antes as
+      // duas situações mostravam a mesma frase e pareciam defeito da interface.
+      voiceSettingsHint.textContent = voices.serverResponded
+        ? 'O servidor respondeu sem vozes pt-BR. Confira Python e edge-tts com o diagnostico.bat (a conversa por texto continua).'
+        : 'Buscando as vozes do servidor…';
+    } else {
+      voiceSettingsHint.textContent = 'Este navegador não oferece voz própria; a Kirana fala pelo servidor. Toque em “Ouvir prévia” para testar.';
+    }
   }
 }
 

@@ -85,17 +85,26 @@ def sanitize_text(text: str) -> str:
     """Limpa o texto para fala. Nada fora da política chega ao motor."""
     import re
 
-    # --- estruturais -------------------------------------------------------
-    text = re.sub(r"```[\s\S]*?```", " ", text)
-    text = re.sub(r"`([^`]*)`", r"\1", text)
+    # --- estruturais (mesma ordem de public/speech-text.js) ----------------
+    text = re.sub(r"```[\s\S]*?(?:```|$)", " ", text)
+    text = re.sub(r"~~~[\s\S]*?(?:~~~|$)", " ", text)
     text = re.sub(r"!\[([^\]]*)\]\([^)]*\)", r"\1", text)
     text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
-    text = re.sub(r"https?://\S+|www\.\S+", " ", text)
+    text = re.sub(r"`([^`]*)`", r"\1", text)
+    text = re.sub(r"<((?:https?://|mailto:)[^>]+)>", " ", text, flags=re.IGNORECASE)
     text = re.sub(r"<[^>]+>", " ", text)
-    text = re.sub(r"(?m)^\s{0,3}(?:#{1,6}\s+|>\s?|[-*+]\s+|\d+[.)]\s+)", "", text)
-    text = re.sub(r"[*_~]{1,3}", "", text)
-    text = re.sub(r"(?m)^\s*\|(.+)\|\s*$", lambda m: m.group(1).replace("|", ", "), text)
-    text = re.sub(r"(?m)^\s*([-*_]\s*){3,}$", " ", text)
+    # separador de tabela antes das células
+    text = re.sub(r"(?m)^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)*\|?\s*$", " ", text)
+    text = re.sub(r"(?m)^\s*\|(.+)\|\s*$", lambda m: " " + m.group(1).replace("|", ", ") + " ", text)
+    text = re.sub(r"(?m)^\s*(?:[-*_]\s*){3,}$", " ", text)
+    text = re.sub(r"(?m)^\s{0,3}#{1,6}\s+", "", text)
+    text = re.sub(r"(?m)^\s{0,3}>+\s?", "", text)
+    text = re.sub(r"(?m)^\s{0,3}(?:[-*+]|\d{1,3}[.)])\s+", "", text)
+    text = re.sub(r"(?m)^\s*[*+]\s+", "", text)
+    text = re.sub(r"(?:https?://|www\.)\S+", " ", text, flags=re.IGNORECASE)
+    # marcadores que sobraram: o motor FALA asterisco, cerquilha, crase, til,
+    # barra vertical. Hífen e travessão ficam (são pontuação falável).
+    text = re.sub(r"[*_~`#|>]", " ", text)
 
     # --- política de caracteres -------------------------------------------
     text = "".join(char if _is_speakable_char(char) else " " for char in text)

@@ -17,6 +17,17 @@ apenas a porta de entrada: em vez de digitar, o visitante fala.
                                     <audio> no navegador
 ```
 
+## Texto falado (v0.4.3)
+
+A limpeza do texto é **a mesma** para os dois motores (`public/speech-text.js`):
+markdown vira conteúdo falado, código de bloco não é lido, link vira rótulo,
+emoji e símbolos não são lidos, acento e pontuação natural permanecem. O texto
+exibido na tela **não é alterado** — `kiranaVoiceReport()` mostra os dois
+(`textDisplayed` e `textSent`).
+
+Antes da 0.4.3 só o servidor limpava: com o motor do navegador, `**negrito**`
+era lido como "asterisco asterisco negrito".
+
 ## Dois motores de fala (v0.4.2)
 
 A Kirana pode falar de dois jeitos, e você escolhe no painel ao lado do microfone
@@ -152,6 +163,11 @@ processando → falando → ouvindo` (contínuo, sem precisar clicar de novo).
 Fim de enunciado: **900 ms de silêncio** depois da última transcrição
 (`LISTEN_TUNING.silenceMs`), com trava de 20 s por enunciado.
 
+Transcrição (v0.4.3): resultados **finais** são mesclados por sobreposição de
+palavras (nunca somados às cegas) e o **interino** é sempre substituído, nunca
+acumulado. Se o navegador deixar um interino sem `isFinal`, ele é aceito depois
+de `interimGraceMs` (1,2 s) — antes a fala ficava na tela e não era enviada.
+
 ### Meio-duplex (correção da v0.4.1)
 
 O microfone fica **fechado durante todo o turno**: enquanto a Kirana processa,
@@ -274,7 +290,7 @@ caminho, não na voz).
 ## Como testar
 
 ```bat
-testar.bat                      :: suíte completa (267 testes)
+testar.bat                      :: suíte completa (298 testes)
 node test\browser\voice-flow.mjs   :: 34 verificações de navegador com áudio real
 npm run voice:bench             :: mede o provedor de verdade
 ```

@@ -243,8 +243,17 @@ try {
     check('áudio estava tocando antes de interromper', playsBefore > 0, `${playsBefore} play(s)`);
 
     await page.locator('#voice-btn').click(); // usuário interrompe
-    const interrupted = await waitState(page, 'interrompido', 5000);
-    check('toque durante a fala interrompe (estado "interrompido")', interrupted === 'interrompido', interrupted);
+    // 'interrompido' e transitório: a Kirana já volta a ouvir em seguida. Disputar
+    // o instante exato falhava conforme a carga da máquina (48/48 numa rodada,
+    // 47/48 na seguinte). O histórico de estados é a prova estável de que a
+    // interrupção aconteceu — e o estado final ('ouvindo') continua verificado.
+    const interrompeu = await page.waitForFunction(
+      () => (window.kiranaVoice?.history?.states || []).some((entrada) => entrada.to === 'interrompido'),
+      null,
+      { timeout: 8000, polling: 50 },
+    ).then(() => true).catch(() => false);
+    const estadoAgora = await voiceState(page);
+    check('toque durante a fala interrompe (estado "interrompido")', interrompeu, interrompeu ? `interrompido -> ${estadoAgora}` : estadoAgora);
     const pauses = await page.evaluate(() => window.__audioLog.filter((e) => e.event === 'pause').length);
     check('áudio é pausado de verdade no barge-in', pauses >= 1, `${pauses} pause(s) após ${playsBefore} play(s)`);
 
@@ -372,6 +381,32 @@ try {
     const finalState = await voiceState(page);
     check('usuário encerra a voz quando quiser', finalState === 'inativo', finalState);
 
+    /* ------------- v0.4.3 / P2: uma identidade só, sem sobreposição -------- */
+    const p2 = await page.evaluate(() => {
+      const avatares = [...document.querySelectorAll('.msg-avatar')];
+      const estouram = avatares.filter((n) => {
+        const temTexto = (n.textContent || '').trim().length > 0;
+        const r = n.getBoundingClientRect();
+        return temTexto || n.scrollWidth > n.offsetWidth || getComputedStyle(n).overflow === 'visible';
+      }).map((n) => (n.textContent || '').trim() || n.className);
+      const faces = [...document.querySelectorAll('.msg-avatar-kirana svg use')].map((u) => u.getAttribute('href'));
+      const bolhas = [...document.querySelectorAll('.bubble')].map((b) => b.getBoundingClientRect().toJSON());
+      const sobrepostas = bolhas.some((a, i) => bolhas.some((b, j) => i !== j
+        && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1));
+      return {
+        estouram,
+        faces,
+        welcomeNaTela: Boolean(document.getElementById('welcome')?.isConnected),
+        sobrepostas,
+        avatarUsuario: document.querySelectorAll('.msg-avatar-user').length,
+      };
+    });
+    check('P2: nenhum avatar transborda texto para fora da bolha', p2.estouram.length === 0, p2.estouram.join(',') || 'ok');
+    check('P2: avatar da Kirana usa a mesma face do cabeçalho', p2.faces.every((href) => href === '#kirana-face') && p2.faces.length > 0, p2.faces.join(','));
+    check('P2: avatar do usuário é ícone (sem a palavra "Você")', p2.avatarUsuario > 0);
+    check('P2: o cartão de boas-vindas sai quando a conversa começa', p2.welcomeNaTela === false);
+    check('P2: nenhuma bolha de mensagem se sobrepõe a outra', p2.sobrepostas === false);
+
     /* -------------------- v0.4.2: escolha de motor e voz ------------------ */
     await page.locator('#voice-config-btn').click();
     await page.waitForFunction(() => !document.getElementById('voice-settings')?.hidden, null, { timeout: 5000 })
@@ -405,6 +440,29 @@ try {
 
     const hint = await page.locator('#voice-settings-hint').textContent();
     check('painel informa qual motor está falando', /servidor|navegador|automático/i.test(hint || ''), (hint || '').slice(0, 70));
+
+    const layout = await page.evaluate(() => {
+      const painel = document.getElementById('voice-settings');
+      const chat = document.getElementById('chat-scroll');
+      const posicao = getComputedStyle(painel).position;
+      const r = painel.getBoundingClientRect();
+      return {
+        posicao,
+        flutua: posicao === 'absolute' || posicao === 'fixed',
+        dentroDaTela: r.top >= 0 && r.bottom <= window.innerHeight + 1,
+        alturaChat: Math.round(chat.getBoundingClientRect().height),
+      };
+    });
+    check('P2: painel de voz flutua (não empurra o chat)', layout.flutua, layout.posicao);
+    check('P2: painel de voz cabe na tela', layout.dentroDaTela);
+    const antesEsc = layout.alturaChat;
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    const depoisEsc = await page.evaluate(() => ({
+      alturaChat: Math.round(document.getElementById('chat-scroll').getBoundingClientRect().height),
+      aberto: !document.getElementById('voice-settings').hidden,
+    }));
+    check('P2: Esc fecha o painel sem mexer no tamanho do chat', !depoisEsc.aberto && depoisEsc.alturaChat === antesEsc, `${antesEsc} → ${depoisEsc.alturaChat}`);
 
     await context.close();
   }

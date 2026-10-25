@@ -14,3 +14,7 @@ logs/
 node_modules/
 coverage/
 .DS_Store
+
+# Python
+__pycache__/
+*.pyc

@@ -22,6 +22,8 @@
  * `public/voice.js`.
  */
 
+import { toSpeechText } from './speech-text.js';
+
 export const ENGINE = { BROWSER: 'browser', EDGE: 'edge', AUTO: 'auto' };
 
 export const VOICE_PREF_KEY = 'kirana.voz.preferencias.v1';
@@ -249,9 +251,12 @@ export function createBrowserSpeechEngine({ host = globalThis, now = () => Date.
    * Fala um trecho. Resolve quando o áudio termina, rejeita em erro real.
    * Cancelamento não é erro: resolve com `{ cancelled: true }`.
    */
-  function speak(text, { voice = null, rate = 1, pitch = 1, onStart, onEnd, lang = 'pt-BR' } = {}) {
+  function speak(text, { voice = null, rate = 1, pitch = 1, onStart, onEnd, lang = 'pt-BR', sanitize = true } = {}) {
     if (!available()) return Promise.reject(Object.assign(new Error('Este navegador não fala texto.'), { code: 'voice_browser_unsupported' }));
-    const clean = String(text ?? '').trim();
+    // Segunda barreira (a primeira é o controlador): nada de markdown chega ao
+    // motor, porque o `speechSynthesis` lê asterisco, cerquilha e barra em voz
+    // alta. A limpeza é idempotente, então rodar duas vezes não muda o texto.
+    const clean = String(sanitize ? toSpeechText(text) : text ?? '').trim();
     if (!clean) return Promise.resolve({ cancelled: true, empty: true });
 
     // Um utterance por vez: nada de sobrepor a resposta anterior.

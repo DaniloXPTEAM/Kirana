@@ -44,6 +44,7 @@
  * (AEC) confiável, que o SpeechRecognition do navegador não expõe.
  */
 
+import { toSpeechText } from './speech-text.js';
 import {
   ENGINE,
   PREVIEW_TEXT,
@@ -77,6 +78,15 @@ export const LISTEN_TUNING = {
   muteAfterSpeechMs: 600, // janela surda depois do áudio (eco/cauda do alto-falante)
   thinkingTimeoutMs: 60_000, // sem nenhum delta: destrava a interface
   speakingStallMs: 20_000, // áudio parado sem progresso: destrava
+  /**
+   * v0.4.3 — quanto esperar por um resultado FINAL antes de aceitar o interino.
+   *
+   * O `SpeechRecognition` do Chrome às vezes deixa um interino pendente para
+   * sempre (o usuário para de falar e não vem `isFinal`). A v0.4.2 rearmava o
+   * silêncio indefinidamente nesse caso: a fala era reconhecida na tela e
+   * NUNCA enviada. Agora, se o interino não muda por este tempo, ele é aceito.
+   */
+  interimGraceMs: 1_200,
   duplicateWindowMs: 2_000,
 };
 
@@ -144,6 +154,95 @@ export function takeSpeakableSentences(buffer, { minChars = 24, maxChars = 320 }
   return { chunks, rest };
 }
 
+/**
+ * Junta o que o reconhecedor de fala entregou, sem repetir palavra (v0.4.3).
+ *
+ * ── O defeito que isto corrige ──────────────────────────────────────────────
+ * O `SpeechRecognition` do Chrome/Edge é instável de duas maneiras:
+ *
+ *  (a) o MESMO resultado final chega mais de uma vez (eventos repetidos);
+ *  (b) depois de um `final`, ele reemite um `interim` que já contém o trecho
+ *      final (e vice-versa), com o `resultIndex` nem sempre apontando para o
+ *      que mudou.
+ *
+ * A v0.4.2 concatenava todo final novo com `transcript` e só evitava o caso
+ * "o final termina exatamente o texto já acumulado". Nos outros casos a frase
+ * era colada duas vezes — o "palavras repetidas" relatado — e, quando o motor
+ * trocava uma palavra pelo palpite fonético (ex.: "Smiles" para algo dito em
+ * português), a versão errada ficava gravada para sempre, porque `transcript`
+ * era a soma de todos os finais.
+ *
+ * ── Regra nova ──────────────────────────────────────────────────────────────
+ * `transcript` = parte **confirmada** (finais, deduplicados) + `interim`, que é
+ * sempre **substituído** (nunca somado). Se um final novo repete o que já está
+ * confirmado, só o sufixo inédito entra. Repetições imediatas de uma palavra
+ * ("eu eu acho") são colapsadas — o reconhecedor faz isso em quase toda pausa.
+ *
+ * @param {string} committed texto já confirmado
+ * @param {string} incoming  trecho novo (final ou interino)
+ * @param {{final?: boolean}} [options]
+ * @returns {{committed: string, interim: string, transcript: string, changed: boolean}}
+ */
+export function mergeRecognition(committed, incoming, { final = false } = {}) {
+  const normalize = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
+  const words = (value) => normalize(value).split(' ').filter(Boolean);
+
+  const base = normalize(committed);
+  const piece = normalize(incoming);
+
+  if (!final) {
+    // Interino: substitui o palpite anterior. Se ele apenas REPETE o que já foi
+    // confirmado (o caso mais comum), não há nada a mostrar além do confirmado.
+    const interim = words(piece).length && collapseRepeats(piece) === collapseRepeats(base) ? '' : collapseRepeats(piece);
+    return { committed: base, interim, transcript: joinSpoken(base, interim), changed: false };
+  }
+
+  let next = base;
+  const incomingWords = words(piece);
+  if (incomingWords.length) {
+    const baseWords = words(base);
+    // Maior sufixo de `base` que é prefixo de `incoming` (sobreposição real).
+    // Comparação sem pontuação: o motor muda ", " conforme o palpite, e
+    // "Olá" + "Olá, tudo bem" precisa ser reconhecido como sobreposição.
+    const bare = (word) => word.toLowerCase().replace(/[.,;:!?…"')\]}]+$/u, '').replace(/^["'(\[{]+/u, '');
+    let overlap = 0;
+    for (let size = Math.min(baseWords.length, incomingWords.length); size > 0; size -= 1) {
+      const suffix = baseWords.slice(-size).map(bare).join(' ');
+      const prefix = incomingWords.slice(0, size).map(bare).join(' ');
+      if (suffix === prefix) {
+        overlap = size;
+        break;
+      }
+    }
+    const novel = incomingWords.slice(overlap).join(' ');
+    // `incoming` inteiro já está contido no fim de `base`: evento repetido.
+    const already = overlap === incomingWords.length;
+    if (!already && novel) next = joinSpoken(base, novel);
+  }
+
+  next = collapseRepeats(next);
+  return { committed: next, interim: '', transcript: next, changed: next !== base };
+}
+
+/** "eu eu acho" -> "eu acho" (só repetição imediata, palavra por palavra). */
+export function collapseRepeats(value) {
+  const out = [];
+  for (const word of String(value ?? '').replace(/\s+/g, ' ').trim().split(' ')) {
+    if (!word) continue;
+    const previous = out[out.length - 1];
+    if (previous && previous.toLowerCase() === word.toLowerCase()) continue;
+    out.push(word);
+  }
+  return out.join(' ');
+}
+
+/** Junta dois trechos falados respeitando pontuação final. */
+function joinSpoken(base, extra) {
+  if (!base) return extra ?? '';
+  if (!extra) return base;
+  return `${base} ${extra}`.replace(/\s+/g, ' ').trim();
+}
+
 /** Emite um evento no documento sem quebrar fora do navegador (testes em Node). */
 function emit(name, detail) {
   try {
@@ -198,7 +297,9 @@ export function createVoiceController({
   let recognizerLive = false; // já existe um recognizer criado e não encerrado
   let muteUntil = 0;
   let buffer = ''; // texto ainda não falado deste turno
-  let transcript = '';
+  let transcript = ''; // parte CONFIRMADA (finais, sem repetição)
+  let interimText = ''; // palpite do momento (sempre substituído, nunca somado)
+  let interimChangedAt = 0; // quando o interino mudou pela última vez
   let sawInterim = false;
   let silenceTimer = null;
   let utteranceTimer = null;
@@ -226,7 +327,7 @@ export function createVoiceController({
     rate,
     ...(preference ?? loadPreference(storage) ?? {}),
   };
-  const catalog = { browser: [], edge: [], at: 0 };
+  const catalog = { browser: [], edge: [], at: 0, serverResponded: false };
   let voicesPromise = null;
 
   const supported = Boolean(RecognitionImpl);
@@ -352,6 +453,7 @@ export function createVoiceController({
     instance.onstart = () => {
       if (!isCurrent() || !active) return;
       transcript = '';
+      interimText = '';
       sawInterim = false;
       setState(VOICE_STATE.LISTENING);
     };
@@ -370,24 +472,31 @@ export function createVoiceController({
       }
       if (pendingTurn || state === VOICE_STATE.PROCESSING) return;
 
+      // Junta TODOS os resultados do evento, separando final de interino.
       let interim = '';
       let finalText = '';
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      for (let i = 0; i < event.results.length; i += 1) {
         const result = event.results[i];
-        const text = result[0]?.transcript ?? '';
-        if (result.isFinal) finalText += text;
-        else interim += text;
+        const text = result?.[0]?.transcript ?? '';
+        if (!text) continue;
+        if (result.isFinal) finalText = finalText ? `${finalText} ${text}` : text;
+        else interim = interim ? `${interim} ${text}` : text;
       }
+
       if (finalText) {
-        const clean = finalText.trim();
-        // O motor às vezes repete o mesmo trecho final: não duplica a fala.
-        const already = transcript.trim().endsWith(clean);
-        if (clean && !already) {
-          transcript = transcript.trim() ? `${transcript.trim()} ${clean}` : clean;
-        }
+        const merged = mergeRecognition(transcript, finalText, { final: true });
+        transcript = merged.committed;
+        interimText = ''; // o final engole o interino anterior
         sawInterim = false;
+        mark('result_final', { changed: merged.changed, words: transcript.split(' ').length });
+      } else if (interim) {
+        const merged = mergeRecognition(transcript, interim, { final: false });
+        if (merged.interim !== interimText) interimChangedAt = now();
+        interimText = merged.interim;
+        sawInterim = true;
+        mark('result_interim', { words: interimText.split(' ').filter(Boolean).length });
       }
-      if (interim) sawInterim = true;
+
       if ((finalText || interim) && state !== VOICE_STATE.SPEECH_DETECTED) {
         setState(VOICE_STATE.SPEECH_DETECTED);
         utteranceTimer = setTimeout(() => finishUtterance('max_duration'), TIMING.maxUtteranceMs);
@@ -456,16 +565,32 @@ export function createVoiceController({
   function finishUtterance(reason) {
     clearTimers();
     if (!active || pendingTurn) return;
-    const text = transcript.trim();
-    transcript = '';
+    // O que vale é o confirmado + o último interino (que pode nunca virar final
+    // quando o usuário para de falar). Nunca a soma de todos os palpites.
+    // Junta confirmado + interino COM sobreposição: o interino quase sempre
+    // repete o final que acabou de chegar ("Quais serviços" + "Quais serviços a
+    // Opportunity oferece"). Somar direto duplicava a frase no envio.
+    const text = mergeRecognition(transcript, interimText, { final: true }).committed.trim();
     if (!text || text.length < TIMING.minChars || !looksSpeakable(text)) {
+      transcript = '';
+      interimText = '';
       if (state === VOICE_STATE.SPEECH_DETECTED) setState(VOICE_STATE.LISTENING, { reason });
       return;
     }
     if (reason === 'silence' && sawInterim) {
-      armSilence(); // ainda há fala em andamento (interino sem final): espera mais
-      return;
+      // Interino pendente: espera o final — mas só até `interimGraceMs`. Sem
+      // esse limite, um interino que nunca fecha deixava a Kirana muda.
+      // IMPORTANTE: não limpar o texto antes deste teste (era o que apagava a
+      // fala quando o silêncio era rearmado).
+      if (now() - interimChangedAt < TIMING.interimGraceMs) {
+        armSilence();
+        return;
+      }
+      mark('interim_accepted_without_final', { words: interimText.split(' ').length });
     }
+    // Daqui para baixo o enunciado é dado por encerrado: pode limpar.
+    transcript = '';
+    interimText = '';
     // Anti-repetição: mesma frase capturada em sequência não vira novo turno.
     const at = now();
     if (text === lastUtterance.text && at - lastUtterance.at < TIMING.duplicateWindowMs) {
@@ -602,6 +727,7 @@ export function createVoiceController({
             if (!response.ok) return [];
             const data = await response.json();
             const parsed = normalizeServerVoices(data?.voices ?? []);
+            catalog.serverResponded = true; // respondeu (mesmo que sem vozes)
             return parsed.length ? parsed : catalog.edge; // resposta vazia não apaga o catálogo
           } catch {
             // Servidor de voz desligado, limite de requisições ou rede caindo:
@@ -638,7 +764,12 @@ export function createVoiceController({
       local: voice.local,
       selected: voice.id === prefs.voiceId,
     });
-    return { browser: catalog.browser.map(describe), edge: catalog.edge.map(describe), settings: describeCurrent() };
+    return {
+      browser: catalog.browser.map(describe),
+      edge: catalog.edge.map(describe),
+      serverResponded: catalog.serverResponded,
+      settings: describeCurrent(),
+    };
   }
 
   function persist() {
@@ -682,14 +813,15 @@ export function createVoiceController({
     await refreshVoices({ includeServer: resolveEngine() === ENGINE.EDGE, force: false });
     const engine = resolveEngine();
     const voice = voiceFor(engine);
+    const spokenPreview = toSpeechText(text);
     if (engine === ENGINE.BROWSER) {
       browserSpeech.cancel();
-      const result = await browserSpeech.speak(text, { voice: voice?.raw ?? null, rate: rateToNumber(prefs.rate), lang });
+      const result = await browserSpeech.speak(spokenPreview, { voice: voice?.raw ?? null, rate: rateToNumber(prefs.rate), lang, sanitize: false });
       return { engine, voice: voice?.name ?? null, ...result };
     }
     // Motor do servidor: usa o mesmo endpoint da conversa, sem entrar na fila
     // e sem mexer no turno (a prévia não vira mensagem no histórico).
-    const segment = { turnId, segmentId: `preview-${(segmentSeq += 1)}`, text };
+    const segment = { turnId, segmentId: `preview-${(segmentSeq += 1)}`, text: spokenPreview };
     const request = requestChunk(segment, epoch, { voice: voice?.raw?.shortName ?? null });
     try {
       const response = await request.promise;
@@ -755,6 +887,7 @@ export function createVoiceController({
       segmentId: segment.segmentId,
       engine: ENGINE.EDGE,
       voice: settings.engine === ENGINE.EDGE ? settings.voice?.name ?? null : null,
+      textDisplayed: segment.displayed ?? null,
       textSent: segment.text,
       chars: segment.text.length,
       ttsStart: request.startedAt,
@@ -899,6 +1032,7 @@ export function createVoiceController({
       segmentId: segment.segmentId,
       engine: ENGINE.BROWSER,
       voice: voice?.name ?? null,
+      textDisplayed: segment.displayed ?? null,
       textSent: segment.text,
       chars: segment.text.length,
       ttsStart: startedAt,
@@ -1043,9 +1177,22 @@ export function createVoiceController({
     }, limit);
   }
 
+  /**
+   * Enfileira um trecho para fala.
+   *
+   * v0.4.3 — a limpeza acontece AQUI, no cliente, para os dois motores. Antes,
+   * só o servidor limpava: com o motor do navegador (padrão desde a v0.4.2) o
+   * texto do modelo ia cru para `speechSynthesis`, que lia os asteriscos de
+   * `**negrito**` em voz alta. `displayed` guarda o original (o que está na
+   * tela); `text` é o que o motor realmente recebe.
+   */
   function enqueueSpeech(text) {
-    if (!speak || !looksSpeakable(text) || muted) return;
-    speechQueue.push(newSegment(text));
+    if (!speak || muted) return;
+    const spoken = toSpeechText(text);
+    if (!spoken || !looksSpeakable(spoken)) return;
+    const segment = newSegment(spoken);
+    segment.displayed = String(text ?? '').trim();
+    speechQueue.push(segment);
   }
 
   /* ---------------------------- integração ------------------------------- */
@@ -1161,6 +1308,7 @@ export function createVoiceController({
     clearTimeout(resumeTimer);
     speechQueue = [];
     buffer = '';
+    interimText = '';
     muteUntil = 0;
     abortRequests();
     releasePlayback();
