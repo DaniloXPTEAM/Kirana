@@ -133,7 +133,20 @@ processando → falando → ouvindo` (contínuo, sem precisar clicar de novo).
 Fim de enunciado: **900 ms de silêncio** depois da última transcrição
 (`LISTEN_TUNING.silenceMs`), com trava de 20 s por enunciado.
 
-## Interrupção (barge-in)
+### Meio-duplex (correção da v0.4.1)
+
+O microfone fica **fechado durante todo o turno**: enquanto a Kirana processa,
+fala ou ainda tem fala na fila, e por mais **600 ms** depois do último áudio
+(`muteAfterSpeechMs`). Ele só reabre por `scheduleResume()`, com um *token* novo:
+resultados que cheguem de um reconhecedor antigo são descartados (é o que impedia
+a Kirana de responder à própria voz). `history.phantomBlocked` conta esses
+descarte.
+
+Interromper **falando** ainda não existe: o barge-in por voz está apenas
+projetado (`docs/AUDITORIA-VOZ-V0.4.1.md`, seção 11). A interrupção real é pelo
+botão/toque.
+
+## Interrupção
 
 Ao interromper, em ordem:
 
@@ -172,6 +185,7 @@ velocidade `+8%`:
 | Síntese completa do texto | — | 1,0–1,3 s (11,9 s de áudio) |
 | Palavras por minuto | 150–180 | **157 ppm** |
 | Interrupção (abort → worker morto) | 100–300 ms | **3–5 ms** no servidor; pausa do áudio é imediata |
+| Silêncio entre frases (v0.4.1) | < 100 ms | **5 ms** (v0.4.0: 728/703 ms, com áudio de 400 ms) |
 
 Conclusões honestas:
 
@@ -181,8 +195,25 @@ Conclusões honestas:
 - O áudio toca **enquanto** é gerado (primeiro byte → play imediato), e a
   resposta é dividida em frases com a próxima já sendo pedida durante a
   reprodução da atual. Sem isso, a espera entre frases seria de ~1 s.
+- A **v0.4.1** passou a pedir a síntese da próxima frase enquanto a atual toca
+  (pipeline). O primeiro som continua custando o mesmo (~700 ms de provedor): a
+  mudança elimina a espera **por frase**, não a primeira.
 - Os números acima são de um sandbox Linux. **No Windows do usuário eles devem
   ser medidos de novo** (`npm run voice:bench`); não foram medidos lá.
+
+## Diagnóstico de um turno (temporário, local)
+
+Para entender o que a Kirana falou e o que ela *achou* que falou:
+
+- No navegador, com a voz ligada: `kiranaVoiceReport()` no console → tabela com
+  `turnId, segmentId, textSent, textLength, ttsStart, ttsFirstByte, ttsEnd,
+  playbackStart, playbackEnd, outcome`.
+- No servidor: `GET /api/voice/diagnostics?sessionId=...` (exige o mesmo token do
+  `/api/chat`) → `receivedChars`, `text_sent_to_tts`, `dropped`,
+  `droppedChars`, `firstByteMs`, `totalMs`, `bytes`, `outcome`.
+
+Os registros ficam **em memória** (últimos 50), não vão para disco e não incluem
+credenciais. Detalhes em `docs/AUDITORIA-VOZ-V0.4.1.md`.
 
 ## Quando a voz não funciona
 
@@ -193,12 +224,13 @@ Conclusões honestas:
 | Python ausente | `GET /api/voice/status` responde `available:false`; a resposta continua no texto. |
 | `edge-tts` ausente ou desatualizado | Idem; o diagnóstico aponta o comando de instalação. |
 | Serviço da Microsoft fora do ar | Estado `erro`, aviso "A voz falhou agora, mas a resposta continua no texto". |
+| Reprodução travada (navegador não emite `ended`) | Cão-de-guarda de 20 s (`speakingStallMs`) declara erro e devolve o microfone, em vez de ficar em "falando". |
 | Navegador sem MP3 em `MediaSource` (Firefox) | O áudio é acumulado e tocado ao final do trecho (um pouco mais de espera). |
 
 ## Como testar
 
 ```bat
-testar.bat                      :: suíte completa (219 testes)
+testar.bat                      :: suíte completa (241 testes)
 node test\browser\voice-flow.mjs   :: 34 verificações de navegador com áudio real
 npm run voice:bench             :: mede o provedor de verdade
 ```

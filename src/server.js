@@ -428,6 +428,17 @@ export function createKiranaServer(overrides = {}) {
       return;
     }
 
+    // Instrumentação da voz: o que foi realmente enviado ao motor em cada
+    // segmento. Só memória, teto de 50 registros, exige o mesmo token da API.
+    if (route === '/api/voice/diagnostics' && method === 'GET') {
+      assertAuth(req);
+      checkRate(req);
+      const sessionId = url.searchParams.get('sessionId') || '';
+      const entries = voice.diagnostics(sessionId ? { sessionId } : {});
+      sendJson(res, 200, { count: entries.length, entries, voice: voice.voice, rate: voice.rate });
+      return;
+    }
+
     // Sintetiza a fala de UMA mensagem da sessão. Texto -> MP3 em stream.
     // Não cria sessão, não altera histórico, não executa ferramentas.
     if (route === '/api/voice/tts' && method === 'POST') {
@@ -438,10 +449,18 @@ export function createKiranaServer(overrides = {}) {
       const session = sessions.get(typeof body.sessionId === 'string' ? body.sessionId : '');
       if (!session) throw new HttpError(404, 'session_not_found', 'Sessão não encontrada.');
       const text = typeof body.text === 'string' ? body.text : '';
+      // Identificadores de rastreio (opcionais): ligam mensagem, segmento e áudio.
+      const turnId = typeof body.turnId === 'number' || typeof body.turnId === 'string' ? String(body.turnId).slice(0, 24) : null;
+      const segmentId = typeof body.segmentId === 'string' ? body.segmentId.slice(0, 40) : null;
 
       let result;
       try {
-        result = voice.synthesizeStream(text, { signal: abortSignalFor(req, res) });
+        result = voice.synthesizeStream(text, {
+          signal: abortSignalFor(req, res),
+          turnId,
+          segmentId,
+          sessionId: session.id,
+        });
       } catch (error) {
         sendError(res, error?.status || 503, error?.code || 'voice_error', error?.message || 'Falha na voz.');
         return;
@@ -451,6 +470,7 @@ export function createKiranaServer(overrides = {}) {
         'Content-Type': result.mime,
         'Cache-Control': 'no-store',
         'X-Kirana-Voice': result.meta.voice,
+        ...(segmentId ? { 'X-Kirana-Segment': segmentId } : {}),
         'X-Accel-Buffering': 'no',
         'Transfer-Encoding': 'chunked',
         'Cross-Origin-Resource-Policy': 'same-origin',

@@ -622,7 +622,8 @@ async function sendMessage(text) {
     els.input.focus();
     // Avisa a voz do desfecho: só aqui sabemos se houve erro/interrupção.
     voiceBridge.done?.({
-      text: buffer,
+      // Sem `text`: o controlador de voz fala apenas o resto não falado.
+      // Passar a resposta inteira aqui fazia a Kirana repetir tudo no fim.
       aborted,
       error: hadError,
       pendingAction: pendingActionFromTurn,
@@ -694,7 +695,7 @@ async function confirmAction(action, approve, card) {
     }
     state.pendingAction = null;
     voiceNoticeUntil = 0;
-    voiceBridge.done?.({ text: buffer, aborted: false, error: false, pendingAction: null });
+    voiceBridge.done?.({ aborted: false, error: false, pendingAction: null });
     stream = finalize(stream, { aborted: false });
     syncComposer(stream);
     state.controller = null;
@@ -946,6 +947,35 @@ function setupVoice() {
 
   // Superfície de depuração/teste (não é API pública da Kirana).
   window.kiranaVoice = voice;
+
+  /**
+   * Diagnóstico da voz no console do navegador:
+   *
+   *   await window.kiranaVoiceReport()   // tabela: turno, segmento, texto, tempos
+   *
+   * Compara o que o navegador pediu para falar com o que o servidor realmente
+   * enviou ao motor (já limpo). Se os textos diferirem, a limpeza alterou algo;
+   * se aparecer palavra que não existe no chat, o problema está no motor.
+   * Nada aqui é enviado para fora: fica na memória do navegador e do servidor.
+   */
+  window.kiranaVoiceReport = async () => {
+    const report = await voice.report();
+    const linhas = report.server.map((entry) => ({
+      turno: entry.turnId,
+      segmento: entry.segmentId,
+      recebido: entry.receivedChars,
+      enviado_ao_motor: entry.text_sent_to_tts,
+      descartados: entry.droppedChars.join(' ') || '',
+      '1o_byte_ms': entry.firstByteMs,
+      total_ms: entry.totalMs,
+      bytes: entry.bytes,
+      resultado: entry.outcome,
+    }));
+    console.table(linhas);
+    console.log('estados:', report.states.map((s) => s.to).join(' → '));
+    console.log('navegador:', report.browser);
+    return report;
+  };
 
   voiceBridge.delta = (text) => voice?.appendDelta(text);
   voiceBridge.done = (info) => voice?.endTurn(info);

@@ -21,20 +21,53 @@ ALLOWED_RATES = {
 }
 
 
+def _is_speakable_char(char: str) -> bool:
+    """Mesma política de `src/voice/tts-text.js` (lista de permissão).
+
+    A v0.4.0 removia emojis por faixas de código fixas, que deixavam passar
+    símbolos falados como palavra (ex.: £ lido como "libra"). Aqui a regra é
+    positiva: só letra, número, marca de acentuação, espaço e a pontuação
+    fechada abaixo passam.
+    """
+    import unicodedata
+
+    if char in ALLOWED_PUNCTUATION:
+        return True
+    if char.isspace():
+        return True
+    code = ord(char)
+    # seletores de variação e keycap são "marcas" para o Unicode, mas invisíveis
+    if 0xFE00 <= code <= 0xFE0F or code == 0x20E3 or 0xE0100 <= code <= 0xE01EF:
+        return False
+    return unicodedata.category(char)[0] in ("L", "N", "M")
+
+
+ALLOWED_PUNCTUATION = set(".,;:!?'\"()[]{}«»-–—…%/$°")
+
+
 def sanitize_text(text: str) -> str:
+    """Limpa o texto para fala. Nada fora da política chega ao motor."""
     import re
+
+    # --- estruturais -------------------------------------------------------
+    text = re.sub(r"```[\s\S]*?```", " ", text)
+    text = re.sub(r"`([^`]*)`", r"\1", text)
     text = re.sub(r"!\[([^\]]*)\]\([^)]*\)", r"\1", text)
     text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
-    text = re.sub(r"```[^\n]*\n?|```", " ", text)
-    text = re.sub(r"`([^`]*)`", r"\1", text)
-    text = re.sub(r"<[^>]+>", " ", text)
     text = re.sub(r"https?://\S+|www\.\S+", " ", text)
+    text = re.sub(r"<[^>]+>", " ", text)
     text = re.sub(r"(?m)^\s{0,3}(?:#{1,6}\s+|>\s?|[-*+]\s+|\d+[.)]\s+)", "", text)
     text = re.sub(r"[*_~]{1,3}", "", text)
-    text = re.sub(r"[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF\uFE0E\uFE0F\u200d\u20e3]", "", text)
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\s*\n+\s*", " ", text)
-    text = re.sub(r"\s+([,.;:!?])", r"\1", text)
+    text = re.sub(r"(?m)^\s*\|(.+)\|\s*$", lambda m: m.group(1).replace("|", ", "), text)
+    text = re.sub(r"(?m)^\s*([-*_]\s*){3,}$", " ", text)
+
+    # --- política de caracteres -------------------------------------------
+    text = "".join(char if _is_speakable_char(char) else " " for char in text)
+
+    # --- espaços e pontuação ----------------------------------------------
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"\s+([,.;:!?…])", r"\1", text)
+    text = re.sub(r"([,;:])(?:\s*[,;:])+", r"\1", text)
     return text.strip()
 
 

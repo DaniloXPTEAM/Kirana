@@ -365,7 +365,10 @@ test('encerrar: desliga tudo, limpa fila e mantém a conversa', async () => {
   assert.equal(controller.active, false);
   assert.equal(controller.state, VOICE_STATE.IDLE);
   assert.equal(controller.queueSize, 0);
-  assert.ok(recognition.stopped >= 1);
+  // v0.4.1: usamos abort() (descarta o áudio já capturado) em vez de stop(),
+  // que ainda entrega o resultado final ao handler. O intento do teste — o
+  // microfone foi fechado — continua o mesmo.
+  assert.ok(recognition.stopped + recognition.aborted >= 1, 'o reconhecedor precisa ser encerrado');
   controller.dispose();
 });
 

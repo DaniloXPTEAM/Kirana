@@ -1,5 +1,57 @@
 # Changelog — Kirana
 
+## 0.4.1 — 25/10/2026 (correção do sistema de voz)
+
+Correção dos defeitos relatados no teste real de Windows da v0.4.0. Relatório
+completo (sintoma, causa comprovada, evidência, correção, testes e limitações) em
+`docs/AUDITORIA-VOZ-V0.4.1.md`.
+
+### Corrigido
+- **Resposta falada duas vezes.** `endTurn()` aceitava um texto de fallback
+  (`|| text`) e o app passava a resposta inteira: o último segmento repetia tudo.
+  O fim de turno agora apenas sinaliza; nenhum texto volta pelo caminho de áudio.
+- **Autoescuta.** O microfone reabria quando a fila de fala esvaziava — **no meio
+  da resposta**. Agora fica fechado durante todo o turno e por 600 ms depois do
+  áudio, com token por sessão: evento atrasado de reconhecedor antigo é
+  descartado (contado em `history.phantomBlocked`).
+- **Palavra "Libra" sem estar no texto.** O glifo `£` (e `♎`) passava pelo filtro
+  e o Edge TTS o pronuncia como "libra" (medido: `£` +4 608 bytes de áudio contra
+  +4 896 da palavra falada). Filtro trocado por **allowlist** de caracteres
+  faláveis, aplicada no JS e de novo no worker Python.
+- **Áudio diferente do texto.** Mesma origem + resíduo de seletor de variação
+  (`U+FE0F`) que sobrava de `1️⃣`. `analyzeSpeechText()` relata exatamente o que
+  foi descartado.
+- **Silêncio de segundos entre frases.** A síntese seguinte só era pedida depois
+  do fim da anterior. Agora é pedida no `playing` da atual: silêncio entre frases
+  **728/703 ms → 5 ms** (áudio de 400 ms, síntese de 300 ms).
+- **Travadas em "Falando"/"Ouvindo".** Transições explícitas, `releasePlayback()`
+  no fim da fila, `scheduleResume()` único e cão-de-guarda de 20 s que declara
+  erro em vez de ficar mudo.
+
+### Adicionado
+- **`GET /api/voice/diagnostics?sessionId=`** (autenticada) e
+  **`window.kiranaVoiceReport()`**: registro por segmento com `turnId`,
+  `segmentId`, `text_sent_to_tts`, o que foi descartado, tempos de síntese e
+  reprodução, bytes e desfecho. Em memória (últimos 50), sem credenciais.
+- **`turnId`/`segmentId`** no `POST /api/voice/tts` e header `X-Kirana-Segment`.
+- **`test/voice-behavior.test.js`** — 22 testes de comportamento cobrindo os
+  cenários da auditoria. Rodados contra o `voice.js` da v0.4.0, **11 falham**;
+  contra a v0.4.1, todos passam.
+- `docs/AUDITORIA-VOZ-V0.4.1.md` — relatório, cenários, medições e roteiro A–E
+  para o Windows.
+
+### Alterado
+- Suíte: **219 → 241** testes; navegador de voz **34/34**; demo **15/15**.
+- Versão 0.4.1 em `package.json` e `src/config.js`.
+
+### Limitações declaradas
+- **Não medido no Windows.** Os números são de Linux (sandbox); o teste A–E na
+  instalação do usuário continua pendente e é o que valida a correção de fato.
+- **Sem microfone físico aqui:** `SpeechRecognition` real não roda em headless; os
+  testes de escuta usam dublês. Eco de alto-falante real não foi reproduzido.
+- **Barge-in por voz não foi implementado** (só projetado): durante a fala a
+  Kirana não ouve. A interrupção disponível é pelo botão/toque.
+
 ## 0.4.0 — 25/10/2026 (voz conversacional, Marco 3)
 
 ### Adicionado

@@ -15,7 +15,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { MAX_SPEECH_CHARS, hasSpeakableContent, sanitizeTextForSpeech } from './tts-text.js';
+import { MAX_SPEECH_CHARS, analyzeSpeechText, hasSpeakableContent, sanitizeTextForSpeech } from './tts-text.js';
 
 export const THALITA_VOICE = 'pt-BR-ThalitaMultilingualNeural';
 
@@ -58,6 +58,15 @@ export function createVoiceService({
   const speechRate = ALLOWED_RATES.includes(rate) ? rate : DEFAULT_RATE;
   const log = logger?.child?.('voice') ?? logger;
   const active = new Set();
+  /**
+   * Instrumentação (v0.4.1): um registro por segmento falado, em memória e com
+   * teto. Guarda o texto EXATO que foi enviado ao motor e o que foi descartado,
+   * para comparar `text_displayed` (no navegador) com `text_sent_to_tts`.
+   * Só existe em RAM: não vai para disco, não vai para o histórico e não
+   * contém credenciais.
+   */
+  const diagnostics = [];
+  const DIAG_LIMIT = 50;
   const pyArgs = platform === 'win32' && pythonCommand === 'py' ? ['-3'] : [];
 
   const enabled = provider !== 'disabled';
@@ -136,9 +145,10 @@ export function createVoiceService({
    * Sintetiza em streaming. Devolve o child process para permitir abort
    * imediato (barge-in) sem esperar o fim do áudio.
    */
-  function synthesizeStream(rawText, { signal } = {}) {
+  function synthesizeStream(rawText, { signal, turnId = null, segmentId = null, sessionId = null } = {}) {
     if (!enabled) throw new VoiceError('Modo de voz desativado na configuração.', { code: 'voice_disabled' });
-    const text = sanitizeTextForSpeech(rawText);
+    const analysis = analyzeSpeechText(rawText);
+    const text = analysis.text;
     if (!text || !hasSpeakableContent(text)) {
       throw new VoiceError('Não há conteúdo falável nesta resposta.', { code: 'voice_empty_text', status: 400 });
     }
@@ -156,21 +166,49 @@ export function createVoiceService({
     const startedAt = Date.now();
     const meta = { voice: THALITA_VOICE, rate: speechRate, provider: 'edge-tts', chars: text.length, firstByteMs: null, totalMs: null, bytes: 0 };
 
+    const record = {
+      at: new Date().toISOString(),
+      sessionId,
+      turnId,
+      segmentId,
+      receivedChars: String(rawText ?? '').length,
+      text_sent_to_tts: text,
+      chars: text.length,
+      dropped: analysis.dropped,
+      droppedChars: analysis.droppedChars,
+      firstByteMs: null,
+      totalMs: null,
+      bytes: 0,
+      outcome: 'started',
+    };
+    diagnostics.push(record);
+    if (diagnostics.length > DIAG_LIMIT) diagnostics.shift();
+
     if (child.stdout) {
       child.stdout.once('data', () => {
         meta.firstByteMs = Date.now() - startedAt;
+        record.firstByteMs = meta.firstByteMs;
       });
       child.stdout.on('data', (chunk) => {
         meta.bytes += chunk.length;
+        record.bytes = meta.bytes;
       });
     }
 
-    const cleanup = () => {
+    const cleanup = (code) => {
       active.delete(child);
       meta.totalMs = Date.now() - startedAt;
+      record.totalMs = meta.totalMs;
+      record.bytes = meta.bytes;
+      if (record.outcome === 'started') {
+        record.outcome = signal?.aborted ? 'aborted' : code === 0 ? 'ok' : 'failed';
+      }
     };
     child.on('close', cleanup);
-    child.on('error', cleanup);
+    child.on('error', () => {
+      record.outcome = 'error';
+      cleanup(-1);
+    });
 
     // Aborto: mata o processo (o worker para de gerar áudio imediatamente).
     const onAbort = () => {
@@ -208,6 +246,13 @@ export function createVoiceService({
     close,
     get activeCount() {
       return active.size;
+    },
+    /** Registros de instrumentação (mais recente por último). */
+    diagnostics(filter = {}) {
+      return diagnostics.filter((entry) => (!filter.sessionId || entry.sessionId === filter.sessionId)).slice();
+    },
+    clearDiagnostics() {
+      diagnostics.length = 0;
     },
   };
 }
