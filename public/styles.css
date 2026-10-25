@@ -506,3 +506,35 @@ ul { margin: 0; padding: 0; list-style: none; }
   .voice-btn { width: 38px; height: 38px; }
   .composer { padding-left: 12px; }
 }
+
+/* --------------------- escolha de voz (v0.4.2) --------------------------- */
+.voice-config-btn {
+  width: 40px; height: 40px; flex: 0 0 auto;
+  border-radius: 50%; border: 1px solid var(--line, #e6e3f2);
+  background: #fff; color: var(--ink-soft, #555c72);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.voice-config-btn svg { width: 19px; height: 19px; }
+.voice-config-btn:hover { background: #f7f5ff; color: var(--brand, #6d4aff); }
+.voice-config-btn[aria-expanded="true"] { background: #f0ebff; color: var(--brand, #6d4aff); border-color: #d9ceff; }
+.voice-config-btn:focus-visible { outline: 2px solid var(--brand, #6d4aff); outline-offset: 2px; }
+
+.voice-settings {
+  margin-top: 10px; padding: 12px 14px;
+  border: 1px solid var(--line, #e6e3f2); border-radius: 14px;
+  background: #fbfaff; display: grid; gap: 10px;
+}
+.voice-settings-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.voice-settings-label { font-size: 0.82rem; font-weight: 600; color: var(--ink-soft, #555c72); min-width: 84px; }
+.voice-settings-input {
+  flex: 1 1 200px; min-height: 36px; padding: 6px 10px;
+  border: 1px solid var(--line, #e6e3f2); border-radius: 10px;
+  background: #fff; color: var(--ink, #1d2233); font-size: 0.88rem;
+}
+.voice-settings-input:focus-visible { outline: 2px solid var(--brand, #6d4aff); outline-offset: 1px; }
+.voice-settings-hint { margin: 0; font-size: 0.78rem; color: var(--ink-soft, #555c72); }
+@media (max-width: 480px) {
+  .voice-config-btn { width: 38px; height: 38px; }
+  .voice-settings-label { min-width: 100%; }
+}

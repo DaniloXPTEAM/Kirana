@@ -218,7 +218,7 @@ nunca no frontend; gateway pessoal **não** pode atender visitantes do site púb
 
 ```bash
 corepack pnpm install --frozen-lockfile   # instala exatamente o pnpm-lock.yaml (obrigatório)
-node scripts/run-tests.mjs                # 241 testes, lista explícita
+node scripts/run-tests.mjs                # 267 testes, lista explícita
 npm run audit                             # sonda de contrato do gateway
 npm run doctor                            # diagnóstico de ambiente (inclui a voz)
 npm run voice:bench                       # mede o provedor de voz (latência, ppm)

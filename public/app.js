@@ -45,6 +45,13 @@ const els = {
   send: document.getElementById('send'),
   voiceBtn: document.getElementById('voice-btn'),
   voiceStatus: document.getElementById('voice-status'),
+  voiceConfigBtn: document.getElementById('voice-config-btn'),
+  voiceSettings: document.getElementById('voice-settings'),
+  voiceEngine: document.getElementById('voice-engine'),
+  voiceSelect: document.getElementById('voice-select'),
+  voiceRate: document.getElementById('voice-rate'),
+  voicePreview: document.getElementById('voice-preview'),
+  voiceSettingsHint: document.getElementById('voice-settings-hint'),
   stop: document.getElementById('stop'),
   composerStatus: document.getElementById('composer-status'),
   composerStatusText: document.getElementById('composer-status-text'),
@@ -972,6 +979,7 @@ function setupVoice() {
       resultado: entry.outcome,
     }));
     console.table(linhas);
+    console.log('motor:', report.settings?.engine, '· voz:', report.settings?.voice?.name, '· taxa:', report.settings?.rate);
     console.log('estados:', report.states.map((s) => s.to).join(' → '));
     console.log('navegador:', report.browser);
     return report;
@@ -999,6 +1007,8 @@ function setupVoice() {
     }
   });
 
+  setupVoiceSettings();
+
   els.voiceBtn.addEventListener('click', () => {
     voice?.toggle().catch(() => {});
   });
@@ -1012,6 +1022,117 @@ function setupVoice() {
     // Aviso de confirmação pendente fica na tela até a ação ser resolvida.
     showVoiceStatus(event.detail.message, true, event.detail.sticky ? Number.MAX_SAFE_INTEGER : 6000);
   });
+}
+
+/* --------------------- painel de voz e velocidade (v0.4.2) --------------- */
+
+/**
+ * Monta o seletor de motor/voz/velocidade.
+ *
+ * A lista é montada a partir do catálogo real: vozes do navegador (que é o
+ * caminho rápido, sem servidor) e vozes do servidor (edge-tts). A escolha é
+ * salva pelo próprio controlador (`localStorage`), então sobrevive ao recarregar.
+ */
+function setupVoiceSettings() {
+  const { voiceConfigBtn, voiceSettings, voiceEngine, voiceSelect, voiceRate, voicePreview, voiceSettingsHint } = els;
+  if (!voice || !voiceConfigBtn || !voiceSettings) return;
+
+  voiceConfigBtn.addEventListener('click', () => {
+    const open = voiceSettings.hidden;
+    voiceSettings.hidden = !open;
+    voiceConfigBtn.setAttribute('aria-expanded', String(open));
+    if (open) {
+      // O catálogo do servidor custa processo Python + rede: busca ao abrir.
+      voice.refreshVoices({ includeServer: true, force: true }).then(renderVoiceSettings).catch(() => {});
+    }
+  });
+
+  const settings = voice.settings;
+  if (voiceEngine) voiceEngine.value = settings.engine === 'edge' || settings.engine === 'browser' ? settings.engine : 'auto';
+  if (voiceRate) voiceRate.value = settings.rate || '+0%';
+
+  voiceEngine?.addEventListener('change', () => {
+    voice.setEngine(voiceEngine.value);
+    renderVoiceSettings();
+  });
+
+  voiceSelect?.addEventListener('change', () => {
+    if (!voiceSelect.value) return;
+    voice.setVoice(voiceSelect.value);
+    renderVoiceSettings();
+  });
+
+  voiceRate?.addEventListener('change', () => {
+    voice.setRate(voiceRate.value);
+    renderVoiceSettings();
+  });
+
+  voicePreview?.addEventListener('click', async () => {
+    voicePreview.disabled = true;
+    const original = voicePreview.textContent;
+    voicePreview.textContent = 'Falando…';
+    try {
+      const result = await voice.previewVoice();
+      if (result?.error) showVoiceStatus(result.error.message, true, 6000);
+    } catch (error) {
+      showVoiceStatus(error?.message || 'Não foi possível tocar a prévia.', true, 6000);
+    } finally {
+      voicePreview.disabled = false;
+      voicePreview.textContent = original;
+    }
+  });
+
+  window.addEventListener('kirana:voice-voices', (event) => {
+    renderVoiceSettings(event.detail?.voices);
+  });
+
+  renderVoiceSettings();
+}
+
+/** Redesenha as opções agrupadas por motor, mantendo a voz escolhida. */
+function renderVoiceSettings(catalog = null) {
+  const { voiceSelect, voiceSettingsHint } = els;
+  if (!voice || !voiceSelect) return;
+  const voices = catalog ?? voice.voices;
+  const settings = voice.settings;
+
+  const grupo = (titulo, lista) => {
+    if (!lista.length) return null;
+    const group = document.createElement('optgroup');
+    group.label = titulo;
+    for (const item of lista) {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = item.label || item.name;
+      option.selected = item.id === settings.voice?.id;
+      group.append(option);
+    }
+    return group;
+  };
+
+  const anterior = voiceSelect.value;
+  voiceSelect.replaceChildren();
+  const navegador = grupo('Neste navegador (mais rápido)', voices.browser ?? []);
+  const servidor = grupo('No servidor (edge-tts)', voices.edge ?? []);
+  if (navegador) voiceSelect.append(navegador);
+  if (servidor) voiceSelect.append(servidor);
+  if (!navegador && !servidor) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'Nenhuma voz disponível agora';
+    voiceSelect.append(option);
+  }
+  const desejada = settings.voice?.id || anterior;
+  if (desejada) voiceSelect.value = desejada;
+
+  if (voiceSettingsHint) {
+    const total = (voices.browser?.length ?? 0) + (voices.edge?.length ?? 0);
+    const motor = settings.engine === 'browser' ? 'navegador' : settings.engine === 'edge' ? 'servidor' : 'automático';
+    const voz = settings.voice?.name ? ` · ${settings.voice.name}` : '';
+    voiceSettingsHint.textContent = total
+      ? `Falando pelo ${motor}${voz} — ${voices.browser?.length ?? 0} voz(es) do navegador, ${voices.edge?.length ?? 0} do servidor.`
+      : 'Nenhuma voz encontrada ainda. Toque em “Ouvir prévia” depois de permitir o áudio.';
+  }
 }
 
 let voiceNoticeUntil = 0;

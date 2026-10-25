@@ -146,6 +146,20 @@
               </svg>
               <span class="voice-ring" aria-hidden="true"></span>
             </button>
+            <button
+              class="voice-config-btn"
+              id="voice-config-btn"
+              type="button"
+              aria-label="Escolher voz e velocidade"
+              aria-expanded="false"
+              aria-controls="voice-settings"
+              title="Voz e velocidade"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 10v4h3l4 3V7L7 10H4Z" fill="currentColor" />
+                <path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none" />
+              </svg>
+            </button>
             <button class="send" id="send" type="submit" aria-label="Enviar mensagem" title="Enviar (Enter)">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 8 6 8-16-8Z" fill="currentColor" /></svg>
             </button>
@@ -154,6 +168,35 @@
             Enter envia · Shift + Enter quebra linha · Kirana pode cometer erros; confirme informações importantes.
           </p>
           <p class="voice-status" id="voice-status" role="status" aria-live="polite" hidden></p>
+
+          <!-- Escolha da voz (v0.4.2): navegador ou servidor, com prévia ---- -->
+          <div class="voice-settings" id="voice-settings" hidden>
+            <div class="voice-settings-row">
+              <label class="voice-settings-label" for="voice-engine">Motor</label>
+              <select id="voice-engine" class="voice-settings-input">
+                <option value="auto">Automático (mais rápido)</option>
+                <option value="browser">Navegador (sem servidor)</option>
+                <option value="edge">Servidor (edge-tts)</option>
+              </select>
+            </div>
+            <div class="voice-settings-row">
+              <label class="voice-settings-label" for="voice-select">Voz</label>
+              <select id="voice-select" class="voice-settings-input"></select>
+            </div>
+            <div class="voice-settings-row">
+              <label class="voice-settings-label" for="voice-rate">Velocidade</label>
+              <select id="voice-rate" class="voice-settings-input">
+                <option value="-10%">Mais devagar (−10%)</option>
+                <option value="-5%">Um pouco mais devagar (−5%)</option>
+                <option value="+0%">Natural</option>
+                <option value="+5%">Um pouco mais rápido (+5%)</option>
+                <option value="+8%">Mais rápido (+8%)</option>
+                <option value="+15%">Bem mais rápido (+15%)</option>
+              </select>
+              <button type="button" class="btn" id="voice-preview">Ouvir prévia</button>
+            </div>
+            <p class="voice-settings-hint" id="voice-settings-hint" role="status" aria-live="polite"></p>
+          </div>
         </div>
       </main>
     </div>

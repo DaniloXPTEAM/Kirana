@@ -1,5 +1,53 @@
 # Changelog — Kirana
 
+## 0.4.2 — 25/10/2026 (voz: pronúncia, motor do navegador, vozes)
+
+Correção pedida depois do teste real de Windows da v0.4.1. Relatório completo em
+`docs/AUDITORIA-VOZ-V0.4.2.md`.
+
+### Corrigido
+- **Pronúncia errada (acentos).** O texto era enviado ao Python como JSON UTF-8
+  cru; num pipe do Windows o Python decodifica com a página ANSI (cp1252) e o
+  worker recebia `eleiÃ§Ãµes` — e mandava isso ao motor. Medido com edge-tts real:
+  mesma frase, **20 736 bytes corretos vs 25 344 corrompidos** (+28% de áudio na
+  comparação direta). Agora: JSON só ASCII (`toAsciiJson`), `PYTHONUTF8=1` /
+  `PYTHONIOENCODING=utf-8` no filho e `stdin.reconfigure("utf-8")` no worker.
+- **Palavras partidas em dois áudios.** O corte por tamanho podia cair no meio de
+  uma palavra quando não havia espaço antes do limite. Agora o corte é sempre em
+  espaço; só um token absurdo (URL gigante) é partido.
+
+### Adicionado
+- **Motor de fala do navegador** (`public/voice-engine.js`): `speechSynthesis`
+  do sistema — sem processo Python e sem rede. É o caminho que o laboratório Voice
+  usava para a Francisca e o que explica a diferença de velocidade percebida.
+  O motor do servidor (edge-tts) continua, como alternativa e como queda.
+- **Escolha de motor, voz e velocidade** no painel ao lado do microfone, com
+  **Ouvir prévia** (frase curta, não entra no histórico, não chama o modelo),
+  preferência salva em `localStorage` e troca sem tocar no código.
+- **Catálogo de vozes pt-BR**: `GET /api/voice/voices` (17 vozes aceitas, entre
+  elas `pt-BR-FranciscaNeural` e as Thalita) + vozes do navegador, unificadas na
+  interface. Preferência: Francisca → Thalita → outras pt-BR.
+- **`POST /api/voice/tts` aceita `voice`** (lista fechada, validada no serviço).
+- **`--self-check` no worker** + linha no `doctor`: "Voz: acentuação até o motor".
+- **Balde próprio de limite para a voz** (6x o do chat): uma resposta falada gera
+  um pedido de síntese por frase — com o balde do chat a fala pararia no meio.
+- Métricas por segmento agora incluem `engine` e `voice`.
+
+### Testes
+- `node scripts/run-tests.mjs`: **241 → 267**.
+- Navegador de voz: **34 → 40** (painel de voz, catálogo, troca de motor,
+  persistência).
+- Demo: 15/15. `npm run voice:bench`: primeiro byte 642–667 ms, 157 ppm.
+
+### Limitações declaradas
+- **O áudio do `speechSynthesis` não foi medido aqui**: o Chromium headless não
+  expõe voz nenhuma (medido, `getVoices() = []`). O caminho do navegador está
+  provado por teste de comportamento; o som precisa do Teste F na sua máquina.
+- A soletração de "eleições" tem **dois mecanismos reproduzidos** (texto
+  corrompido e texto fragmentado), ambos eliminados, mas a causa exata na sua
+  máquina só o `doctor`/`kiranaVoiceReport()` confirma.
+- Barge-in por voz continua só projetado (interrupção é pelo botão/toque).
+
 ## 0.4.1 — 25/10/2026 (correção do sistema de voz)
 
 Correção dos defeitos relatados no teste real de Windows da v0.4.0. Relatório

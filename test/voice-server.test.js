@@ -19,13 +19,14 @@ function fakeWorker({ bytes = 'audio-mpeg-fake', failStatus = null, onAbort = nu
   const created = [];
   const spawnImpl = (command, args) => {
     const child = new EventEmitter();
-    const received = { text: null, killed: false };
+    const received = { text: null, payload: null, killed: false };
     child.stdout = Readable.from([Buffer.from(bytes)]);
     child.stdout.on('end', () => setTimeout(() => child.emit('close', 0), 1));
     child.stderr = new EventEmitter();
     child.stdin = {
       end(payload) {
         if (payload) {
+          received.payload = String(payload);
           try {
             received.text = JSON.parse(payload).text;
           } catch {
@@ -277,4 +278,121 @@ test('abortar antes de começar não cria processo', async () => {
     (error) => error.code === 'voice_aborted',
   );
   assert.equal(created.length, 0);
+});
+
+/* ------------------- v0.4.2: codificação, vozes, catálogo ----------------- */
+
+test('acentos chegam ao worker íntegros (o que está no stdin é só ASCII)', async () => {
+  const { spawnImpl, created } = fakeWorker();
+  const voice = service({ spawnImpl });
+  const result = voice.synthesizeStream('As eleições e a inteligência em português.', {});
+  result.stream.resume();
+  await new Promise((resolve) => result.child.once('close', resolve));
+
+  const enviado = created[0].payload; // bytes crus escritos no stdin
+  assert.equal(/[^\x00-\x7F]/.test(enviado), false, 'nada acima de 0x7F: imune ao cp1252 do Windows');
+  assert.equal(created[0].received.text, 'As eleições e a inteligência em português.');
+});
+
+test('toAsciiJson escapa acentos e sobrevive ao round-trip', async () => {
+  const { toAsciiJson, pythonUtf8Env } = await import('../src/voice/tts.js');
+  const json = toAsciiJson({ text: 'eleições — ação, coração', rate: '+8%', voice: 'pt-BR-ThalitaMultilingualNeural' });
+  assert.equal(/[^\x00-\x7F]/.test(json), false, 'o JSON não pode ter caractere não-ASCII');
+  assert.equal(JSON.parse(json).text, 'eleições — ação, coração');
+  const env = pythonUtf8Env({ FOO: '1' });
+  assert.equal(env.PYTHONIOENCODING, 'utf-8');
+  assert.equal(env.PYTHONUTF8, '1');
+  assert.equal(env.FOO, '1', 'o resto do ambiente é preservado');
+});
+
+test('voz pedida fora da lista fechada é recusada antes de criar processo', async () => {
+  const { spawnImpl, created } = fakeWorker();
+  const voice = service({ spawnImpl });
+  assert.throws(
+    () => voice.synthesizeStream('texto válido aqui', { voice: 'pt-BR-VozInventadaNeural' }),
+    (error) => error.code === 'voice_invalid_voice' && error.status === 400,
+  );
+  assert.throws(
+    () => voice.synthesizeStream('texto válido aqui', { voice: 'en-US-AriaNeural' }),
+    (error) => error.code === 'voice_invalid_voice',
+  );
+  assert.equal(created.length, 0);
+});
+
+test('voz aceita é enviada ao worker', async () => {
+  const { spawnImpl, created } = fakeWorker();
+  const voice = service({ spawnImpl });
+  const result = voice.synthesizeStream('texto válido aqui', { voice: 'pt-BR-FranciscaNeural' });
+  result.stream.resume();
+  await new Promise((resolve) => result.child.once('close', resolve));
+  assert.equal(result.meta.voice, 'pt-BR-FranciscaNeural');
+  assert.equal(voice.diagnostics().at(-1).voice, 'pt-BR-FranciscaNeural');
+});
+
+test('GET /api/voice/voices devolve o catálogo pt-BR e a voz padrão', async () => {
+  const { spawnImpl } = fakeWorker({
+    bytes: JSON.stringify([
+      { shortName: 'pt-BR-ThalitaMultilingualNeural', locale: 'pt-BR', gender: 'Female' },
+      { shortName: 'pt-BR-FranciscaNeural', locale: 'pt-BR', gender: 'Female' },
+      { shortName: 'en-US-AriaNeural', locale: 'en-US', gender: 'Female' },
+    ]),
+  });
+  const voice = service({ spawnImpl });
+  await withServer(voice, async (kirana) => {
+    const response = await fetch(`${kirana.base}/api/voice/voices`);
+    assert.equal(response.status, 200);
+    const data = await response.json();
+    assert.deepEqual(data.voices.map((item) => item.shortName).sort(), ['pt-BR-FranciscaNeural', 'pt-BR-ThalitaMultilingualNeural']);
+    assert.equal(data.voices[0].engine, 'edge');
+    assert.equal(data.defaultVoice, THALITA_VOICE);
+  });
+});
+
+test('GET /api/voice/voices exige o mesmo token da API', async () => {
+  const { spawnImpl } = fakeWorker({ bytes: '[]' });
+  const voice = service({ spawnImpl });
+  await withServer(
+    voice,
+    async (kirana) => {
+      const denied = await fetch(`${kirana.base}/api/voice/voices`);
+      assert.equal(denied.status, 401);
+      const allowed = await fetch(`${kirana.base}/api/voice/voices`, { headers: { Authorization: 'Bearer token-de-teste-123' } });
+      assert.equal(allowed.status, 200);
+    },
+    { env: { KIRANA_ACCESS_TOKEN: 'token-de-teste-123' } },
+  );
+});
+
+test('POST /api/voice/tts aceita a voz escolhida e recusa voz inventada', async () => {
+  const { spawnImpl } = fakeWorker();
+  const voice = service({ spawnImpl });
+  await withServer(voice, async (kirana) => {
+    const session = await newSession(kirana.base);
+    const ok = await fetch(`${kirana.base}/api/voice/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: session.id, text: 'olá, tudo bem por aqui', voice: 'pt-BR-FranciscaNeural' }),
+    });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.headers.get('x-kirana-voice'), 'pt-BR-FranciscaNeural');
+    await ok.arrayBuffer();
+
+    const bad = await fetch(`${kirana.base}/api/voice/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: session.id, text: 'olá, tudo bem por aqui', voice: 'xx-YY-Inventada' }),
+    });
+    assert.equal(bad.status, 400);
+    assert.equal((await bad.json()).error.code, 'voice_invalid_voice');
+  });
+});
+
+test('self-check confirma que os acentos chegam íntegros ao worker', async () => {
+  const { spawnImpl } = fakeWorker({
+    bytes: JSON.stringify({ stdinEncoding: 'utf-8', roundTrip: true, received: 'A inteligência está ótima, eleições e português.' }),
+  });
+  const voice = service({ spawnImpl });
+  const result = await voice.selfCheck();
+  assert.equal(result.ok, true);
+  assert.equal(result.roundTrip, true);
 });

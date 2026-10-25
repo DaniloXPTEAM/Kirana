@@ -20,6 +20,48 @@ import { MAX_SPEECH_CHARS, analyzeSpeechText, hasSpeakableContent, sanitizeTextF
 export const THALITA_VOICE = 'pt-BR-ThalitaMultilingualNeural';
 
 /**
+ * Vozes pt-BR aceitas (lista fechada, igual à do worker). Thalita continua
+ * sendo o padrão; as demais existem para o usuário escolher na interface.
+ */
+export const ALLOWED_VOICES = [
+  'pt-BR-ThalitaMultilingualNeural',
+  'pt-BR-FranciscaNeural',
+  'pt-BR-AntonioNeural',
+  'pt-BR-BrendaNeural',
+  'pt-BR-DonatoNeural',
+  'pt-BR-ElzaNeural',
+  'pt-BR-FabioNeural',
+  'pt-BR-GiovannaNeural',
+  'pt-BR-HumbertoNeural',
+  'pt-BR-JulioNeural',
+  'pt-BR-LeilaNeural',
+  'pt-BR-LeticiaNeural',
+  'pt-BR-ManuelaNeural',
+  'pt-BR-NicolauNeural',
+  'pt-BR-ThalitaNeural',
+  'pt-BR-ValerioNeural',
+  'pt-BR-YaraNeural',
+];
+
+/**
+ * JSON com escapes ASCII.
+ *
+ * O `JSON.stringify` normal emite UTF-8 cru. O Python filho, quando o stdio não
+ * é UTF-8 (padrão no Windows para pipes: página ANSI cp1252), decodifica esses
+ * bytes como cp1252 e o worker recebe "eleiÃ§Ãµes" em vez de "eleições" — e
+ * manda isso para o motor, mudando a pronúncia. Gerado assim, o JSON é 100%
+ * ASCII e não depende da codificação de nenhum dos dois lados.
+ */
+export function toAsciiJson(value) {
+  return JSON.stringify(value).replace(/[\u007F-\uFFFF]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
+}
+
+/** Ambiente que força UTF-8 no processo filho (2ª barreira). */
+export function pythonUtf8Env(base = process.env) {
+  return { ...base, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' };
+}
+
+/**
  * Velocidades aceitas pelo worker. Lista fechada de propósito: o valor vai
  * para o motor externo e não deve ser arbitrário.
  *
@@ -53,9 +95,11 @@ export function createVoiceService({
   platform = process.platform,
   provider = process.env.KIRANA_TTS_PROVIDER || 'edge',
   rate = process.env.KIRANA_TTS_RATE || DEFAULT_RATE,
+  voice = process.env.KIRANA_TTS_VOICE || THALITA_VOICE,
   logger,
 } = {}) {
   const speechRate = ALLOWED_RATES.includes(rate) ? rate : DEFAULT_RATE;
+  const defaultVoice = ALLOWED_VOICES.includes(voice) ? voice : THALITA_VOICE;
   const log = logger?.child?.('voice') ?? logger;
   const active = new Set();
   /**
@@ -77,6 +121,7 @@ export function createVoiceService({
       const child = spawnImpl(pythonCommand, [...pyArgs, workerPath, ...args], {
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe'],
+        env: pythonUtf8Env(),
       });
       const out = [];
       const err = [];
@@ -117,11 +162,11 @@ export function createVoiceService({
     try {
       const { stdout } = await runWorkerOnce(['--list-voices'], { timeoutMs: 20_000 });
       const voices = JSON.parse(stdout.toString('utf8') || '[]');
-      const found = Array.isArray(voices) && voices.some((v) => v.shortName === THALITA_VOICE);
+      const found = Array.isArray(voices) && voices.some((v) => v.shortName === defaultVoice);
       return {
         available: Boolean(found),
         provider: 'edge-tts',
-        voice: THALITA_VOICE,
+        voice: defaultVoice,
         rate: speechRate,
         voiceFound: Boolean(found),
         catalogSize: Array.isArray(voices) ? voices.length : 0,
@@ -132,7 +177,7 @@ export function createVoiceService({
       return {
         available: false,
         provider: 'edge-tts',
-        voice: THALITA_VOICE,
+        voice: defaultVoice,
         rate: speechRate,
         checkMs: Date.now() - started,
         reason: error?.code || 'voice_unavailable',
@@ -142,10 +187,52 @@ export function createVoiceService({
   }
 
   /**
+   * Catálogo de vozes pt-BR do provedor (com cache curto).
+   *
+   * A interface usa isto para oferecer as vozes do servidor ao lado das vozes
+   * do navegador. Falha de rede/provedor devolve lista vazia — nunca impede a
+   * conversa, porque o motor do navegador não depende disto.
+   */
+  const catalogCache = { at: 0, voices: [] };
+  async function listVoices({ force = false, ttlMs = 5 * 60_000 } = {}) {
+    if (!enabled) return [];
+    if (!force && catalogCache.voices.length && Date.now() - catalogCache.at < ttlMs) return catalogCache.voices;
+    try {
+      const { stdout } = await runWorkerOnce(['--list-voices'], { timeoutMs: 20_000 });
+      const items = JSON.parse(stdout.toString('utf8') || '[]');
+      const voices = (Array.isArray(items) ? items : [])
+        .filter((item) => ALLOWED_VOICES.includes(item?.shortName))
+        .map((item) => ({ shortName: item.shortName, locale: item.locale ?? 'pt-BR', gender: item.gender ?? null, status: item.status ?? null }));
+      catalogCache.voices = voices;
+      catalogCache.at = Date.now();
+      return voices;
+    } catch {
+      return catalogCache.voices; // último catálogo conhecido, se houver
+    }
+  }
+
+  /**
+   * Verifica se o texto chega íntegro ao worker (acentos inclusive).
+   *
+   * Existe porque a corrupção Node→Python no Windows é silenciosa: o áudio sai,
+   * só sai errado. O `doctor` chama isto e compara.
+   */
+  async function selfCheck() {
+    const probe = 'A inteligência está ótima, eleições e português.';
+    try {
+      const { stdout } = await runWorkerOnce(['--self-check'], { timeoutMs: 20_000, input: toAsciiJson({ text: probe }) });
+      const result = JSON.parse(stdout.toString('utf8'));
+      return { ...result, probe, ok: Boolean(result.roundTrip) };
+    } catch (error) {
+      return { ok: false, probe, error: error?.code || 'voice_self_check_failed' };
+    }
+  }
+
+  /**
    * Sintetiza em streaming. Devolve o child process para permitir abort
    * imediato (barge-in) sem esperar o fim do áudio.
    */
-  function synthesizeStream(rawText, { signal, turnId = null, segmentId = null, sessionId = null } = {}) {
+  function synthesizeStream(rawText, { signal, turnId = null, segmentId = null, sessionId = null, voice = null } = {}) {
     if (!enabled) throw new VoiceError('Modo de voz desativado na configuração.', { code: 'voice_disabled' });
     const analysis = analyzeSpeechText(rawText);
     const text = analysis.text;
@@ -156,15 +243,20 @@ export function createVoiceService({
       throw new VoiceError('Texto acima do limite de fala.', { code: 'voice_text_too_long', status: 413 });
     }
     if (signal?.aborted) throw new VoiceError('Requisição cancelada.', { code: 'voice_aborted', status: 499 });
+    const chosenVoice = voice ?? defaultVoice;
+    if (!ALLOWED_VOICES.includes(chosenVoice)) {
+      throw new VoiceError('Voz não suportada neste servidor.', { code: 'voice_invalid_voice', status: 400 });
+    }
 
     const child = spawnImpl(pythonCommand, [...pyArgs, workerPath], {
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
+      env: pythonUtf8Env(),
     });
     active.add(child);
 
     const startedAt = Date.now();
-    const meta = { voice: THALITA_VOICE, rate: speechRate, provider: 'edge-tts', chars: text.length, firstByteMs: null, totalMs: null, bytes: 0 };
+    const meta = { voice: chosenVoice, rate: speechRate, provider: 'edge-tts', chars: text.length, firstByteMs: null, totalMs: null, bytes: 0 };
 
     const record = {
       at: new Date().toISOString(),
@@ -173,6 +265,7 @@ export function createVoiceService({
       segmentId,
       receivedChars: String(rawText ?? '').length,
       text_sent_to_tts: text,
+      voice: chosenVoice,
       chars: text.length,
       dropped: analysis.dropped,
       droppedChars: analysis.droppedChars,
@@ -221,7 +314,8 @@ export function createVoiceService({
     signal?.addEventListener?.('abort', onAbort, { once: true });
     child.on('close', () => signal?.removeEventListener?.('abort', onAbort));
 
-    if (child.stdin) child.stdin.end(JSON.stringify({ text, rate: speechRate }));
+    // Sempre JSON ASCII: independe da codificação do stdio do Python no Windows.
+    if (child.stdin) child.stdin.end(toAsciiJson({ text, rate: speechRate, voice: chosenVoice }));
 
     return { mime: 'audio/mpeg', stream: child.stdout, child, meta, text };
   }
@@ -239,9 +333,12 @@ export function createVoiceService({
 
   return {
     provider: enabled ? 'edge-tts' : 'disabled',
-    voice: THALITA_VOICE,
+    voice: defaultVoice,
+    voices: ALLOWED_VOICES,
     rate: speechRate,
     status,
+    listVoices,
+    selfCheck,
     synthesizeStream,
     close,
     get activeCount() {

@@ -68,6 +68,20 @@ if ((process.env.KIRANA_TTS_PROVIDER || 'edge') === 'disabled') {
         ? `${state.voice} disponível (${state.catalogSize} vozes no catálogo, ${state.checkMs} ms)`
         : `indisponível: ${state.reason || state.note}. A interface continua funcionando por texto.`,
     );
+
+    // Codificação Node -> Python (v0.4.2): no Windows o stdio de um pipe usa a
+    // página ANSI, então os acentos podem ser corrompidos no caminho. Isso não
+    // quebra a voz — só a pronúncia. O worker devolve o que realmente recebeu.
+    if (state.available) {
+      const check = await voice.selfCheck();
+      record(
+        'Voz: acentuação até o motor',
+        check.ok ? 'ok' : 'fail',
+        check.ok
+          ? `texto íntegro (stdio ${check.stdinEncoding ?? '?'}, locale ${check.localeEncoding ?? '?'})`
+          : `o worker recebeu "${check.received ?? '?'}" em vez de "${check.probe}" — a pronúncia vai sair errada`,
+      );
+    }
   } catch (error) {
     record('Voz (TTS)', 'warn', `falhou ao consultar: ${error?.message}. A interface continua funcionando por texto.`);
   } finally {

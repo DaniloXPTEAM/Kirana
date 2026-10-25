@@ -17,6 +17,25 @@ apenas a porta de entrada: em vez de digitar, o visitante fala.
                                     <audio> no navegador
 ```
 
+## Dois motores de fala (v0.4.2)
+
+A Kirana pode falar de dois jeitos, e você escolhe no painel ao lado do microfone
+(botão de alto-falante → Motor / Voz / Velocidade / **Ouvir prévia**):
+
+| Motor | O que usa | Vantagem | Limite |
+| --- | --- | --- | --- |
+| **Navegador** | `speechSynthesis` do seu Windows/Edge | começa quase na hora: **sem processo Python e sem rede** | depende das vozes que o navegador expõe (no Edge existem as "Online (Natural)" em pt-BR) |
+| **Servidor** | worker Python + `edge-tts` (Thalita, Francisca, …) | igual em qualquer navegador | custa processo + conexão antes do primeiro som |
+| **Automático** (padrão) | navegador se houver voz pt-BR; senão servidor | ninguém fica sem voz | — |
+
+Preferência de voz: a salva → **Francisca** → Thalita → outras pt-BR → padrão do
+sistema. A escolha fica salva no navegador (`localStorage`) e vale na próxima vez.
+**A Thalita continua disponível** — trocar de voz não é trocar de mecanismo.
+
+> As vozes do navegador e do servidor têm nomes parecidos, mas **não são o mesmo
+> mecanismo**: "Francisca Online (Natural)" é a voz do Windows/Edge (nuvem da
+> Microsoft via navegador) e `pt-BR-FranciscaNeural` é a do edge-tts.
+
 ## O que foi acrescentado
 
 | Arquivo | Papel |
@@ -203,6 +222,10 @@ Conclusões honestas:
 
 ## Diagnóstico de um turno (temporário, local)
 
+Cada registro agora diz **qual motor e qual voz** falaram aquele trecho:
+`engine: "browser" | "edge"` e `voice`. No motor do navegador não existe "primeiro
+byte": `ttsFirstByte` é igual a `playbackStart` (a síntese é a reprodução).
+
 Para entender o que a Kirana falou e o que ela *achou* que falou:
 
 - No navegador, com a voz ligada: `kiranaVoiceReport()` no console → tabela com
@@ -224,13 +247,34 @@ credenciais. Detalhes em `docs/AUDITORIA-VOZ-V0.4.1.md`.
 | Python ausente | `GET /api/voice/status` responde `available:false`; a resposta continua no texto. |
 | `edge-tts` ausente ou desatualizado | Idem; o diagnóstico aponta o comando de instalação. |
 | Serviço da Microsoft fora do ar | Estado `erro`, aviso "A voz falhou agora, mas a resposta continua no texto". |
-| Reprodução travada (navegador não emite `ended`) | Cão-de-guarda de 20 s (`speakingStallMs`) declara erro e devolve o microfone, em vez de ficar em "falando". |
+| Reprodução travada (navegador não emite `ended`) | Cão-de-guarda de 20 s (`speakingStallMs`) declara erro e devolve o microfone, em vez de ficar em "falando". No motor do navegador o prazo é 4x maior, porque uma frase longa leva mais tempo. |
+| Navegador sem nenhuma voz (headless, Firefox antigo, Windows sem voz pt-BR) | O motor cai automaticamente para o servidor; se você escolheu "Navegador" de propósito, a Kirana avisa e continua falando pelo servidor. |
+| Limite de requisições | A voz tem um balde próprio (6x o do chat). Uma resposta com várias frases gera um pedido por frase — com o balde do chat, a fala pararia no meio. |
 | Navegador sem MP3 em `MediaSource` (Firefox) | O áudio é acumulado e tocado ao final do trecho (um pouco mais de espera). |
+
+## Acentuação: a checagem que pega o problema silencioso
+
+No Windows, o `stdin` de um processo Python num pipe usa a página ANSI
+(cp1252), não UTF-8. Se o texto não fosse blindado, o worker receberia
+`eleiÃ§Ãµes` em vez de `eleições` — o áudio sairia, só que errado. Correção em
+três camadas (JSON só ASCII, ambiente `PYTHONUTF8=1`, `stdin.reconfigure`).
+
+Para conferir na sua máquina:
+
+```bat
+diagnostico.bat
+:: ou
+node scripts/doctor.mjs
+```
+
+A linha **"Voz: acentuação até o motor"** mostra `texto íntegro` (bom) ou o texto
+corrompido que o worker recebeu (aí a pronúncia sai errada e o problema está no
+caminho, não na voz).
 
 ## Como testar
 
 ```bat
-testar.bat                      :: suíte completa (241 testes)
+testar.bat                      :: suíte completa (267 testes)
 node test\browser\voice-flow.mjs   :: 34 verificações de navegador com áudio real
 npm run voice:bench             :: mede o provedor de verdade
 ```

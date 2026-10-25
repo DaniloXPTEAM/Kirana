@@ -371,6 +371,41 @@ try {
     await page.waitForFunction(() => window.kiranaVoice?.state === 'inativo', null, { timeout: 10000 }).catch(() => {});
     const finalState = await voiceState(page);
     check('usuário encerra a voz quando quiser', finalState === 'inativo', finalState);
+
+    /* -------------------- v0.4.2: escolha de motor e voz ------------------ */
+    await page.locator('#voice-config-btn').click();
+    await page.waitForFunction(() => !document.getElementById('voice-settings')?.hidden, null, { timeout: 5000 })
+      .then(() => check('painel de voz abre pelo botão de configuração', true))
+      .catch(() => check('painel de voz abre pelo botão de configuração', false));
+
+    const engines = await page.evaluate(() => [...document.querySelectorAll('#voice-engine option')].map((o) => o.value));
+    check('painel oferece automático, navegador e servidor', ['auto', 'browser', 'edge'].every((v) => engines.includes(v)), engines.join(','));
+
+    // O catálogo do servidor é buscado ao abrir o painel (processo Python real).
+    const hasEdgeVoice = await page.waitForFunction(
+      () => [...document.querySelectorAll('#voice-select optgroup[label*="servidor"] option')].length > 0,
+      null,
+      { timeout: 30000 },
+    ).then(() => true).catch(() => false);
+    check('vozes do servidor aparecem no seletor', hasEdgeVoice);
+
+    const picked = await page.evaluate(async () => {
+      const select = document.getElementById('voice-select');
+      const edgeOption = [...select.options].find((option) => option.value.startsWith('edge:'));
+      if (!edgeOption) return null;
+      select.value = edgeOption.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return { engine: window.kiranaVoice.settings.engine, voice: window.kiranaVoice.settings.voice?.name };
+    });
+    check('escolher voz do servidor muda o motor', picked?.engine === 'edge', picked ? `${picked.engine} / ${picked.voice}` : 'sem voz');
+
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('kirana.voz.preferencias.v1') || 'null'));
+    check('preferência de voz fica salva no navegador', Boolean(saved?.voiceId), saved ? saved.voiceId : 'nada salvo');
+
+    const hint = await page.locator('#voice-settings-hint').textContent();
+    check('painel informa qual motor está falando', /servidor|navegador|automático/i.test(hint || ''), (hint || '').slice(0, 70));
+
     await context.close();
   }
 } catch (error) {

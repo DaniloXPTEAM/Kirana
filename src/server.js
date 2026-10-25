@@ -50,6 +50,20 @@ export function createKiranaServer(overrides = {}) {
   const registry = overrides.registry ?? createToolRegistry({ tools, logger });
   const agent = overrides.agent ?? createAgent({ config, gateway, registry, sessions, memory, logger, catalog });
   const limiter = createRateLimiter(config.rateLimit);
+  /**
+   * Voz: balde próprio de limite.
+   *
+   * Uma única resposta falada gera VÁRIOS pedidos de síntese (um por frase) e,
+   * se o mesmo balde do chat fosse usado, o limite padrão (20/min) silenciaria
+   * a Kirana no meio da resposta — e o seletor de vozes apareceria vazio. O
+   * limite da voz é proporcional (6x) ao do chat, no mesmo intervalo, e a
+   * síntese continua com as mesmas travas: sessão válida, mesmo token, mesmo
+   * limite de 3000 caracteres e abort que mata o worker.
+   */
+  const voiceLimiter = createRateLimiter({
+    max: Math.max(config.rateLimit.max * 6, 60),
+    windowMs: config.rateLimit.windowMs,
+  });
   const siteKit = overrides.siteKit ?? createSiteKit({ sitesDir: path.join(PROJECT_ROOT, 'sites'), logger });
   const demoContact = overrides.demoContact ?? createDemoContact({ interests, logger });
   // Voz: modalidade da MESMA agente. Só sintetiza texto; não orquestra nada.
@@ -91,6 +105,15 @@ export function createKiranaServer(overrides = {}) {
     } catch (error) {
       if (error instanceof HttpError) throw error;
       throw new HttpError(403, 'forbidden_origin', 'Origem inválida.');
+    }
+  }
+
+  function checkVoiceRate(req) {
+    const result = voiceLimiter.check(clientIp(req));
+    if (!result.allowed) {
+      throw new HttpError(429, 'rate_limited', 'Muitas requisições de voz em pouco tempo. Aguarde um instante.', {
+        retryAfterMs: Math.round(result.retryAfterMs),
+      });
     }
   }
 
@@ -428,6 +451,26 @@ export function createKiranaServer(overrides = {}) {
       return;
     }
 
+    // Catálogo de vozes pt-BR do motor do servidor. A interface combina isto
+    // com as vozes do próprio navegador; se o provedor estiver fora do ar, a
+    // lista volta vazia e a voz do navegador continua funcionando.
+    if (route === '/api/voice/voices' && (method === 'GET' || method === 'HEAD')) {
+      assertAuth(req);
+      checkVoiceRate(req);
+      const voices = await voice.listVoices({ force: url.searchParams.get('force') === '1' });
+      sendJson(res, 200, {
+        voices: voices.map((item) => ({
+          engine: 'edge',
+          shortName: item.shortName,
+          locale: item.locale,
+          gender: item.gender,
+        })),
+        defaultVoice: voice.voice,
+        rate: voice.rate,
+      });
+      return;
+    }
+
     // Instrumentação da voz: o que foi realmente enviado ao motor em cada
     // segmento. Só memória, teto de 50 registros, exige o mesmo token da API.
     if (route === '/api/voice/diagnostics' && method === 'GET') {
@@ -444,7 +487,7 @@ export function createKiranaServer(overrides = {}) {
     if (route === '/api/voice/tts' && method === 'POST') {
       assertAuth(req);
       assertSameOrigin(req);
-      checkRate(req);
+      checkVoiceRate(req); // balde próprio: uma resposta falada = vários pedidos
       const body = await readJsonBody(req, { maxBytes: 32 * 1024 });
       const session = sessions.get(typeof body.sessionId === 'string' ? body.sessionId : '');
       if (!session) throw new HttpError(404, 'session_not_found', 'Sessão não encontrada.');
@@ -452,6 +495,8 @@ export function createKiranaServer(overrides = {}) {
       // Identificadores de rastreio (opcionais): ligam mensagem, segmento e áudio.
       const turnId = typeof body.turnId === 'number' || typeof body.turnId === 'string' ? String(body.turnId).slice(0, 24) : null;
       const segmentId = typeof body.segmentId === 'string' ? body.segmentId.slice(0, 40) : null;
+      // Voz escolhida na interface (opcional). A lista é fechada no serviço.
+      const requestedVoice = typeof body.voice === 'string' ? body.voice.slice(0, 64) : null;
 
       let result;
       try {
@@ -460,6 +505,7 @@ export function createKiranaServer(overrides = {}) {
           turnId,
           segmentId,
           sessionId: session.id,
+          voice: requestedVoice,
         });
       } catch (error) {
         sendError(res, error?.status || 503, error?.code || 'voice_error', error?.message || 'Falha na voz.');

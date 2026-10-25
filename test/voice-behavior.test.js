@@ -568,3 +568,29 @@ test('16b. takeSpeakableSentences não inventa nem perde texto', () => {
   const junto = `${chunks.join(' ')} ${rest}`.replace(/\s+/g, ' ').trim();
   assert.equal(junto, original.replace(/\s+/g, ' ').trim());
 });
+
+test('16c. o texto falado nunca é cortado no meio de uma palavra', () => {
+  // 400 caracteres sem espaço até 300: o corte tem de acontecer no espaço.
+  // Frase única e longa (o corte por tamanho acontece dentro de `push`, que só
+  // roda em fim de frase).
+  const frase = `${'palavra '.repeat(60).trim()}.`;
+  const { chunks } = takeSpeakableSentences(frase, { minChars: 24, maxChars: 120 });
+  assert.equal(chunks.length > 1, true);
+  for (const chunk of chunks) {
+    assert.equal(chunk.length <= 120, true, `pedaço grande demais: ${chunk.length}`);
+    // cada palavra do pedaço precisa estar inteira (o último leva o ponto final)
+    const palavras = chunk.split(' ').map((word) => word.replace(/\.$/, ''));
+    assert.equal(palavras.every((word) => word === 'palavra'), true, `fragmento: ${JSON.stringify(chunk)}`);
+  }
+  // Um "token" gigante e sem pontuação não é falado no meio do turno: fica no
+  // buffer e sai inteiro no fim (nada de fragmento em áudio).
+  const gigante = 'a'.repeat(900);
+  const semFim = takeSpeakableSentences(gigante, { minChars: 24, maxChars: 300 });
+  assert.equal(semFim.chunks.length, 0);
+  assert.equal(semFim.rest.length, 900);
+  // Com fim de frase, o corte acontece — é o único caso em que um token é
+  // partido, e é ele que impede a fila de travar com uma "palavra" de 900 letras.
+  const comFim = takeSpeakableSentences(`${gigante}.`, { minChars: 24, maxChars: 300 });
+  assert.equal(comFim.chunks.length >= 3, true);
+  assert.equal(comFim.chunks.join('').replace(/\./g, '').length, 900);
+});

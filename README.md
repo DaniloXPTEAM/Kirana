@@ -32,7 +32,7 @@ ao navegador.
 | Rate limiting, validação de entrada, CORS/origem, CSP | ✅ implementado e testado |
 | CopilotKit + AG-UI + sites por cliente (Marco 2) | ✅ implementado e testado |
 | **Voz conversacional: ouvir, falar, interromper (Marco 3)** | ✅ implementado e testado em Chromium real |
-| Testes automatizados | ✅ 241 testes, 0 falhas |
+| Testes automatizados | ✅ 267 testes, 0 falhas |
 | Validação com o gateway ChatGPT real | ⏳ pendente — depende da sua máquina |
 | Meta de 2 s para a primeira resposta útil | ⏳ não medida em condição real |
 
@@ -232,7 +232,7 @@ O backend também passou a **cancelar a leitura da resposta do gateway** ao rece
 npm test          # ou testar.bat — resolve a lista de arquivos, sem glob do shell
 ```
 
-Resultado desta entrega: **241 testes, 241 aprovados, 0 falhas** (~3 min),
+Resultado desta entrega: **267 testes, 267 aprovados, 0 falhas** (~3 min),
 mais **15 verificações** de navegador do site de demonstração e **34** da voz
 (`test/browser/voice-flow.mjs`). A voz real também tem medição própria:
 `npm run voice:bench`.

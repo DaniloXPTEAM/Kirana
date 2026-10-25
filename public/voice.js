@@ -1,5 +1,5 @@
 /**
- * Kirana — voz conversacional (cliente). v0.4.1
+ * Kirana — voz conversacional (cliente). v0.4.2
  *
  * Isto NÃO é uma segunda Kirana: usa as mesmas sessões, o mesmo /api/chat, as
  * mesmas ferramentas e a mesma memória. O módulo faz apenas três coisas:
@@ -32,10 +32,29 @@
  *     Windows). Correção: pipeline de um segmento — o próximo é pedido assim
  *     que o atual começa a tocar.
  *
+ * (d) DOIS MOTORES DE FALA (v0.4.2) — a fala pode vir do `speechSynthesis` do
+ *     navegador (o caminho do laboratório Voice: sem processo Python e sem rede,
+ *     começa em centésimos de segundo) ou do worker Python/edge-tts do servidor.
+ *     O motor é escolhido nas preferências, com queda automática para o outro
+ *     quando a voz some. A fila, a interrupção e o diagnóstico são os mesmos
+ *     para os dois caminhos: só muda quem sintetiza.
+ *
  * Meia-duplex é intencional nesta versão. Interromper por voz (barge-in com o
  * microfone aberto durante a fala) fica para depois: exige cancelamento de eco
  * (AEC) confiável, que o SpeechRecognition do navegador não expõe.
  */
+
+import {
+  ENGINE,
+  PREVIEW_TEXT,
+  createBrowserSpeechEngine,
+  describeEngine,
+  loadPreference,
+  normalizeServerVoices,
+  pickVoice,
+  rateToNumber,
+  savePreference,
+} from './voice-engine.js';
 
 /** Estados explícitos da conversa por voz. */
 export const VOICE_STATE = {
@@ -72,13 +91,31 @@ export function takeSpeakableSentences(buffer, { minChars = 24, maxChars = 320 }
   const chunks = [];
   let rest = String(buffer ?? '');
 
+  /**
+   * Empurra um trecho para a fila.
+   *
+   * v0.4.2 — o corte é SEMPRE em espaço. Antes, quando não havia espaço antes
+   * do limite, o texto era cortado no meio do caractere: a palavra chegava
+   * dividida em dois áudios e o motor pronunciava dois pedaços (é uma das
+   * formas de "soletração" relatadas). Agora uma palavra só é partida se for um
+   * "token" absurdo (mais que o dobro do limite, ex.: URL gigante sem espaço).
+   */
   const push = (text) => {
     let piece = text.trim();
     while (piece.length > maxChars) {
       const cut = piece.lastIndexOf(' ', maxChars);
-      const at = cut > minChars ? cut : maxChars;
-      chunks.push(piece.slice(0, at).trim());
-      piece = piece.slice(at).trim();
+      if (cut > minChars) {
+        chunks.push(piece.slice(0, cut).trim());
+        piece = piece.slice(cut).trim();
+        continue;
+      }
+      if (piece.length > maxChars * 2) {
+        // token único e enorme: corta, mas é o único caso em que isso acontece
+        chunks.push(piece.slice(0, maxChars).trim());
+        piece = piece.slice(maxChars).trim();
+        continue;
+      }
+      break; // palavra grande sozinha: fala inteira, nunca pela metade
     }
     if (piece) chunks.push(piece);
   };
@@ -132,8 +169,13 @@ export function createVoiceController({
   AudioImpl = globalThis.Audio,
   lang = 'pt-BR',
   endpoint = '/api/voice/tts',
+  voicesEndpoint = '/api/voice/voices',
   headers = () => ({}),
   speak = true,
+  speechEngine = null,
+  storage = globalThis.localStorage,
+  preference = null,
+  rate = '+0%',
   logger = console,
   tuning = {},
   now = () => Date.now(),
@@ -174,6 +216,18 @@ export function createVoiceController({
   let muted = false; // turno cancelado: não falar texto atrasado
   const activeRequests = new Set();
   const history = { turns: 0, cancellations: 0, errors: 0, phantomBlocked: 0 };
+
+  /* ------------------------- motores de fala (v0.4.2) -------------------- */
+
+  const browserSpeech = speechEngine ?? createBrowserSpeechEngine({ logger, now });
+  let prefs = {
+    engine: ENGINE.AUTO,
+    voiceId: null,
+    rate,
+    ...(preference ?? loadPreference(storage) ?? {}),
+  };
+  const catalog = { browser: [], edge: [], at: 0 };
+  let voicesPromise = null;
 
   const supported = Boolean(RecognitionImpl);
 
@@ -486,13 +540,173 @@ export function createVoiceController({
     }
   }
 
+  /* --------------------- escolha do motor e da voz (v0.4.2) ---------------- */
+
+  /** O navegador consegue falar agora (API presente e ao menos uma voz)? */
+  function browserUsable() {
+    return Boolean(browserSpeech?.available?.()) && catalog.browser.length > 0;
+  }
+
+  /**
+   * Motor efetivo do próximo segmento.
+   *
+   * `auto` prefere o navegador porque é o caminho sem Python e sem rede (o que
+   * o laboratório Voice mostrou ser muito mais rápido). Se o navegador não
+   * expõe voz nenhuma — headless, Firefox antigo, Windows sem voz pt-BR — cai
+   * para o servidor sem interromper a conversa.
+   */
+  function resolveEngine() {
+    if (prefs.engine === ENGINE.EDGE) return ENGINE.EDGE;
+    if (prefs.engine === ENGINE.BROWSER) return browserUsable() ? ENGINE.BROWSER : ENGINE.EDGE;
+    return browserUsable() ? ENGINE.BROWSER : ENGINE.EDGE;
+  }
+
+  function voiceFor(engine) {
+    if (engine === ENGINE.BROWSER) {
+      return catalog.browser.find((voice) => voice.id === prefs.voiceId) ?? pickVoice(catalog.browser, { engine: ENGINE.BROWSER });
+    }
+    return catalog.edge.find((voice) => voice.id === prefs.voiceId) ?? pickVoice(catalog.edge, { engine: ENGINE.EDGE });
+  }
+
+  /** Nome do motor/voz em uso, para o app mostrar na tela. */
+  function describeCurrent() {
+    const engine = resolveEngine();
+    return { engine, voice: voiceFor(engine), label: describeEngine(engine, voiceFor(engine)), rate: prefs.rate };
+  }
+
+  /**
+   * Carrega o catálogo: vozes do navegador (assíncronas!) + catálogo pt-BR do
+   * servidor. Nunca rejeita: sem catálogo do servidor o motor do navegador
+   * continua funcionando, e vice-versa.
+   */
+  function refreshVoices({ force = false, includeServer = false } = {}) {
+    if (voicesPromise && !force && !includeServer) return voicesPromise;
+    voicesPromise = (async () => {
+      const [browser, edge] = await Promise.all([
+        (async () => {
+          try {
+            return await (browserSpeech?.listVoices?.() ?? []);
+          } catch (error) {
+            logger.debug?.('[voz] catálogo do navegador indisponível', error?.message);
+            return [];
+          }
+        })(),
+        (async () => {
+          // O catálogo do servidor custa um processo Python + rede: só é
+          // buscado quando a interface pede (painel de voz) ou quando já temos
+          // uma lista antiga. O caminho do navegador não depende disto.
+          if (!includeServer && catalog.edge.length) return catalog.edge;
+          if (!includeServer) return [];
+          try {
+            const response = await fetchImpl(voicesEndpoint, { headers: headers() });
+            if (!response.ok) return [];
+            const data = await response.json();
+            const parsed = normalizeServerVoices(data?.voices ?? []);
+            return parsed.length ? parsed : catalog.edge; // resposta vazia não apaga o catálogo
+          } catch {
+            // Servidor de voz desligado, limite de requisições ou rede caindo:
+            // mantém o último catálogo conhecido; o navegador não depende disto.
+            return catalog.edge;
+          }
+        })(),
+      ]);
+      catalog.browser = browser;
+      catalog.edge = edge;
+      catalog.at = now();
+      // A voz salva pode ter sumido: reescolhe uma do mesmo motor.
+      if (prefs.voiceId && ![...browser, ...edge].some((voice) => voice.id === prefs.voiceId)) {
+        const fallbackEngine = prefs.voiceId.startsWith('browser:') ? ENGINE.BROWSER : ENGINE.EDGE;
+        prefs.voiceId = voiceFor(fallbackEngine)?.id ?? null;
+        persist();
+      }
+      emit('kirana:voice-voices', { voices: listVoices(), settings: describeCurrent() });
+      return catalog;
+    })().finally(() => {
+      voicesPromise = null;
+    });
+    return voicesPromise;
+  }
+
+  function listVoices() {
+    if (!catalog.at) refreshVoices({ includeServer: true });
+    const describe = (voice) => ({
+      id: voice.id,
+      engine: voice.engine,
+      name: voice.name,
+      label: voice.label,
+      lang: voice.lang,
+      local: voice.local,
+      selected: voice.id === prefs.voiceId,
+    });
+    return { browser: catalog.browser.map(describe), edge: catalog.edge.map(describe), settings: describeCurrent() };
+  }
+
+  function persist() {
+    savePreference(storage, { engine: prefs.engine, voiceId: prefs.voiceId, rate: prefs.rate });
+  }
+
+  /** Troca de motor preservando a conversa. */
+  function setEngine(engine) {
+    if (![ENGINE.AUTO, ENGINE.BROWSER, ENGINE.EDGE].includes(engine)) return describeCurrent();
+    prefs = { ...prefs, engine, voiceId: null };
+    const current = resolveEngine();
+    prefs.voiceId = voiceFor(current)?.id ?? null;
+    persist();
+    mark('engine_changed', { engine, resolved: current, voice: prefs.voiceId });
+    emit('kirana:voice-voices', { voices: listVoices(), settings: describeCurrent() });
+    return describeCurrent();
+  }
+
+  /** Troca de voz; se a voz for de outro motor, o motor acompanha. */
+  function setVoice(voiceId) {
+    const found = [...catalog.browser, ...catalog.edge].find((voice) => voice.id === voiceId);
+    if (!found) return describeCurrent();
+    prefs = { ...prefs, voiceId: found.id, engine: found.engine };
+    persist();
+    mark('voice_changed', { voiceId: found.id, engine: found.engine });
+    emit('kirana:voice-voices', { voices: listVoices(), settings: describeCurrent() });
+    return describeCurrent();
+  }
+
+  function setRate(nextRate) {
+    prefs = { ...prefs, rate: String(nextRate ?? prefs.rate) };
+    persist();
+    return describeCurrent();
+  }
+
+  /**
+   * Prévia da voz escolhida: frase curta, sem chamar o modelo e sem entrar no
+   * histórico da conversa. Serve para o usuário comparar vozes antes de falar.
+   */
+  async function previewVoice(text = PREVIEW_TEXT) {
+    await refreshVoices({ includeServer: resolveEngine() === ENGINE.EDGE, force: false });
+    const engine = resolveEngine();
+    const voice = voiceFor(engine);
+    if (engine === ENGINE.BROWSER) {
+      browserSpeech.cancel();
+      const result = await browserSpeech.speak(text, { voice: voice?.raw ?? null, rate: rateToNumber(prefs.rate), lang });
+      return { engine, voice: voice?.name ?? null, ...result };
+    }
+    // Motor do servidor: usa o mesmo endpoint da conversa, sem entrar na fila
+    // e sem mexer no turno (a prévia não vira mensagem no histórico).
+    const segment = { turnId, segmentId: `preview-${(segmentSeq += 1)}`, text };
+    const request = requestChunk(segment, epoch, { voice: voice?.raw?.shortName ?? null });
+    try {
+      const response = await request.promise;
+      await playResponse(response, request, { myEpoch: epoch, onPlayStart: () => {} });
+      return { engine, voice: voice?.name ?? null, played: true };
+    } finally {
+      request.controller.abort();
+    }
+  }
+
   function newSegment(text) {
     segmentSeq += 1;
     return { turnId, segmentId: `${turnId}-${segmentSeq}`, text };
   }
 
   /** Abre a síntese de um segmento. O corpo só é consumido na hora de tocar. */
-  function requestChunk(segment, myEpoch) {
+  function requestChunk(segment, myEpoch, { voice = null } = {}) {
     const controller = new AbortController();
     activeRequests.add(controller);
     const startedAt = now();
@@ -504,6 +718,7 @@ export function createVoiceController({
         text: segment.text,
         turnId: segment.turnId,
         segmentId: segment.segmentId,
+        ...(voice ? { voice } : {}),
       }),
       signal: controller.signal,
     })
@@ -534,9 +749,12 @@ export function createVoiceController({
     audio.preload = 'auto';
     currentAudio = audio;
 
+    const settings = describeCurrent();
     const record = {
       turnId: segment.turnId,
       segmentId: segment.segmentId,
+      engine: ENGINE.EDGE,
+      voice: settings.engine === ENGINE.EDGE ? settings.voice?.name ?? null : null,
       textSent: segment.text,
       chars: segment.text.length,
       ttsStart: request.startedAt,
@@ -665,6 +883,74 @@ export function createVoiceController({
   }
 
   /**
+   * Fala um segmento pelo `speechSynthesis` do navegador.
+   *
+   * Não há pedido HTTP, nem processo, nem MP3: `speak()` entrega o texto ao
+   * motor do sistema e o áudio começa em dezenas/centenas de milissegundos.
+   * Em compensação, aqui "síntese" e "reprodução" são o mesmo evento — o
+   * registro de diagnóstico reflete isso (`ttsFirstByte === playbackStart`).
+   */
+  async function playBrowserSegment(segment, { myEpoch, onPlayStart }) {
+    const settings = describeCurrent();
+    const voice = settings.voice;
+    const startedAt = now();
+    const record = {
+      turnId: segment.turnId,
+      segmentId: segment.segmentId,
+      engine: ENGINE.BROWSER,
+      voice: voice?.name ?? null,
+      textSent: segment.text,
+      chars: segment.text.length,
+      ttsStart: startedAt,
+      ttsFirstByte: null,
+      ttsEnd: null,
+      playbackStart: null,
+      playbackEnd: null,
+      bytes: null,
+      outcome: 'started',
+    };
+    diagnostics.push(record);
+    if (diagnostics.length > 60) diagnostics.shift();
+
+    setState(VOICE_STATE.SPEAKING, { force: state !== VOICE_STATE.SPEAKING });
+    mark('chunk_browser_begin', { segmentId: segment.segmentId, voice: record.voice });
+
+    const result = await browserSpeech.speak(segment.text, {
+      voice: voice?.raw ?? null,
+      rate: rateToNumber(prefs.rate),
+      lang,
+      onStart: () => {
+        record.playbackStart = now();
+        record.ttsFirstByte = record.playbackStart;
+        record.ttsEnd = record.playbackStart;
+        onPlayStart?.();
+      },
+    });
+
+    if (result?.error) {
+      record.outcome = result.error.code || 'voice_browser_error';
+      throw result.error;
+    }
+    if (myEpoch !== epoch) {
+      record.outcome = 'cancelled';
+      return;
+    }
+    record.playbackEnd = result?.ended ?? now();
+    record.ttsEnd = record.ttsEnd ?? record.playbackEnd;
+    record.outcome = result?.cancelled ? 'cancelled' : 'played';
+    mark('chunk_browser_end', { segmentId: segment.segmentId, outcome: record.outcome });
+    emit('kirana:voice-audio', {
+      turnId: segment.turnId,
+      segmentId: segment.segmentId,
+      engine: ENGINE.BROWSER,
+      voice: record.voice,
+      bytes: null,
+      firstAudioMs: record.playbackStart ? record.playbackStart - record.ttsStart : null,
+      totalMs: record.playbackEnd - record.ttsStart,
+    });
+  }
+
+  /**
    * Fala a fila em ordem, até acabar ou ser interrompida.
    *
    * Ponto central de desempenho: o próximo segmento é PEDIDO ao servidor assim
@@ -678,7 +964,14 @@ export function createVoiceController({
     let upcoming = null;
     clearTimeout(stallWatchdog);
     try {
-      const next = () => (myEpoch === epoch && speechQueue.length ? requestChunk(speechQueue.shift(), myEpoch) : null);
+      // A fila é a mesma para os dois motores; muda só como o segmento nasce.
+      const next = () => {
+        if (myEpoch !== epoch || !speechQueue.length) return null;
+        const segment = speechQueue.shift();
+        if (resolveEngine() === ENGINE.BROWSER) return { browser: true, segment };
+        const request = requestChunk(segment, myEpoch, { voice: voiceFor(ENGINE.EDGE)?.raw?.shortName ?? null });
+        return request;
+      };
       upcoming = next();
       while (upcoming && myEpoch === epoch) {
         const current = upcoming;
@@ -686,7 +979,14 @@ export function createVoiceController({
         setState(VOICE_STATE.SPEAKING, { force: state !== VOICE_STATE.SPEAKING });
         armStallWatchdog(myEpoch);
         try {
-          mark('chunk_play_begin', { segmentId: current.segment.segmentId });
+          mark('chunk_play_begin', { segmentId: current.segment.segmentId, engine: current.browser ? ENGINE.BROWSER : ENGINE.EDGE });
+          if (current.browser) {
+            await playBrowserSegment(current.segment, { myEpoch, onPlayStart: () => {
+              if (!upcoming && myEpoch === epoch) upcoming = next();
+            } });
+            if (!upcoming) upcoming = next();
+            continue;
+          }
           await playResponse(await current.promise, current, {
             myEpoch,
             onPlayStart: () => {
@@ -707,7 +1007,7 @@ export function createVoiceController({
         if (!upcoming) upcoming = next();
       }
     } finally {
-      upcoming?.controller.abort();
+      upcoming?.controller?.abort?.();
       clearTimeout(stallWatchdog);
       speaking = false;
       currentAudio = null;
@@ -729,6 +1029,10 @@ export function createVoiceController({
 
   function armStallWatchdog(myEpoch) {
     clearTimeout(stallWatchdog);
+    // No motor do navegador o próprio utterance avisa o fim; o cão-de-guarda
+    // existe só para o caso de o navegador nunca emitir 'end' (bug conhecido do
+    // Chrome com textos longos). Por isso o prazo é bem mais folgado.
+    const limit = resolveEngine() === ENGINE.BROWSER ? TIMING.speakingStallMs * 4 : TIMING.speakingStallMs;
     stallWatchdog = setTimeout(() => {
       if (myEpoch !== epoch) return;
       mark('speaking_stall');
@@ -736,7 +1040,7 @@ export function createVoiceController({
       notice('A reprodução parou. A resposta continua no texto.');
       setState(VOICE_STATE.ERROR, { reason: 'speaking_stall', message: 'A reprodução parou; a resposta está no texto.' });
       interrupt({ stopGeneration: false });
-    }, TIMING.speakingStallMs);
+    }, limit);
   }
 
   function enqueueSpeech(text) {
@@ -814,6 +1118,13 @@ export function createVoiceController({
     if (active) return true;
     active = true;
     epoch += 1;
+    // O catálogo do navegador chega de forma assíncrona (voiceschanged).
+    refreshVoices().then((loaded) => {
+      if (!loaded.browser.length && prefs.engine === ENGINE.BROWSER) {
+        notice('Este navegador não oferece voz própria; a Kirana vai falar pelo motor do servidor.');
+      }
+      mark('voices_ready', { browser: loaded.browser.length, edge: loaded.edge.length, engine: resolveEngine() });
+    });
     muted = false;
     buffer = '';
     speechQueue = [];
@@ -853,6 +1164,7 @@ export function createVoiceController({
     muteUntil = 0;
     abortRequests();
     releasePlayback();
+    browserSpeech?.cancel?.();
     speaking = false;
     stopRecognition();
     if (currentAudio) {
@@ -880,6 +1192,7 @@ export function createVoiceController({
     clearTimeout(turnWatchdog);
     abortRequests();
     releasePlayback();
+    browserSpeech?.cancel?.();
     speaking = false;
     if (currentAudio) {
       try {
@@ -956,12 +1269,31 @@ export function createVoiceController({
       } catch {
         /* sem servidor: devolve só o lado do navegador */
       }
-      return { browser: diagnostics.slice(), server, states: stateHistory.slice(), trace: trace.slice() };
+      return {
+        browser: diagnostics.slice(),
+        server,
+        states: stateHistory.slice(),
+        trace: trace.slice(),
+        settings: { ...describeCurrent(), voices: { browser: catalog.browser.length, edge: catalog.edge.length } },
+      };
     },
     start,
     stop: stopAll,
     toggle,
     interrupt,
+    /* motores e vozes (v0.4.2) */
+    refreshVoices,
+    listVoices,
+    setEngine,
+    setVoice,
+    setRate,
+    previewVoice,
+    get settings() {
+      return describeCurrent();
+    },
+    get voices() {
+      return listVoices();
+    },
     appendDelta,
     endTurn,
     dispose,
@@ -972,6 +1304,11 @@ export function createVoiceController({
     // superfícies usadas por testes de navegador e unitários
     _internal: {
       finishUtterance,
+      resolveEngine,
+      browserSpeech,
+      get prefs() {
+        return { ...prefs };
+      },
       takeSpeakableSentences,
       micSuspended,
       isRecognizerLive: () => recognizerLive,
