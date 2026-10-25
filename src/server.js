@@ -20,6 +20,9 @@ import { loadCatalog } from './catalog/index.js';
 import { createToolRegistry } from './tools/registry.js';
 import { createToolDefinitions } from './tools/definitions.js';
 import { createAgent, mapError } from './agent.js';
+import { createSiteKit } from './copilot/site-kit.js';
+import { createCopilotHandler } from './copilot/runtime.js';
+import { createDemoContact } from './demo-contact.js';
 import { createRateLimiter } from './ratelimit.js';
 import {
   HttpError,
@@ -46,6 +49,15 @@ export function createKiranaServer(overrides = {}) {
   const registry = overrides.registry ?? createToolRegistry({ tools, logger });
   const agent = overrides.agent ?? createAgent({ config, gateway, registry, sessions, memory, logger, catalog });
   const limiter = createRateLimiter(config.rateLimit);
+  const siteKit = overrides.siteKit ?? createSiteKit({ sitesDir: path.join(PROJECT_ROOT, 'sites'), logger });
+  const demoContact = overrides.demoContact ?? createDemoContact({ interests, logger });
+  // CopilotKit é opcional: se a inicialização falhar, a Kirana v0.2.1 segue no ar.
+  let copilot = null;
+  try {
+    copilot = overrides.copilot ?? createCopilotHandler({ agent, sessions, siteKit, logger, basePath: '/api/copilot' });
+  } catch (error) {
+    logger.warn('CopilotKit indisponível; interface antiga segue funcionando', { message: error?.message });
+  }
 
   let gatewayStatusCache = { at: 0, value: null };
 
@@ -171,6 +183,19 @@ export function createKiranaServer(overrides = {}) {
 
       if (url.pathname === '/health') {
         sendJson(res, 200, { status: 'ok', app: config.appName, version: config.version, uptime: Math.round(process.uptime()) });
+        return;
+      }
+
+      // CopilotKit / AG-UI (V2). Fica fora do handleApi para preservar o
+      // fluxo antigo: nenhuma rota existente muda de comportamento.
+      if (url.pathname.startsWith('/api/copilot')) {
+        if (!copilot) return sendError(res, 503, 'copilot_unavailable', 'CopilotKit não disponível neste ambiente.');
+        await copilot.handler(req, res);
+        return;
+      }
+
+      if (url.pathname === '/demo' || url.pathname === '/demo/') {
+        serveStatic(config.publicDir, '/demo/index.html', res);
         return;
       }
 
@@ -355,6 +380,33 @@ export function createKiranaServer(overrides = {}) {
           throw error;
         },
       });
+      return;
+    }
+
+    /* --------------- site de demonstração: contato com autorização --------------- */
+    if (route === '/api/demo/contact/prepare' && method === 'POST') {
+      checkRate(req);
+      assertSameOrigin(req);
+      const body = await readJsonBody(req, { maxBytes: config.maxBodyBytes });
+      const result = demoContact.prepare({ values: body.values });
+      if (!result.ok) {
+        sendJson(res, result.status || 400, { error: result.error, message: result.message, errors: result.errors });
+        return;
+      }
+      sendJson(res, 200, { token: result.token, expiresAt: result.expiresAt, confirmationRequired: true });
+      return;
+    }
+
+    if (route === '/api/demo/contact/submit' && method === 'POST') {
+      checkRate(req);
+      assertSameOrigin(req);
+      const body = await readJsonBody(req, { maxBytes: config.maxBodyBytes });
+      const result = demoContact.submit({ token: body.token, values: body.values });
+      if (!result.ok) {
+        sendJson(res, result.status || 400, { error: result.error, message: result.message });
+        return;
+      }
+      sendJson(res, 201, { protocolo: result.protocolo, criadoEm: result.criadoEm, stored: true });
       return;
     }
 

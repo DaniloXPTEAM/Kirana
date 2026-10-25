@@ -62,6 +62,7 @@ export async function* readSseStream(body, { signal } = {}) {
   const decoder = new TextDecoder('utf-8');
   const parser = createSseParser();
   const reader = body.getReader();
+  let fullyRead = false;
 
   const handle = (events) => {
     const out = [];
@@ -83,7 +84,10 @@ export async function* readSseStream(body, { signal } = {}) {
     while (true) {
       if (signal?.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError');
       const { value, done } = await reader.read();
-      if (done) break;
+      if (done) {
+        fullyRead = true;
+        break;
+      }
       const text = decoder.decode(value, { stream: true });
       for (const item of handle(parser.push(text))) yield item;
     }
@@ -91,6 +95,16 @@ export async function* readSseStream(body, { signal } = {}) {
     if (tail) for (const item of handle(parser.push(tail))) yield item;
     for (const item of handle(parser.flush())) yield item;
   } finally {
+    // Se o consumidor parou antes do fim (ex.: recebeu `[DONE]`), cancelar o
+    // corpo fecha a conexão com o gateway. Sem isso o socket fica aberto até o
+    // servidor derrubar — um vazamento por turno quando o gateway usa keep-alive.
+    if (!fullyRead) {
+      try {
+        await reader.cancel();
+      } catch {
+        /* ignore */
+      }
+    }
     try {
       reader.releaseLock();
     } catch {

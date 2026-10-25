@@ -1,5 +1,29 @@
 # Changelog — Kirana
 
+## 0.2.1 — 24/10/2026 (correção do indicador de geração)
+
+### Corrigido
+- **Indicador "Kirana está escrevendo…" eterno** (bug existente desde a 0.1.0). Duas causas:
+  - `public/styles.css`: `.composer-status { display: flex }` vencia a regra do navegador para
+    `[hidden]`; `hidden = true` não escondia o bloco. Adicionada regra global
+    `[hidden] { display: none !important; }`.
+  - `public/app.js`: estado do compositor misturado em flags; um stream encerrado sem evento
+    `done` deixava a UI presa. Agora há uma máquina de estados em `public/stream-state.js`, que
+    sempre volta a ocioso (`done`, `error`, cancelamento, encerramento inesperado).
+- `src/sse.js`: a resposta do gateway não era cancelada ao parar de ler em `[DONE]`, mantendo o
+  socket aberto (um vazamento por turno com gateway keep-alive).
+
+### Adicionado
+- `test/ui-state.test.js` (11 testes): conclusão, erro, cancelamento, encerramento inesperado,
+  idempotência.
+- `test/ui-css.test.js` (6 testes): guarda estática da regra `[hidden]` e dos elementos do
+  compositor.
+- `test/stream-close.test.js` (5 testes): `done` como último evento, fechamento do SSE, erro,
+  cancelamento do cliente e liberação da conexão com o gateway.
+
+### Preservado
+- LangGraph, contrato do gateway, ferramentas, confirmação, memória, layout e comportamento visual.
+
 ## 0.2.0 — 24/10/2026 (Fase 2, Marco 0 + Marco 1)
 
 ### Adicionado
@@ -36,3 +60,4 @@
 
 ## 0.1.0 — 24/10/2026
 - Fase 1: interface, streaming, sessões, memória, 7 ferramentas, confirmação, testes e docs.
+

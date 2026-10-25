@@ -1,12 +1,35 @@
 # HANDOFF — Kirana Fase 2 (checkpoint: Marco 0 + Marco 1 concluídos)
 
 **Data:** 24/10/2026
-**Versão do projeto:** 0.2.0 (base: Fase 1 v0.1.2 + LangGraph)
+**Versão do projeto:** 0.2.1 (base: Fase 1 v0.1.2 + LangGraph + correção do indicador de geração)
 **Estado:** base corrigida, orquestração LangGraph integrada e validada por testes. CopilotKit,
 capacidades, imagens, voz e widget **ainda não iniciados**.
 **Este documento existe para permitir continuar em outra sessão sem refazer trabalho.**
 
 ---
+
+## 0. Correção 0.2.1 — indicador de geração travado (validado no Windows pelo proprietário)
+
+O dono do projeto confirmou que a Kirana conversa pelo gateway real, mas o indicador
+"Kirana está escrevendo…", o spinner e o botão Interromper continuavam visíveis após a resposta.
+
+**Duas causas independentes, ambas corrigidas:**
+
+| # | Causa | Onde | Correção |
+|---|---|---|---|
+| 1 | `.composer-status { display: flex }` vencia a regra do navegador `[hidden] { display: none }`; `hidden = true` não escondia o bloco | `public/styles.css` | regra global `[hidden] { display: none !important; }` |
+| 2 | Estado do compositor em flags soltas; encerramento do stream sem `done` deixava a UI presa | `public/app.js` | máquina de estados `public/stream-state.js`, que sempre volta a ocioso |
+| 3 | A resposta do gateway não era cancelada ao parar em `[DONE]` (socket aberto por turno) | `src/sse.js` | `reader.cancel()` no `finally` quando a leitura para antes do fim |
+
+**Backend verificado (não presumido):** `done` é emitido uma única vez e é o último evento; o SSE é
+fechado em < 100 ms; erro fecha o stream; cancelamento do cliente encerra o turno; a conexão com o
+gateway é liberada. Coberto por `test/stream-close.test.js`.
+
+**Testes:** 102 → **124** (11 de estado do cliente, 6 de guarda de CSS, 5 de encerramento do SSE).
+`npm test` continua passando 100% e `npm run audit` segue com 0 violações de contrato.
+
+**Arquivos novos nesta correção:** `public/stream-state.js`, `test/ui-state.test.js`,
+`test/ui-css.test.js`, `test/stream-close.test.js`.
 
 ## 1. Estado do projeto e caminho
 
@@ -85,7 +108,11 @@ trace`. Sem checkpointer de propósito: a persistência real é `src/sessions.js
 ## 4. Comandos e resultados reais
 
 ```console
-$ node scripts/run-tests.mjs
+$ node scripts/run-tests.mjs      # após a correção 0.2.1
+[testes] 13 arquivo(s)
+# tests 124 · pass 124 · fail 0 · duration_ms ≈ 8 700
+
+$ node scripts/run-tests.mjs      # antes da correção 0.2.1
 [testes] Node v20.20.2 em linux
 [testes] 10 arquivo(s): contract.test.js, gateway.test.js, memory.test.js, orchestrator.test.js,
          payload.test.js, server.test.js, sessions.test.js, sse.test.js, tools.test.js, validation.test.js
@@ -96,7 +123,7 @@ Requisições válidas enviadas ao gateway: 17
 Violações de contrato: 0
 ```
 
-Antes desta etapa: 93 testes. Agora: **102** (+9 de orquestrador). Os 93 anteriores passam
+Linha do tempo: 93 (Fase 1) → 102 (+9 LangGraph) → **124** (+22 correção do indicador). Os 93 anteriores passam
 **sem nenhuma alteração**, com o grafo como padrão — evidência de paridade comportamental.
 
 Comparação de overhead (gateway simulado, 12 turnos, mediana):
@@ -162,6 +189,8 @@ nunca no frontend; gateway pessoal **não** pode atender visitantes do site púb
 3. **Gateway exige reautenticação após reinício** (OAuth em memória). Sintoma: 401 → a interface
    mostra mensagem de chave/autorização.
 4. **Ações pendentes** cancelam ao continuar a conversa (comportamento de projeto, não bug).
+5. **CSS:** qualquer novo bloco com `display:` que use `hidden` já está protegido pela regra global;
+   não remova `[hidden] { display: none !important }` (há teste guardando isso).
 5. **`test/helpers.js`** não é teste; não renomear para `*.test.js`.
 
 ---

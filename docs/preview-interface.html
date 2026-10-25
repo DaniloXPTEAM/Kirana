@@ -33,6 +33,15 @@
 
 * { box-sizing: border-box; }
 
+/*
+ * `hidden` precisa vencer qualquer `display` definido neste arquivo.
+ * Sem esta regra, `.composer-status { display: flex }` sobrepõe o
+ * `display: none` que o navegador aplica a [hidden] — e o indicador de
+ * geração (spinner, "Kirana está escrevendo…", botão Interromper) ficava
+ * visível para sempre ao terminar a resposta.
+ */
+[hidden] { display: none !important; }
+
 html, body {
   height: 100%;
   margin: 0;

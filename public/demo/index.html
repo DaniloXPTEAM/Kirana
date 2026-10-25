@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Opportunity AI · demonstração local da Kirana</title>
+<style>
+  :root { --accent:#1f6feb; --ink:#0d1117; --muted:#5b6672; --line:#e3e8ee; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--ink); }
+  header { position:sticky; top:0; z-index:5; background:rgba(255,255,255,.95); border-bottom:1px solid var(--line); backdrop-filter:blur(6px); }
+  .wrap { max-width:1040px; margin:0 auto; padding:0 20px; }
+  .bar { display:flex; align-items:center; gap:18px; height:62px; }
+  .brand { font-weight:700; letter-spacing:-.02em; }
+  nav { display:flex; gap:6px; margin-left:auto; flex-wrap:wrap; }
+  nav a { color:var(--muted); text-decoration:none; font-size:14px; padding:8px 12px; border-radius:8px; }
+  nav a:hover, nav a[aria-current="true"] { background:#eef4ff; color:var(--accent); }
+  section { padding:44px 0; border-bottom:1px solid var(--line); scroll-margin-top:72px; }
+  h1 { font-size:34px; line-height:1.15; letter-spacing:-.03em; margin:0 0 12px; }
+  h2 { font-size:22px; letter-spacing:-.02em; margin:0 0 6px; }
+  p.lead { color:var(--muted); font-size:17px; margin:0 0 18px; max-width:60ch; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
+  .card { border:1px solid var(--line); border-radius:14px; padding:16px; transition:.15s; }
+  .card h3 { margin:0 0 6px; font-size:15px; }
+  .card p { margin:0; color:var(--muted); font-size:13.5px; line-height:1.5; }
+  .card[data-selected="true"] { border-color:var(--accent); box-shadow:0 0 0 3px #1f6feb22; }
+  form { display:grid; gap:12px; max-width:560px; }
+  label { font-size:13px; font-weight:600; display:block; margin-bottom:4px; }
+  input, select, textarea { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:9px; font:inherit; font-size:14px; }
+  input:focus, select:focus, textarea:focus { outline:2px solid #1f6feb33; border-color:var(--accent); }
+  textarea { min-height:96px; resize:vertical; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:9px; padding:11px 16px; font:inherit; font-weight:600; cursor:pointer; }
+  button.secondary { background:#eef1f5; color:var(--ink); }
+  .hint { color:var(--muted); font-size:12.5px; }
+  #kirana-notice { border:1px solid #dbe6f5; background:#f2f7ff; border-radius:12px; padding:14px 16px; margin-top:14px; display:none; }
+  .result { margin-top:12px; padding:12px 14px; border-radius:10px; font-size:14px; display:none; }
+  .result.ok { display:block; background:#e9f8ee; border:1px solid #bfe6cc; }
+  .result.err { display:block; background:#fdeeee; border:1px solid #f3c9c9; }
+  footer { padding:24px 0; color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap bar">
+    <div class="brand">Opportunity AI <small style="color:#5b6672;font-weight:500">· demo local</small></div>
+    <nav id="site-nav">
+      <a href="#inicio" data-page="inicio" aria-current="true">Início</a>
+      <a href="#solucoes" data-page="solucoes">Soluções</a>
+      <a href="#labs" data-page="labs">Labs</a>
+      <a href="#contato" data-page="contato">Contato</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="inicio">
+    <h1>Inteligência artificial para transformar processos em oportunidades</h1>
+    <p class="lead">Página de demonstração local, reproduzindo a estrutura do opportunity.ia.br. A Kirana pode navegar, abrir o formulário e preencher com você.</p>
+    <button class="secondary" id="cta-contato" type="button">Falar sobre um projeto</button>
+  </section>
+
+  <section id="solucoes">
+    <h2>Soluções</h2>
+    <p class="lead">Seis frentes de trabalho. Peça à Kirana para destacar uma delas.</p>
+    <div class="grid" id="services">
+      <article class="card" data-service="agentes"><h3>Agentes de IA personalizados</h3><p>Triagem de pedidos, consulta a informações internas e rotinas administrativas.</p></article>
+      <article class="card" data-service="atendimento"><h3>Atendimento digital e WhatsApp</h3><p>Dúvidas comuns, triagem de conversas e passagem para atendimento humano.</p></article>
+      <article class="card" data-service="crm"><h3>CRM e automação de vendas</h3><p>Organização de funil e lembretes de retorno.</p></article>
+      <article class="card" data-service="workflows"><h3>Workflows e automação</h3><p>Coleta e tratamento de dados, arquivos e integração entre ferramentas.</p></article>
+      <article class="card" data-service="relatorios"><h3>Relatórios inteligentes</h3><p>Resumos executivos, indicadores e rascunhos de apresentação.</p></article>
+      <article class="card" data-service="voz-android"><h3>Agentes de voz e Android</h3><p>Pesquisa e prototipagem — frente em avaliação.</p></article>
+    </div>
+    <div id="kirana-notice" role="status" aria-live="polite"></div>
+  </section>
+
+  <section id="labs">
+    <h2>Opportunity Labs</h2>
+    <p class="lead">Em conceito e desenvolvimento: Opportunity CRM, CineForma, Kirana e Opportunity Creators.</p>
+  </section>
+
+  <section id="contato">
+    <h2>Contato</h2>
+    <p class="lead">Formulário de demonstração local: o envio grava em <code>data/interests</code> do projeto.</p>
+    <form id="contact-form" novalidate>
+      <div class="row">
+        <div><label for="f-nome">Nome *</label><input id="f-nome" name="nome" autocomplete="name" /></div>
+        <div><label for="f-email">E-mail *</label><input id="f-email" name="email" type="email" autocomplete="email" /></div>
+      </div>
+      <div class="row">
+        <div><label for="f-whatsapp">WhatsApp</label><input id="f-whatsapp" name="whatsapp" /></div>
+        <div><label for="f-empresa">Empresa</label><input id="f-empresa" name="empresa" /></div>
+      </div>
+      <div>
+        <label for="f-interesse">Interesse *</label>
+        <select id="f-interesse" name="interesse">
+          <option value="">Selecione…</option>
+          <option>Agentes de IA personalizados</option>
+          <option>Atendimento digital e WhatsApp</option>
+          <option>CRM e automação de vendas</option>
+          <option>Workflows e automação</option>
+          <option>Relatórios inteligentes</option>
+          <option>Agentes de voz e Android</option>
+          <option>Opportunity Labs e parcerias</option>
+          <option>Outro assunto</option>
+        </select>
+      </div>
+      <div><label for="f-mensagem">Mensagem *</label><textarea id="f-mensagem" name="mensagem"></textarea></div>
+      <div class="hint">O envio pelo widget só acontece após confirmação explícita.</div>
+      <div><button type="submit" id="f-submit">Enviar pedido</button></div>
+      <div class="result" id="form-result" role="status" aria-live="polite"></div>
+    </form>
+  </section>
+
+  <footer>Demonstração local · Kirana V2 com CopilotKit · não representa o site publicado.</footer>
+</main>
+
+<script src="/demo/demo.js"></script>
+<script src="/widget/kirana-widget.js" defer></script>
+</body>
+</html>

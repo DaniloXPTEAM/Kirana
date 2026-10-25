@@ -5,6 +5,8 @@
  * gateway existe no navegador; só um token opcional de acesso local.
  */
 
+import { createStreamState, applyEvent, finalize, composerView } from './stream-state.js';
+
 const state = {
   sessionId: null,
   sessionTitle: '',
@@ -445,12 +447,23 @@ async function startNewSession({ silent = false } = {}) {
 
 /* --------------------------------- envio --------------------------------- */
 
+/**
+ * Aplica a visão do compositor (spinner / rótulo / botão Interromper).
+ * A decisão de mostrar ou não vem de `stream-state.js` — nunca de flags soltas.
+ */
 function setStreamingUI(active, label) {
   state.streaming = active;
   els.composerStatus.hidden = !active;
-  if (label) els.composerStatusText.textContent = label;
+  els.composerStatus.setAttribute('aria-hidden', String(!active));
+  if (active && label) els.composerStatusText.textContent = label;
   els.send.disabled = active;
   els.input.setAttribute('aria-busy', String(active));
+}
+
+/** Sincroniza a UI com o estado do stream. */
+function syncComposer(streamState) {
+  const view = composerView(streamState);
+  setStreamingUI(view.busy, view.label);
 }
 
 async function sendMessage(text) {
@@ -473,7 +486,10 @@ async function sendMessage(text) {
   const shell = createAssistantShell();
   const controller = new AbortController();
   state.controller = controller;
-  setStreamingUI(true, 'Kirana está pensando…');
+
+  let stream = createStreamState();
+  stream = applyEvent(stream, { type: 'start' });
+  syncComposer(stream);
 
   let buffer = '';
   let gotFirstDelta = false;
@@ -508,6 +524,10 @@ async function sendMessage(text) {
     }
 
     await consumeSse(response, (event) => {
+      // O estado do compositor é sempre derivado do evento, num único lugar.
+      stream = applyEvent(stream, event);
+      syncComposer(stream);
+
       switch (event.type) {
         case 'session':
           if (event.title) {
@@ -518,21 +538,13 @@ async function sendMessage(text) {
           state.models.active = event.model;
           els.modelPill.textContent = event.model;
           break;
-        case 'status':
-          if (event.label) els.composerStatusText.textContent = event.label;
-          break;
         case 'delta':
           buffer += event.text;
-          if (!gotFirstDelta) setStreamingUI(true, 'Kirana está escrevendo…');
           paint();
-          break;
-        case 'tool_start':
-          setStreamingUI(true, `Consultando ${(event.title || event.name).toLowerCase()}…`);
           break;
         case 'tool_result':
           shell.bubble.classList.remove('cursor');
           addToolPill(shell.meta, { name: event.name, title: event.title, ok: event.ok, pending: event.errorCode === 'confirmation_required' });
-          setStreamingUI(true, 'Organizando a resposta…');
           break;
         case 'confirmation':
           pendingActionFromTurn = event.action;
@@ -587,7 +599,12 @@ async function sendMessage(text) {
       state.pendingAction = pendingActionFromTurn;
       shell.body.appendChild(renderConfirmation(pendingActionFromTurn));
     }
-    setStreamingUI(false);
+    // Fecha o turno em QUALQUER desfecho, inclusive stream encerrado sem `done`.
+    stream = finalize(stream, { aborted, error: hadError });
+    syncComposer(stream);
+    if (stream.reason && stream.reason !== 'completed' && stream.reason !== 'aborted') {
+      console.debug('[kirana] turno encerrado:', stream.reason);
+    }
     state.controller = null;
     await refreshHistory();
     scrollToBottom();
@@ -602,7 +619,9 @@ async function confirmAction(action, approve, card) {
   const shell = createAssistantShell();
   const controller = new AbortController();
   state.controller = controller;
-  setStreamingUI(true, approve ? 'Executando a ação confirmada…' : 'Cancelando…');
+  let stream = createStreamState();
+  stream = applyEvent(stream, { type: 'status', label: approve ? 'Executando a ação confirmada…' : 'Cancelando…' });
+  syncComposer(stream);
 
   let buffer = '';
   let gotFirstDelta = false;
@@ -629,11 +648,12 @@ async function confirmAction(action, approve, card) {
     }
 
     await consumeSse(response, (event) => {
+      stream = applyEvent(stream, event);
+      syncComposer(stream);
+
       if (event.type === 'delta') {
         buffer += event.text;
         paint();
-      } else if (event.type === 'status' && event.label) {
-        els.composerStatusText.textContent = event.label;
       } else if (event.type === 'tool_result') {
         addToolPill(shell.meta, { name: event.name, title: event.title, ok: event.ok });
       } else if (event.type === 'done') {
@@ -655,7 +675,8 @@ async function confirmAction(action, approve, card) {
         : '<p>Sem problemas, não registrei nada.</p>';
     }
     state.pendingAction = null;
-    setStreamingUI(false);
+    stream = finalize(stream, { aborted: false });
+    syncComposer(stream);
     state.controller = null;
     await refreshHistory();
     scrollToBottom();
@@ -667,7 +688,10 @@ function stopGeneration() {
     state.controller.abort();
     state.controller = null;
   }
+  // O `finally` de sendMessage também encerra; aqui garantimos resposta imediata
+  // ao clique, sem esperar o próximo tick de rede.
   setStreamingUI(false);
+  state.streaming = false;
 }
 
 /* -------------------------------- memória -------------------------------- */

@@ -23,6 +23,9 @@ export const EVENTS = {
   delta: 'delta',
   toolStart: 'tool_start',
   toolResult: 'tool_result',
+  // Ferramenta de FRONTEND (declarada pelo site): o modelo pede, o navegador
+  // executa. A Kirana não executa nada nesse caso — só repassa a chamada.
+  externalTool: 'external_tool',
   confirmation: 'confirmation',
   done: 'done',
   error: 'error',
@@ -74,12 +77,12 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
 
   /* ------------------------------- contexto ------------------------------- */
 
-  function buildApiMessages(session, { activeToolsDescription }) {
+  function buildApiMessages(session, { activeToolsDescription, contextNote }) {
     const system = buildSystemPrompt({
       memoryItems: memory.promptItems(config.agent.memoryMaxChars),
       activeTools: activeToolsDescription,
       catalogMeta: catalog.meta,
-    });
+    }) + (contextNote ? `\n\n${contextNote}` : '');
     const history = buildContextMessages(session.messages, config.agent.historyLimit);
     const messages = [{ role: 'system', content: system }, ...history.map(toApiMessage)];
 
@@ -216,12 +219,31 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
     const writeToolNames = new Set(registry.writeTools().map((t) => t.name));
 
     const tools = registry.openAISchemas().filter((schema) => allowWrite || !writeToolNames.has(schema.function.name));
+
+    // Ferramentas de frontend declaradas pelo site (AG-UI). Somam-se às da
+    // Kirana; nunca as substituem e nunca são executadas no servidor.
+    const externalSchemas = Array.isArray(state.io.externalTools) ? state.io.externalTools : [];
+    for (const schema of externalSchemas) {
+      if (!schema?.function?.name) continue;
+      if (tools.some((t) => t.function.name === schema.function.name)) continue;
+      tools.push(schema);
+    }
+
     const activeTools = registry
       .list()
       .filter((t) => allowWrite || t.kind !== 'write')
       .map((t) => ({ name: t.name, kind: t.kind, description: t.description.split('. ')[0] }));
 
-    const messages = buildApiMessages(session, { activeToolsDescription: activeTools });
+    for (const schema of externalSchemas) {
+      if (!schema?.function?.name) continue;
+      activeTools.push({
+        name: schema.function.name,
+        kind: 'frontend',
+        description: schema.function.description.split('. ')[0],
+      });
+    }
+
+    const messages = buildApiMessages(session, { activeToolsDescription: activeTools, contextNote: state.io.contextNote });
     return { messages, toolSchemas: tools, activeTools };
   }
 
@@ -262,6 +284,43 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
   async function handleToolCall({ call, io, allowWrite, pendingActionExists, emit }) {
     const name = call.function?.name;
     const tool = registry.get(name);
+
+    // Ferramenta de frontend: a Kirana apenas anuncia a chamada. Quem executa
+    // é a interface do site, via CopilotKit/AG-UI. Nada roda no backend.
+    const externalTool = !tool ? (io.externalToolMap?.get(name) ?? null) : null;
+    if (externalTool) {
+      const validation = externalTool.validate(call.function?.arguments);
+      if (!validation.ok) {
+        emit({ type: EVENTS.toolResult, name, title: name, ok: false, errorCode: 'invalid_args', external: true });
+        return {
+          content: toolResultContent({
+            ok: false,
+            erro: {
+              codigo: 'invalid_args',
+              mensagem: 'Argumentos inválidos para a ação da interface. Corrija e peça de novo.',
+              detalhes: validation.errors,
+            },
+          }),
+        };
+      }
+      emit({ type: EVENTS.toolStart, name, title: name, kind: 'frontend' });
+      emit({
+        type: EVENTS.externalTool,
+        callId: call.id,
+        name,
+        args: validation.args,
+        requiresConfirmation: Boolean(externalTool.requiresConfirmation),
+      });
+      emit({ type: EVENTS.toolResult, name, title: name, ok: true, external: true });
+      return {
+        content: toolResultContent({
+          ok: true,
+          status: 'delegada_para_interface',
+          mensagem:
+            'A ação foi entregue à interface do site, que a executa no navegador. Se ela exigir confirmação, a interface mostra os dados e aguarda o usuário. Não diga que foi concluída antes do resultado da interface.',
+        }),
+      };
+    }
 
     if (!tool) {
       emit({ type: EVENTS.toolResult, name, title: name, ok: false, errorCode: 'unknown_tool' });
@@ -396,7 +455,7 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
     return { ok: false, error: mapped };
   }
 
-  async function runTurn({ session, text, emit, signal, temperatureOverride }) {
+  async function runTurn({ session, text, emit, signal, temperatureOverride, externalTools, contextNote }) {
     const clean = String(text ?? '').trim();
     if (!clean) throw new TurnError('Mensagem vazia.', 'empty_message');
     if (clean.length > 8000) throw new TurnError('Mensagem acima de 8000 caracteres.', 'message_too_long');
@@ -405,6 +464,7 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
     sessions.append(session, { role: 'user', content: clean });
 
     const startedAt = Date.now();
+    const externalList = Array.isArray(externalTools) ? externalTools : [];
     const io = {
       emit,
       signal,
@@ -413,6 +473,9 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
       startedAt,
       ctx: { sessionId: session.id, memory, sessions, config, catalog, logger },
       toolCache: new Map(),
+      contextNote: contextNote || null,
+      externalTools: externalList.map((t) => t.schema).filter(Boolean),
+      externalToolMap: new Map(externalList.map((t) => [t.schema.function.name, t])),
     };
 
     try {

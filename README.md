@@ -1,6 +1,6 @@
 # Kirana — agente conversacional da Opportunity AI
 
-**Versão:** 0.2.0 (Fase 1 validada + orquestração LangGraph)
+**Versão:** 0.2.1 (Fase 1 validada + LangGraph + correção do indicador de geração)
 **Organização:** Opportunity AI
 **Gateway utilizado:** `Kirana-ChatGPT-Gateway v0.2.0` (não modificado)
 **Data desta entrega:** 24/10/2026
@@ -202,13 +202,28 @@ npm run audit        # sonda de contrato ponta a ponta (0 violações esperadas)
 3. Confira se algum `KIRANA_SEND_*` está `true` no `.env` (o padrão é `false`).
 4. Se persistir, copie a mensagem exata — a recuperação automática já remove um campo por vez.
 
+## 5.2 Encerramento do turno (correção v0.2.1)
+
+Ao terminar uma resposta, o indicador "Kirana está escrevendo…" precisa sumir. Duas causas foram
+corrigidas:
+
+1. **CSS:** `.composer-status { display: flex }` vencia a regra do navegador para `[hidden]`, então
+   `hidden = true` não escondia nada. Adicionada a regra global
+   `[hidden] { display: none !important; }`.
+2. **Estado do cliente:** o compositor agora é dirigido por `public/stream-state.js`, que volta a
+   ocioso em **todos** os desfechos — `done`, erro, cancelamento e encerramento inesperado do
+   stream (sem `done`).
+
+O backend também passou a **cancelar a leitura da resposta do gateway** ao receber `[DONE]`
+(antes o socket ficava aberto: um vazamento por turno).
+
 ## 6. Testes
 
 ```bash
 npm test          # ou testar.bat — resolve a lista de arquivos, sem glob do shell
 ```
 
-Resultado desta entrega: **102 testes, 102 aprovados, 0 falhas** (~3,5 s).
+Resultado desta entrega: **124 testes, 124 aprovados, 0 falhas** (~8,7 s).
 
 Cobrem, entre outros:
 
@@ -283,7 +298,8 @@ kirana/
 ├─ src/contract.js               # contrato do payload (validação local)
 ├─ src/graph.js                  # orquestrador LangGraph (prepare→model→tools→finalize)
 ├─ scripts/run-tests.mjs         # executor de testes multiplataforma
-├─ test/                         # 102 testes automatizados
+├─ public/stream-state.js         # máquina de estados do compositor (cliente)
+├─ test/                         # 124 testes automatizados
 └─ docs/                         # arquitetura, integração, segurança, relatório
 ```
 

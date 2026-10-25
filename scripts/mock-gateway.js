@@ -110,9 +110,22 @@ const server = http.createServer(async (req, res) => {
     const messages = Array.isArray(body.messages) ? body.messages : [];
     const userText = lastUserText(messages);
     const tools = Array.isArray(body.tools) ? body.tools.map((t) => t.function?.name) : [];
-    const alreadyCalledTool = messages.some((m) => m.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.length);
+    // Só conta ferramentas chamadas NESTE turno (depois da última mensagem do
+    // usuário): o histórico da sessão inclui turnos anteriores.
+    const lastUserIndex = messages.reduce((acc, m, i) => (m.role === 'user' ? i : acc), -1);
+    const alreadyCalledTool = messages
+      .slice(Math.max(lastUserIndex, 0))
+      .some((m) => m.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.length);
     const wantsServices = /servi[cç]o/i.test(userText) && tools.includes('consultar_servicos');
     const wantsInterest = /interesse|contato comercial|falar com a equipe/i.test(userText) && tools.includes('registrar_interesse_comercial');
+
+    // Ferramentas de FRONTEND (declaradas pelo site via CopilotKit/AG-UI).
+    // O mock só as pede quando o site realmente as anunciou.
+    const frontend = {
+      navigate: tools.includes('navigateToPage') && /abra|abrir|navegue|ir para|v[aá] para/i.test(userText),
+      fill: tools.includes('fillContactForm') && /preencha|preencher|preenche/i.test(userText),
+      submit: tools.includes('submitContactRequest') && /(envie|enviar|submeta|confirmo|pode enviar)/i.test(userText),
+    };
 
     res.writeHead(200, {
       'Content-Type': 'text/event-stream; charset=utf-8',
@@ -121,6 +134,38 @@ const server = http.createServer(async (req, res) => {
     });
 
     const id = `chatcmpl-mock-${Date.now()}`;
+
+    if (!alreadyCalledTool && (frontend.navigate || frontend.fill || frontend.submit)) {
+      const call = frontend.navigate
+        ? { name: 'navigateToPage', args: { page: /contato/i.test(userText) ? 'contato' : 'solucoes' } }
+        : frontend.fill
+          ? {
+              name: 'fillContactForm',
+              args: {
+                nome: 'Ana Demo',
+                email: 'ana.demo@exemplo.com',
+                whatsapp: '(85) 99999-0000',
+                empresa: 'Empresa Demo',
+                interesse: 'Atendimento digital e WhatsApp',
+                mensagem: 'Quero conhecer as soluções de inteligência artificial para atendimento de clientes.',
+              },
+            }
+          : { name: 'submitContactRequest', args: {} };
+
+      const toolCall = {
+        index: 0,
+        id: `call_${Date.now()}`,
+        type: 'function',
+        function: { name: call.name, arguments: JSON.stringify(call.args) },
+      };
+      sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: { role: 'assistant', content: '' } }] });
+      sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: { tool_calls: [toolCall] } }] });
+      sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] });
+      sse(res, '[DONE]');
+      res.end();
+      console.log(`[mock-gateway] ferramenta de frontend: ${call.name}`);
+      return;
+    }
 
     if (!alreadyCalledTool && (wantsServices || wantsInterest)) {
       const name = wantsServices ? 'consultar_servicos' : 'registrar_interesse_comercial';

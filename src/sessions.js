@@ -35,10 +35,13 @@ export function createSessionStore({ dataDir, logger }) {
   const store = {
     dir: sessionsDir,
 
-    create({ title, model } = {}) {
+    create({ id, title, model } = {}) {
       const now = new Date().toISOString();
+      // `id` explícito permite sessões estáveis por thread/site (V2 CopilotKit),
+      // sem alterar o comportamento de quem cria sessão aleatória.
+      const explicitId = typeof id === 'string' && /^s_[A-Za-z0-9-]{6,64}$/.test(id) ? id : null;
       const session = {
-        id: `s_${randomUUID()}`,
+        id: explicitId || `s_${randomUUID()}`,
         title: title ? makeTitle(title) : 'Nova conversa',
         createdAt: now,
         updatedAt: now,
