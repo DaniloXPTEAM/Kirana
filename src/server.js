@@ -24,6 +24,7 @@ import { createSiteKit } from './copilot/site-kit.js';
 import { createCopilotHandler } from './copilot/runtime.js';
 import { createDemoContact } from './demo-contact.js';
 import { createRateLimiter } from './ratelimit.js';
+import { createVoiceService } from './voice/tts.js';
 import {
   HttpError,
   securityHeaders,
@@ -51,6 +52,8 @@ export function createKiranaServer(overrides = {}) {
   const limiter = createRateLimiter(config.rateLimit);
   const siteKit = overrides.siteKit ?? createSiteKit({ sitesDir: path.join(PROJECT_ROOT, 'sites'), logger });
   const demoContact = overrides.demoContact ?? createDemoContact({ interests, logger });
+  // Voz: modalidade da MESMA agente. Só sintetiza texto; não orquestra nada.
+  const voice = overrides.voice ?? createVoiceService({ logger });
   // CopilotKit é opcional: se a inicialização falhar, a Kirana v0.2.1 segue no ar.
   let copilot = null;
   try {
@@ -186,6 +189,29 @@ export function createKiranaServer(overrides = {}) {
         return;
       }
 
+      // Metadados do site integrado (ações permitidas, recursos, chaves de
+      // estado). Somente leitura e sem segredos: serve ao widget e à integração.
+      if (url.pathname === '/api/site/info' && (method === 'GET' || method === 'HEAD')) {
+        const site = siteKit.resolve(url.searchParams.get('site') || '');
+        sendJson(res, site ? 200 : 404, site
+          ? {
+              site: {
+                id: site.id,
+                name: site.name,
+                persona: site.persona,
+                greeting: site.greeting,
+                features: site.features,
+                tools: site.tools.map((t) => ({ name: t.name, description: t.description, requiresConfirmation: t.requiresConfirmation })),
+                stateKeys: site.stateKeys,
+                generativeComponents: site.generativeComponents,
+              },
+              copilotkit: '/api/copilot',
+              sites: siteKit.list().map((x) => x.id),
+            }
+          : { error: 'site_not_found' });
+        return;
+      }
+
       // CopilotKit / AG-UI (V2). Fica fora do handleApi para preservar o
       // fluxo antigo: nenhuma rota existente muda de comportamento.
       if (url.pathname.startsWith('/api/copilot')) {
@@ -227,6 +253,15 @@ export function createKiranaServer(overrides = {}) {
       }
     }
   });
+
+  /** Sinal de aborto ligado ao fechamento da conexão (barge-in / navegador). */
+  function abortSignalFor(req, res) {
+    const controller = new AbortController();
+    res.on('close', () => {
+      if (!res.writableEnded) controller.abort(new DOMException('client closed', 'AbortError'));
+    });
+    return controller.signal;
+  }
 
   async function handleApi({ req, res, url, method }) {
     const route = url.pathname;
@@ -383,6 +418,69 @@ export function createKiranaServer(overrides = {}) {
       return;
     }
 
+    /* --------------------------- voz (TTS) --------------------------- */
+    // Estado do motor. Não chama a rede: apenas verifica o worker local.
+    if (route === '/api/voice/status' && (method === 'GET' || method === 'HEAD')) {
+      assertAuth(req);
+      checkRate(req);
+      const state = await voice.status();
+      sendJson(res, 200, { ...state, streaming: true, mime: 'audio/mpeg', maxChars: 3000 });
+      return;
+    }
+
+    // Sintetiza a fala de UMA mensagem da sessão. Texto -> MP3 em stream.
+    // Não cria sessão, não altera histórico, não executa ferramentas.
+    if (route === '/api/voice/tts' && method === 'POST') {
+      assertAuth(req);
+      assertSameOrigin(req);
+      checkRate(req);
+      const body = await readJsonBody(req, { maxBytes: 32 * 1024 });
+      const session = sessions.get(typeof body.sessionId === 'string' ? body.sessionId : '');
+      if (!session) throw new HttpError(404, 'session_not_found', 'Sessão não encontrada.');
+      const text = typeof body.text === 'string' ? body.text : '';
+
+      let result;
+      try {
+        result = voice.synthesizeStream(text, { signal: abortSignalFor(req, res) });
+      } catch (error) {
+        sendError(res, error?.status || 503, error?.code || 'voice_error', error?.message || 'Falha na voz.');
+        return;
+      }
+
+      res.writeHead(200, {
+        'Content-Type': result.mime,
+        'Cache-Control': 'no-store',
+        'X-Kirana-Voice': result.meta.voice,
+        'X-Accel-Buffering': 'no',
+        'Transfer-Encoding': 'chunked',
+        'Cross-Origin-Resource-Policy': 'same-origin',
+      });
+
+      let done = false;
+      const finish = (error) => {
+        if (done) return;
+        done = true;
+        logger.info('voz: síntese encerrada', { code: error || 'ok', ...result.meta, session: session.id });
+        if (!res.writableEnded) res.end();
+      };
+
+      result.stream.on('data', (chunk) => {
+        if (!res.write(chunk)) {
+          result.stream.pause();
+          res.once('drain', () => result.stream.resume());
+        }
+      });
+      result.stream.on('end', () => finish());
+      result.stream.on('error', () => finish('voice_stream_error'));
+      res.on('close', () => {
+        if (!done) {
+          try { result.child.kill(); } catch { /* já morto */ }
+          finish('client_closed');
+        }
+      });
+      return;
+    }
+
     /* --------------- site de demonstração: contato com autorização --------------- */
     if (route === '/api/demo/contact/prepare' && method === 'POST') {
       checkRate(req);
@@ -463,7 +561,9 @@ export function createKiranaServer(overrides = {}) {
         });
       });
     },
+    voice,
     close() {
+      voice.close();
       return new Promise((resolve) => server.close(() => resolve()));
     },
   };

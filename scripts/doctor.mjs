@@ -14,6 +14,7 @@ import path from 'node:path';
 import { loadConfig, loadEnvFile, PROJECT_ROOT } from '../src/config.js';
 import { createGatewayClient } from '../src/gateway.js';
 import { createLogger } from '../src/logger.js';
+import { createVoiceService } from '../src/voice/tts.js';
 
 const checks = [];
 const record = (name, status, detail = '') => checks.push({ name, status, detail });
@@ -52,6 +53,27 @@ const portFree = await new Promise((resolve) => {
   server.listen(config.port, config.host);
 });
 record('Porta da Kirana', portFree ? 'ok' : 'warn', portFree ? `${config.host}:${config.port} livre` : `${config.host}:${config.port} já está em uso`);
+
+// Voz: verifica o worker Python e o catálogo do provedor (só se habilitada).
+if ((process.env.KIRANA_TTS_PROVIDER || 'edge') === 'disabled') {
+  record('Voz (TTS)', 'warn', 'desativada por KIRANA_TTS_PROVIDER=disabled');
+} else {
+  const voice = createVoiceService({ logger });
+  try {
+    const state = await voice.status();
+    record(
+      'Voz (TTS)',
+      state.available ? 'ok' : 'warn',
+      state.available
+        ? `${state.voice} disponível (${state.catalogSize} vozes no catálogo, ${state.checkMs} ms)`
+        : `indisponível: ${state.reason || state.note}. A interface continua funcionando por texto.`,
+    );
+  } catch (error) {
+    record('Voz (TTS)', 'warn', `falhou ao consultar: ${error?.message}. A interface continua funcionando por texto.`);
+  } finally {
+    voice.close();
+  }
+}
 
 if (config.gateway.apiKey) {
   const gateway = createGatewayClient({ config, logger });

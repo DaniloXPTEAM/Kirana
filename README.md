@@ -30,7 +30,9 @@ ao navegador.
 | Memória persistente opcional, com consulta/correção/exclusão | ✅ implementado e testado |
 | Fallback de modelo (primário → alternativo) sem duplicar ações | ✅ implementado e testado |
 | Rate limiting, validação de entrada, CORS/origem, CSP | ✅ implementado e testado |
-| Testes automatizados | ✅ 67 testes, 0 falhas |
+| CopilotKit + AG-UI + sites por cliente (Marco 2) | ✅ implementado e testado |
+| **Voz conversacional: ouvir, falar, interromper (Marco 3)** | ✅ implementado e testado em Chromium real |
+| Testes automatizados | ✅ 219 testes, 0 falhas |
 | Validação com o gateway ChatGPT real | ⏳ pendente — depende da sua máquina |
 | Meta de 2 s para a primeira resposta útil | ⏳ não medida em condição real |
 
@@ -223,7 +225,10 @@ O backend também passou a **cancelar a leitura da resposta do gateway** ao rece
 npm test          # ou testar.bat — resolve a lista de arquivos, sem glob do shell
 ```
 
-Resultado desta entrega: **124 testes, 124 aprovados, 0 falhas** (~8,7 s).
+Resultado desta entrega: **219 testes, 219 aprovados, 0 falhas** (~3 min),
+mais **15 verificações** de navegador do site de demonstração e **34** da voz
+(`test/browser/voice-flow.mjs`). A voz real também tem medição própria:
+`npm run voice:bench`.
 
 Cobrem, entre outros:
 
@@ -344,3 +349,6 @@ Nenhuma dependência de terceiros: só a biblioteca padrão do Node.
 - [`docs/SEGURANCA-PRIVACIDADE.md`](docs/SEGURANCA-PRIVACIDADE.md) — modelo de ameaças e checklist.
 - [`docs/RELATORIO-VALIDACAO.md`](docs/RELATORIO-VALIDACAO.md) — o que foi realmente testado.
 - [`docs/preview-interface.html`](docs/preview-interface.html) — prévia estática da interface.
+- [`docs/VOZ.md`](docs/VOZ.md) — voz: instalação no Windows, estados, interrupção, privacidade e medições.
+- [`docs/AUDITORIA-MARCO3.md`](docs/AUDITORIA-MARCO3.md) — auditoria feita antes de implementar a voz.
+- [`docs/RELATORIO-MARCO3.md`](docs/RELATORIO-MARCO3.md) — o que mudou no Marco 3 e comparação com o Marco 2.

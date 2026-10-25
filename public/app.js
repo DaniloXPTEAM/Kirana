@@ -6,6 +6,7 @@
  */
 
 import { createStreamState, applyEvent, finalize, composerView } from './stream-state.js';
+import { createVoiceController } from './voice.js';
 
 const state = {
   sessionId: null,
@@ -21,6 +22,13 @@ const state = {
   token: sessionStorage.getItem('kirana.token') || '',
 };
 
+/**
+ * Ponte com a voz: o app avisa o controlador sobre o turno em andamento para
+ * que a fala acompanhe o texto. Fica vazio quando a voz não está montada, e
+ * nesse caso `sendMessage()` se comporta exatamente como antes.
+ */
+const voiceBridge = { delta: null, done: null };
+
 const els = {
   app: document.getElementById('app'),
   sidebar: document.getElementById('sidebar'),
@@ -35,6 +43,8 @@ const els = {
   composer: document.getElementById('composer'),
   input: document.getElementById('composer-input'),
   send: document.getElementById('send'),
+  voiceBtn: document.getElementById('voice-btn'),
+  voiceStatus: document.getElementById('voice-status'),
   stop: document.getElementById('stop'),
   composerStatus: document.getElementById('composer-status'),
   composerStatusText: document.getElementById('composer-status-text'),
@@ -541,6 +551,7 @@ async function sendMessage(text) {
         case 'delta':
           buffer += event.text;
           paint();
+          voiceBridge.delta?.(event.text);
           break;
         case 'tool_result':
           shell.bubble.classList.remove('cursor');
@@ -609,6 +620,13 @@ async function sendMessage(text) {
     await refreshHistory();
     scrollToBottom();
     els.input.focus();
+    // Avisa a voz do desfecho: só aqui sabemos se houve erro/interrupção.
+    voiceBridge.done?.({
+      text: buffer,
+      aborted,
+      error: hadError,
+      pendingAction: pendingActionFromTurn,
+    });
   }
 }
 
@@ -675,6 +693,8 @@ async function confirmAction(action, approve, card) {
         : '<p>Sem problemas, não registrei nada.</p>';
     }
     state.pendingAction = null;
+    voiceNoticeUntil = 0;
+    voiceBridge.done?.({ text: buffer, aborted: false, error: false, pendingAction: null });
     stream = finalize(stream, { aborted: false });
     syncComposer(stream);
     state.controller = null;
@@ -882,10 +902,108 @@ function bindEvents() {
   });
 }
 
+/* ---------------------------------- voz ---------------------------------- */
+
+/**
+ * Liga o botão de voz ao MESMO `sendMessage()` do texto. Nenhuma sessão
+ * paralela é criada: o que o visitante fala vira uma mensagem normal na
+ * conversa atual, com o mesmo histórico e as mesmas ferramentas.
+ */
+const VOICE_LABEL = {
+  inativo: { text: '', label: 'Conversar por voz com a Kirana', title: 'Falar com a Kirana' },
+  'pedindo-microfone': { text: 'Permita o microfone no navegador para conversar.', label: 'Aguardando permissão do microfone', title: 'Permita o microfone' },
+  ouvindo: { text: 'Estou ouvindo… fale normalmente.', label: 'Kirana está ouvindo', title: 'Ouvindo — toque para parar' },
+  'fala-detectada': { text: 'Registrando o que você disse…', label: 'Captando sua fala', title: 'Captando sua fala' },
+  processando: { text: 'Pensando na resposta…', label: 'Kirana está pensando', title: 'Pensando — toque para cancelar' },
+  falando: { text: 'Falando… toque no botão para interromper.', label: 'Kirana está falando', title: 'Falando — toque para interromper' },
+  interrompido: { text: 'Interrompido.', label: 'Fala interrompida', title: 'Interrompido' },
+  erro: { text: 'A voz encontrou um problema.', label: 'Erro na voz', title: 'Erro na voz' },
+};
+
+let voice = null;
+
+function setupVoice() {
+  if (!els.voiceBtn) return;
+
+  // O controlador é sempre criado: quando o navegador não tem
+  // SpeechRecognition ele mesmo avisa (sem quebrar o chat por texto).
+  const sttSupported = 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
+  if (!sttSupported) {
+    els.voiceBtn.title = 'Voz indisponível neste navegador — use o texto';
+    els.voiceBtn.setAttribute('aria-label', 'Voz indisponível: use o texto');
+  }
+
+  voice = createVoiceController({
+    send: async (text) => {
+      // Se ainda houver resposta em andamento, falar interrompe (barge-in).
+      if (state.streaming) stopGeneration();
+      await sendMessage(text);
+    },
+    stop: () => stopGeneration(),
+    getSessionId: () => state.sessionId,
+    headers: () => apiHeaders(),
+  });
+
+  // Superfície de depuração/teste (não é API pública da Kirana).
+  window.kiranaVoice = voice;
+
+  voiceBridge.delta = (text) => voice?.appendDelta(text);
+  voiceBridge.done = (info) => voice?.endTurn(info);
+
+  voice.subscribe((next, detail) => {
+    const view = VOICE_LABEL[next] || VOICE_LABEL.inativo;
+    els.voiceBtn.dataset.state = next;
+    els.voiceBtn.setAttribute('aria-pressed', String(next !== 'inativo'));
+    els.voiceBtn.setAttribute('aria-label', view.label);
+    els.voiceBtn.title = view.title;
+    if (next === 'inativo') {
+      els.voiceStatus.hidden = true;
+      els.voiceStatus.textContent = '';
+      els.voiceStatus.classList.remove('is-error');
+    } else {
+      // No erro, a mensagem específica ("microfone negado", "motor falhou")
+      // vale mais que o rótulo genérico do estado.
+      const message = next === 'erro' ? detail?.message || voice.notice || view.text : view.text;
+      // Não apaga um aviso importante (erro/confirmação) que acabou de aparecer.
+      if (next === 'erro' || Date.now() >= voiceNoticeUntil) showVoiceStatus(message, next === 'erro');
+    }
+  });
+
+  els.voiceBtn.addEventListener('click', () => {
+    voice?.toggle().catch(() => {});
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && voice?.active) voice.stop();
+  });
+
+  window.addEventListener('kirana:voice-notice', (event) => {
+    if (!event.detail?.message) return;
+    // Aviso de confirmação pendente fica na tela até a ação ser resolvida.
+    showVoiceStatus(event.detail.message, true, event.detail.sticky ? Number.MAX_SAFE_INTEGER : 6000);
+  });
+}
+
+let voiceNoticeUntil = 0;
+
+/**
+ * Escreve o status da voz. `holdMs` mantém o aviso na tela por alguns
+ * segundos, para que a próxima mudança de estado não o apague na hora (era o
+ * que acontecia com "confirme na tela" e com mensagens de erro).
+ */
+function showVoiceStatus(message, isError = false, holdMs = 0) {
+  if (!els.voiceStatus) return;
+  if (holdMs) voiceNoticeUntil = Date.now() + holdMs;
+  els.voiceStatus.textContent = message;
+  els.voiceStatus.classList.toggle('is-error', Boolean(isError));
+  els.voiceStatus.hidden = !message;
+}
+
 /* --------------------------------- início -------------------------------- */
 
 async function boot() {
   bindEvents();
+  setupVoice();
   await loadConfig();
   await Promise.all([loadStatus(), loadTools(), loadMemory().catch(() => {})]);
   await refreshHistory();

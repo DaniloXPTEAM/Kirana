@@ -102,10 +102,20 @@ test('autorização expira e exige nova confirmação', () => {
   advance(11 * 60_000);
   const result = contact.submit({ token, values: VALUES });
 
+  // Código específico: token existia, mas o prazo passou.
   assert.equal(result.ok, false);
-  assert.equal(result.error, 'authorization_required');
-  assert.equal(interests.count(), 0);
+  assert.equal(result.error, 'authorization_expired');
+  assert.equal(interests.count(), 0, 'nada pode ser gravado após expirar');
   assert.ok(expiresAt > 0);
+
+  // E o token expirado não pode ser reaproveitado depois.
+  assert.equal(contact.submit({ token, values: VALUES }).ok, false);
+  assert.equal(interests.count(), 0);
+
+  // Nova confirmação funciona normalmente.
+  const fresh = contact.prepare({ values: VALUES });
+  assert.equal(contact.submit({ token: fresh.token, values: VALUES }).ok, true);
+  assert.equal(interests.count(), 1);
 });
 
 test('cancelar = simplesmente não enviar (nada é gravado)', () => {

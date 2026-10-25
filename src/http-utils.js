@@ -177,10 +177,15 @@ export function securityHeaders({ allowEmbed = false } = {}) {
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self'",
       "connect-src 'self'",
+      // Áudio da resposta (TTS): vem de /api/voice/tts e da URL de blob usada
+      // para tocar o MP3 em streaming. Sem isto o navegador bloqueia o play().
+      "media-src 'self' blob:",
       "base-uri 'none'",
       "form-action 'none'",
       `frame-ancestors ${allowEmbed ? '*' : "'self'"}`,
     ].join('; '),
-    'Permissions-Policy': 'geolocation=(), microphone=(), camera=()',
+    // `microphone=(self)` libera o microfone apenas para esta origem (o botão
+    // de voz usa SpeechRecognition). Câmera e geolocalização seguem bloqueadas.
+    'Permissions-Policy': 'geolocation=(), microphone=(self), camera=()',
   };
 }

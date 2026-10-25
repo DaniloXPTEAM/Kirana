@@ -114,7 +114,7 @@ export async function startFakeGateway({ script, apiKey = 'test-key' } = {}) {
   };
 }
 
-export async function startKirana({ gatewayUrl, env = {} } = {}) {
+export async function startKirana({ gatewayUrl, env = {}, overrides = {} } = {}) {
   const dataDir = env.KIRANA_DATA_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'kirana-test-'));
   const config = loadConfig({
     KIRANA_DATA_DIR: dataDir,
@@ -126,7 +126,7 @@ export async function startKirana({ gatewayUrl, env = {} } = {}) {
     KIRANA_LOG_LEVEL: 'error',
     ...env,
   });
-  const app = createKiranaServer({ config, logger: silentLogger });
+  const app = createKiranaServer({ config, logger: silentLogger, ...overrides });
   await app.listen();
   const { port } = app.server.address();
 

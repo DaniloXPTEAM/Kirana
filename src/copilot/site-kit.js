@@ -80,6 +80,16 @@ export function createSiteKit({ sitesDir, logger } = {}) {
     }
   }
 
+  /**
+   * Resolução ESTRITA: se um id foi informado e não existe, devolve null.
+   * Cair no site padrão nesse caso misturaria clientes — o fallback só vale
+   * quando NENHUM id é informado.
+   */
+  function resolve(siteId) {
+    if (siteId === undefined || siteId === null || siteId === '') return get(null);
+    return sites.get(String(siteId)) ?? null;
+  }
+
   function get(siteId) {
     if (siteId && sites.has(siteId)) return sites.get(siteId);
     if (sites.has(DEFAULT_SITE_ID)) return sites.get(DEFAULT_SITE_ID);
@@ -138,5 +148,5 @@ export function createSiteKit({ sitesDir, logger } = {}) {
     }
   }
 
-  return { get, list: () => [...sites.values()], buildExternalTools, sessionIdFor, originAllowed };
+  return { get, resolve, has: (id) => sites.has(String(id ?? '')), list: () => [...sites.values()], buildExternalTools, sessionIdFor, originAllowed };
 }

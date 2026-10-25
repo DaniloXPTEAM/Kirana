@@ -21,7 +21,7 @@ export const AGUI = {
   RUN_ERROR: 'RUN_ERROR',
 };
 
-const KIRANA = {
+export const KIRANA_EVENT = {
   delta: 'delta',
   start: 'start',
   status: 'status',
@@ -53,6 +53,13 @@ export function createAgUiTranslator({ runId, messageId = `m_${runId}` }) {
     return [{ type: AGUI.TEXT_MESSAGE_END, messageId }];
   }
 
+  /** STEP_STARTED precisa de STEP_FINISHED: o runtime valida o stream. */
+  function endStep() {
+    if (!stepOpen) return [];
+    stepOpen = false;
+    return [{ type: 'STEP_FINISHED', stepName: 'kirana.model' }];
+  }
+
   function startText() {
     if (textOpen) return [];
     textOpen = true;
@@ -63,13 +70,13 @@ export function createAgUiTranslator({ runId, messageId = `m_${runId}` }) {
     if (!event || typeof event !== 'object' || finalized) return [];
 
     switch (event.type) {
-      case KIRANA.delta: {
+      case KIRANA_EVENT.delta: {
         const delta = event.text ?? event.delta ?? '';
         if (!delta) return [];
         return [...startText(), { type: AGUI.TEXT_MESSAGE_CONTENT, messageId, delta }];
       }
 
-      case KIRANA.start: {
+      case KIRANA_EVENT.start: {
         const opened = stepOpen ? [] : [{ type: 'STEP_STARTED', stepName: 'kirana.model' }];
         stepOpen = true;
         return opened;
@@ -77,7 +84,7 @@ export function createAgUiTranslator({ runId, messageId = `m_${runId}` }) {
 
       // Ferramenta de frontend: quem executa é o navegador. A chamada precisa
       // sair completa (nome + argumentos) para o CopilotKit rodar a ação.
-      case KIRANA.externalTool: {
+      case KIRANA_EVENT.externalTool: {
         const toolCallId = event.callId || nextId('tc');
         openTools.set(event.name, toolCallId);
         return [
@@ -88,7 +95,7 @@ export function createAgUiTranslator({ runId, messageId = `m_${runId}` }) {
       }
 
       // Ferramenta de servidor: a Kirana executa; só informamos a chamada.
-      case KIRANA.toolStart:
+      case KIRANA_EVENT.toolStart:
         if (event.kind === 'frontend') return [];
         {
           const toolCallId = nextId('tc');
@@ -96,7 +103,7 @@ export function createAgUiTranslator({ runId, messageId = `m_${runId}` }) {
           return [{ type: AGUI.TOOL_CALL_START, toolCallId, toolCallName: event.name, parentMessageId: messageId }];
         }
 
-      case KIRANA.toolResult: {
+      case KIRANA_EVENT.toolResult: {
         if (event.external) return [];
         const toolCallId = openTools.get(event.name);
         if (!toolCallId) return [];
@@ -104,27 +111,31 @@ export function createAgUiTranslator({ runId, messageId = `m_${runId}` }) {
         return [{ type: AGUI.TOOL_CALL_END, toolCallId }];
       }
 
-      case KIRANA.confirmation:
+      case KIRANA_EVENT.confirmation:
         return [{ type: AGUI.CUSTOM, name: 'kirana.confirmation', value: { action: event.action ?? null } }];
 
-      case KIRANA.session:
+      case KIRANA_EVENT.session:
         return [{ type: AGUI.CUSTOM, name: 'kirana.session', value: { sessionId: event.id ?? event.sessionId ?? null } }];
 
-      case KIRANA.status:
+      case KIRANA_EVENT.status:
         return [{ type: AGUI.CUSTOM, name: 'kirana.status', value: { stage: event.stage ?? null, label: event.label ?? null } }];
 
       // RUN_STARTED/RUN_FINISHED são responsabilidade do BuiltInAgent do
       // CopilotKit (runFactory). Aqui só fechamos o texto.
-      case KIRANA.done: {
+      case KIRANA_EVENT.done: {
         finalized = true;
-        return [...endText(), { type: AGUI.CUSTOM, name: 'kirana.done', value: { responseMs: event.responseMs ?? null, aborted: Boolean(event.aborted) } }];
+        return [
+          ...endText(),
+          ...endStep(),
+          { type: AGUI.CUSTOM, name: 'kirana.done', value: { responseMs: event.responseMs ?? null, aborted: Boolean(event.aborted) } },
+        ];
       }
 
-      case KIRANA.error: {
+      case KIRANA_EVENT.error: {
         finalized = true;
         const message = event.error?.message || event.message || 'Falha ao executar o turno.';
         const code = event.error?.code || event.code || 'turn_error';
-        return [...endText(), { type: AGUI.RUN_ERROR, message, code }];
+        return [...endText(), ...endStep(), { type: AGUI.RUN_ERROR, message, code }];
       }
 
       default:
@@ -135,7 +146,7 @@ export function createAgUiTranslator({ runId, messageId = `m_${runId}` }) {
   function close(reason = 'closed') {
     if (finalized) return [];
     finalized = true;
-    return [...endText(), { type: AGUI.CUSTOM, name: 'kirana.closed', value: { reason } }];
+    return [...endText(), ...endStep(), { type: AGUI.CUSTOM, name: 'kirana.closed', value: { reason } }];
   }
 
   return { translate, close, get finalized() { return finalized; } };

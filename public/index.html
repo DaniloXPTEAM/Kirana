@@ -128,6 +128,24 @@
               placeholder="Escreva sua mensagem para a Kirana…"
               aria-describedby="composer-help"
             ></textarea>
+            <button
+              class="voice-btn"
+              id="voice-btn"
+              type="button"
+              aria-label="Conversar por voz com a Kirana"
+              aria-pressed="false"
+              title="Falar com a Kirana"
+              data-state="inativo"
+            >
+              <svg class="voice-icon-mic" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 15a3.5 3.5 0 0 0 3.5-3.5V6a3.5 3.5 0 1 0-7 0v5.5A3.5 3.5 0 0 0 12 15Z" fill="currentColor" />
+                <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none" />
+              </svg>
+              <svg class="voice-icon-stop" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="7.5" y="7.5" width="9" height="9" rx="2" fill="currentColor" />
+              </svg>
+              <span class="voice-ring" aria-hidden="true"></span>
+            </button>
             <button class="send" id="send" type="submit" aria-label="Enviar mensagem" title="Enviar (Enter)">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 8 6 8-16-8Z" fill="currentColor" /></svg>
             </button>
@@ -135,6 +153,7 @@
           <p class="composer-help" id="composer-help">
             Enter envia · Shift + Enter quebra linha · Kirana pode cometer erros; confirme informações importantes.
           </p>
+          <p class="voice-status" id="voice-status" role="status" aria-live="polite" hidden></p>
         </div>
       </main>
     </div>

@@ -1,5 +1,104 @@
 # Changelog — Kirana
 
+## 0.4.0 — 25/10/2026 (voz conversacional, Marco 3)
+
+### Adicionado
+- **Voz como modalidade da mesma agente**: botão circular no composer da
+  interface principal. A fala vira uma mensagem normal em `/api/chat` — mesmas
+  sessões, mesmo LangGraph, mesma memória, mesmas ferramentas, mesmo HITL.
+- **`POST /api/voice/tts`** → `audio/mpeg` em streaming (motor Microsoft Thalita
+  Neural PT-BR via worker Python `edge-tts`), com abort que **mata o processo**,
+  limite de 3000 caracteres, exigência de sessão válida e mesmas proteções de
+  token/origem do `/api/chat`.
+- **`GET /api/voice/status`** — disponibilidade do motor, voz e velocidade.
+- **`src/voice/tts-text.js`** — limpeza do texto **apenas para fala** (emoji,
+  markdown, URL, blocos de código). O histórico e a tela continuam intactos.
+- **`public/voice.js`** — máquina de estados explícita (inativo →
+  pedindo-microfone → ouvindo → fala-detectada → processando → falando →
+  ouvindo, com `interrompido` e `erro`), fim de enunciado por silêncio,
+  anti-duplicata, anti-eco e interrupção pelo botão.
+- **Fala progressiva**: a resposta é dividida em frases; a próxima síntese é
+  pedida enquanto a frase atual toca (sem silêncio entre frases).
+- **Velocidade ajustável** (`KIRANA_TTS_RATE`, padrão `+8%`): a voz natural mede
+  146 ppm, abaixo da faixa desejada; com `+8%` mede 157 ppm.
+- **`npm run voice:bench`** — mede latência real, ppm e tempo de interrupção.
+- **`docs/VOZ.md`** — instalação Windows, privacidade, limitações e medições.
+- Testes: **+38** (9 limpeza de texto, 16 máquina de estados, 13 rotas HTTP) e
+  **34 verificações de navegador** com áudio real (`test/browser/voice-flow.mjs`).
+
+### Corrigido (defeitos reais encontrados durante a implementação)
+- **`Permissions-Policy: microphone=()` bloqueava o microfone** em toda a
+  interface. Agora é `microphone=(self)`; câmera e geolocalização seguem bloqueadas.
+- **CSP sem `media-src`** impedia o `<audio>` de tocar o MP3 (`blob:`).
+- Frases curtas travavam a divisão em pedaços (`"Oi!"` nunca era falado).
+- Depois de interromper, **texto atrasado do turno cancelado ainda era falado**
+  (agora `muted`/`epoch` invalidam a resposta fantasma).
+- Interromper deixava o controlador preso em `falando` (o áudio pausado nunca
+  emite `ended`); agora a reprodução é liberada explicitamente.
+- Motor de voz repetindo o mesmo trecho final duplicava a fala (`"preçopreço"`).
+- Erro de TTS era sobrescrito pelo rótulo genérico do estado na tela.
+
+### Preservado
+- Marco 2 inteiro: **219 testes** (181 anteriores + 38 novos), navegador do demo
+  **15/15**, `npm run audit` com 0 violações de contrato do gateway.
+- `/api/copilot`, widget React, `stream-state.js`, interface vanilla, `iniciar.bat`,
+  `diagnostico.bat`, `data/`, catálogo, memória, interesses e as 7 ferramentas.
+- Nenhuma dependência Node nova. Python/`edge-tts` é opcional: sem ele a Kirana
+  funciona por texto e o diagnóstico informa o que instalar.
+
+### Limitações declaradas
+- O provedor é **externo e não oficial** (endpoint do Edge). Não é offline e pode
+  parar sem aviso; não há equivalência com a voz do ChatGPT.
+- A meta de primeiro áudio ≤ 800 ms é atingida na maioria das execuções
+  (mediana ~700 ms), **não em todas**; 500 ms não é garantido.
+- O `SpeechRecognition` é do navegador (Chrome/Edge) e depende de serviço
+  externo de transcrição; Firefox não tem.
+- Testes de navegador usam dublê de `SpeechRecognition` (não há microfone no
+  ambiente de desenvolvimento); microfone físico precisa ser validado na máquina
+  do usuário.
+
+## 0.3.0 — 25/10/2026 (CopilotKit integrado, Marco 2)
+
+### Adicionado
+- **Runtime oficial do CopilotKit** em `POST /api/copilot` (`CopilotRuntime` +
+  `copilotRuntimeNodeHttpEndpoint`), montado no servidor Node existente. Envelope
+  `{method:"agent/run", params:{agentId}, body}` validado ponta a ponta.
+- **Agente Kirana como `BuiltInAgent` modo `custom`**: o CopilotKit orquestra o run; a Kirana
+  continua dona de LangGraph, gateway e ferramentas. Nenhum agente ou gateway duplicado.
+- **Tradutor Kirana → AG-UI** (`src/copilot/agui-events.js`): texto, tool calls, confirmações,
+  erros e o par `STEP_STARTED`/`STEP_FINISHED`.
+- **Kit por site** (`sites/<id>/site.json` + `src/copilot/site-kit.js`): ações permitidas,
+  chaves de estado, componentes de UI generativa, origens autorizadas e isolamento por sessão.
+- **Ferramentas de frontend reais** (`navigateToPage`, `openContactForm`, `selectService`,
+  `showPricing`, `fillContactForm`, `submitContactRequest`) com validação de JSON Schema.
+- **HITL com autorização de uso único** (`src/demo-contact.js`): token ligado ao hash dos
+  dados; reutilizar, trocar dados ou expirar exige nova confirmação.
+- **Site de demonstração local** (`/demo/index.html`) + widget React (`public/widget/kirana-widget.js`).
+- **Segundo site** (`sites/demo-parceiro/`) provando o isolamento entre clientes.
+- `GET /api/site/info` — metadados públicos do site (sem segredos).
+- Testes: `test/copilot-*.test.js` (40 testes) + `test/browser/demo-flow.mjs` (15 verificações
+  em Chromium real).
+
+### Corrigido (defeitos reais encontrados pelos testes)
+- `STEP_STARTED` sem `STEP_FINISHED` fazia o runtime responder `RUN_ERROR / INCOMPLETE_STREAM`.
+- **Vazamento entre sites**: `siteId` desconhecido caía no site padrão e compartilhava sessão.
+  Agora é recusado com `unknown_site` e a resolução é estrita.
+- `BuiltInAgent` é importado de `@copilotkit/runtime/v2` (o entry raiz não o exporta).
+- `copilotRuntimeNodeHttpEndpoint` usa `baseUrl` (não `basePath`).
+- Sessão determinística por site+thread deixou de ser recriada a cada run (histórico persistia
+  no teste, mas não em produção).
+- `sessions.create` aceita `id` explícito (sem alterar o comportamento de sessões aleatórias).
+
+### Preservado
+- LangGraph (`src/graph.js`), gateway SIWC, autenticação, SSE, `stream-state.js`, correção CSS
+  do indicador, interface vanilla, catálogo, memória, interesses e todas as 7 ferramentas.
+- Testes das versões anteriores: 124 → todos verdes.
+
+### Limitação declarada
+- `@copilotkit/react-core` não compila neste ambiente (memória do sandbox). O widget usa o
+  protocolo do runtime oficial, sem os hooks React do CopilotKit. Ver
+  `docs/COMPATIBILIDADE-COPILOTKIT.md`.
+
 ## 0.2.1 — 24/10/2026 (correção do indicador de geração)
 
 ### Corrigido

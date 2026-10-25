@@ -41,8 +41,13 @@ export function createKiranaAgent({ agent, sessions, siteKit, logger }) {
       const runId = input?.runId || `run_${Date.now()}`;
       const translator = createAgUiTranslator({ runId });
 
-      const siteId = String(input?.forwardedProps?.siteId || input?.forwardedProps?.site || DEFAULT_SITE_ID).slice(0, 64);
-      const site = siteKit?.get(siteId) ?? null;
+      const requestedSite = input?.forwardedProps?.siteId ?? input?.forwardedProps?.site ?? '';
+      // Site informado precisa existir: sem fallback silencioso para outro cliente.
+      const site = siteKit ? siteKit.resolve(requestedSite) : null;
+      if (siteKit && !site) {
+        yield { type: 'RUN_ERROR', message: `Site não integrado: ${String(requestedSite).slice(0, 64)}.`, code: 'unknown_site' };
+        return;
+      }
       const scopedSite = site?.id || 'default';
 
       const text = lastUserText(input);
