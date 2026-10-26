@@ -13,9 +13,11 @@
  * o cliente executa (`public/site-agent.js`). O handler não finge ter navegado —
  * devolve `siteAction` e o texto confirma isso ao modelo.
  *
- * `request_file_upload` NÃO é registrada: o site não tem endpoint seguro de
- * upload. Em vez de simular, `get_site_context` informa a limitação e a Kirana
- * diz ao visitante que o envio é pelo canal oficial.
+ * Histórico: na Fase 4 `request_file_upload` ficou de fora porque não havia
+ * infraestrutura. Na Fase 5 ela existe em `src/site/request-tools.js`, com
+ * endpoint próprio, validação de tipo/tamanho/assinatura, isolamento por sessão
+ * e expiração — e só responde `ok` quando a política de upload está ligada no
+ * `site.json`.
  */
 
 const MAX_ITEMS = 10;
@@ -69,7 +71,9 @@ function sectionText(map, prefixes) {
   return '';
 }
 
-export function createSiteTools({ siteContext, logger, defaultSiteId = null } = {}) {
+import { validateRequestData } from '../requests/requirements.js';
+
+export function createSiteTools({ siteContext, logger, defaultSiteId = null, requests = null } = {}) {
   if (!siteContext) throw new Error('createSiteTools exige siteContext');
 
   /** Site ativo do turno: ctx.siteId (sessão) → default. */
@@ -131,9 +135,17 @@ export function createSiteTools({ siteContext, logger, defaultSiteId = null } = 
           rotasPermitidas: siteContext.allowedRoutes(site).length,
           conhecimento: { documentos: knowledge?.docs?.length ?? 0, atualizadoEm: knowledge?.docs?.[0]?.capturedAt ?? null },
           uploads: {
-            disponivel: false,
-            motivo: site.permissions?.deniedReasons?.request_file_upload ?? 'sem endpoint seguro de upload neste site',
+            disponivel: site.uploads?.enabled === true,
+            motivo:
+              site.uploads?.enabled === true
+                ? null
+                : site.uploads?.reason ?? site.permissions?.deniedReasons?.request_file_upload ?? 'upload desabilitado neste site',
+            maxMb: site.uploads?.maxMb ?? null,
+            maxFiles: site.uploads?.maxFiles ?? null,
           },
+          solicitacao: site.endpoints?.submitRequest
+            ? { envioDisponivel: true }
+            : { envioDisponivel: false, motivo: 'Sem endpoint autorizado: pedidos ficam em rascunho.' },
         };
       },
     },
@@ -308,21 +320,49 @@ export function createSiteTools({ siteContext, logger, defaultSiteId = null } = 
         required: ['motivo', 'campos'],
         additionalProperties: false,
       },
-      handler: ({ motivo, campos = [] }) => ({
-        ok: true,
-        // Diretiva para a interface: renderiza o formulário no chat.
-        siteAction: {
-          type: 'request_input',
-          motivo: short(motivo, 200),
-          campos: campos.slice(0, 6).map((campo) => ({
-            nome: String(campo.nome).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40),
-            rotulo: short(campo.rotulo, 80),
-            tipo: campo.tipo ?? 'texto',
-            obrigatorio: campo.obrigatorio === true,
-          })),
-        },
-        mensagem: 'Campos apresentados ao visitante. Aguarde o preenchimento — nada foi enviado.',
-      }),
+      handler: ({ motivo, campos = [] }, ctx) => {
+        // Fase 5: coleta progressiva. Se existe solicitação ativa, a Kirana já
+        // sabe o que o visitante informou — pedir de novo é o defeito clássico
+        // de formulário. Aqui só entram os campos que ainda faltam.
+        const request = requests?.store?.activeFor(ctx?.sessionId) ?? null;
+        let pedidos = campos.map((campo) => ({
+          nome: String(campo.nome).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40),
+          rotulo: short(campo.rotulo, 80),
+          tipo: campo.tipo ?? 'texto',
+          obrigatorio: campo.obrigatorio === true,
+        }));
+
+        const jaInformado = request?.data ?? {};
+        const faltando = [];
+        if (request) {
+          const report = validateRequestData({
+            requirements: requests?.requirements,
+            serviceId: request.serviceId,
+            data: jaInformado,
+            files: request.files,
+          });
+          for (const item of [...(report.ausentes ?? []), ...(report.erros ?? [])]) faltando.push(item.campo);
+          // Reordena/filtra: só o que falta, mantendo a ordem do requisito.
+          const especificados = pedidos.filter((campo) => faltando.includes(campo.nome));
+          pedidos = especificados.length ? especificados : pedidos.filter((campo) => !jaInformado[campo.nome]);
+        } else {
+          pedidos = pedidos.filter((campo) => !jaInformado[campo.nome]);
+        }
+
+        return {
+          ok: true,
+          requestId: request?.id ?? null,
+          jaInformado: Object.fromEntries(Object.entries(jaInformado).filter(([, value]) => value != null && value !== '')),
+          siteAction: {
+            type: 'request_input',
+            motivo: short(motivo, 200),
+            campos: pedidos.slice(0, 6),
+          },
+          mensagem: pedidos.length
+            ? 'Campos apresentados ao visitante. Aguarde o preenchimento — nada foi enviado.'
+            : 'O visitante já informou os dados necessários; não peça novamente. Valide a solicitação e peça confirmação.',
+        };
+      },
     },
 
     /* ----------------------------- navegação ----------------------------- */

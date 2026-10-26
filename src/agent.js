@@ -43,7 +43,7 @@ class TurnError extends Error {
   }
 }
 
-export function createAgent({ config, gateway, registry, sessions, memory, logger, catalog, siteContext = null }) {
+export function createAgent({ config, gateway, registry, sessions, memory, logger, catalog, siteContext = null, requests = null }) {
   const log = logger?.child?.('agent') ?? logger;
   /** 'langgraph' (padrão) ou 'legacy' — permite rollback e teste de paridade. */
   const orchestrator = config.agent.orchestrator === 'legacy' ? 'legacy' : 'langgraph';
@@ -102,6 +102,25 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
     ];
     if (current.page?.summary) lines.push(`Resumo da página: ${current.page.summary}`);
     if (current.service) lines.push(`Solução em foco: ${current.service.title} (${current.service.serviceId}).`);
+    // Fase 5: a tarefa em andamento faz parte do contexto do site. Sem isso a
+    // Kirana repetiria perguntas já respondidas depois de uma navegação.
+    const task = requests?.store?.activeFor(session?.id) ?? null;
+    if (task) {
+      const dados = Object.entries(task.data ?? {})
+        .filter(([, value]) => value != null && value !== '')
+        .map(([key, value]) => `${key}=${String(value).slice(0, 120)}`)
+        .join('; ');
+      lines.push(
+        '',
+        '## Solicitação em andamento',
+        `- Identificador: **${task.id}** (serviço: ${task.serviceTitle ?? task.serviceId}).`,
+        `- Estado: **${task.state}**.`,
+        `- Dados já informados: ${dados || 'nenhum ainda'}.`,
+        `- Arquivos anexados: ${(task.files ?? []).length}.`,
+        '- Não peça de novo o que já está acima. Use `validate_service_request` para ver o que falta.',
+        '- O envio só acontece com `submit_service_request` aprovado pelo visitante; sem endpoint autorizado a solicitação continua rascunho.',
+      );
+    }
     if (knowledge && !knowledge.empty) {
       lines.push('', buildKnowledgePrompt(knowledge, site));
       lines.push(
@@ -111,7 +130,9 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
         '- Preços, prazos e clientes NÃO são publicados: diga isso em vez de estimar.',
         '- Navegação só em páginas autorizadas; a ação é executada pelo navegador do visitante.',
         '- Ações com efeito exigem confirmação na tela; você nunca envia formulário sozinha.',
-        '- Upload de arquivo não está disponível: oriente o uso do formulário/WhatsApp oficial.',
+        site.uploads?.enabled === true
+          ? '- Upload de arquivo está disponível: use `request_file_upload` e deixe o visitante escolher o arquivo. O servidor valida tipo, tamanho e conteúdo; nada é executado.'
+          : '- Upload de arquivo não está disponível: oriente o uso do formulário/WhatsApp oficial.',
       );
     }
     return lines.join('\n');
@@ -480,6 +501,12 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
     finalize: finalizeTurnState,
     toolResultContent,
     maxToolRounds: () => config.agent.maxToolRounds,
+    // Fase 5: o grafo carrega o estado da tarefa a cada rodada.
+    loadTask: (state) => {
+      const active = requests?.store?.activeFor(state?.io?.session?.id ?? '') ?? null;
+      if (!active) return null;
+      return { id: active.id, state: active.state, serviceId: active.serviceId, files: (active.files ?? []).length, fields: Object.keys(active.data ?? {}) };
+    },
   });
 
   /* -------------------------------- turno --------------------------------- */

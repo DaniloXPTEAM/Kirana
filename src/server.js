@@ -20,6 +20,10 @@ import { loadCatalog } from './catalog/index.js';
 import { createToolRegistry } from './tools/registry.js';
 import { createSiteContext } from './site/context.js';
 import { createSiteTools } from './site/tools.js';
+import { createRequestTools } from './site/request-tools.js';
+import { createRequestStore, isSessionId } from './requests/store.js';
+import { createFileStore } from './requests/files.js';
+import { loadRequirements } from './requests/requirements.js';
 import { createToolDefinitions } from './tools/definitions.js';
 import { createAgent, mapError } from './agent.js';
 import { createSiteKit } from './copilot/site-kit.js';
@@ -61,10 +65,46 @@ export function createKiranaServer(overrides = {}) {
   const siteContext =
     overrides.siteContext ??
     (overrides.disableSite ? null : createSiteContext({ siteKit, sitesDir: path.join(PROJECT_ROOT, 'sites'), logger }));
-  const siteTools = overrides.siteTools ?? (siteContext ? createSiteTools({ siteContext, logger, defaultSiteId: config.site?.id ?? null }).tools : []);
-  const tools = overrides.tools ?? [...baseTools, ...siteTools];
+  /**
+   * Fase 5 — solicitações operacionais.
+   *
+   * `requestStore` guarda a tarefa (rascunho → envio), `fileStore` guarda os
+   * anexos com política própria, e `requirements` é o cadastro por serviço do
+   * site. Os três são opcionais para não quebrar instâncias sem a Fase 5.
+   */
+  const requestStore = overrides.requestStore ?? createRequestStore({ dataDir: config.dataDir, logger });
+  const fileStore =
+    overrides.fileStore ??
+    createFileStore({
+      dataDir: config.dataDir,
+      logger,
+      maxBytes: (config.site?.uploads?.maxMb ?? 5) * 1024 * 1024,
+      maxFiles: config.site?.uploads?.maxFiles ?? 5,
+      retentionDays: config.site?.uploads?.retentionDays ?? 30,
+    });
+  /**
+   * Requisitos por serviço: `sites/<siteId>/requirements.json`.
+   * Ausente = nenhum requisito publicado; as ferramentas respondem a lacuna em
+   * vez de inventar exigência (regra da Fase 5).
+   */
+  const requirements =
+    overrides.requirements ??
+    (() => {
+      const siteId = config.site?.id ?? '';
+      const dir = siteId ? path.join(PROJECT_ROOT, 'sites', siteId) : null;
+      return dir ? loadRequirements({ dir, logger }) : null;
+    })();
+  const requests = { store: requestStore, requirements, files: fileStore };
+  const siteTools =
+    overrides.siteTools ?? (siteContext ? createSiteTools({ siteContext, logger, defaultSiteId: config.site?.id ?? null, requests }).tools : []);
+  const requestTools =
+    overrides.requestTools ??
+    (siteContext
+      ? createRequestTools({ siteContext, requests, files: fileStore, logger, defaultSiteId: config.site?.id ?? null, config }).tools
+      : []);
+  const tools = overrides.tools ?? [...baseTools, ...siteTools, ...requestTools];
   const registry = overrides.registry ?? createToolRegistry({ tools, logger });
-  const agent = overrides.agent ?? createAgent({ config, gateway, registry, sessions, memory, logger, catalog, siteContext });
+  const agent = overrides.agent ?? createAgent({ config, gateway, registry, sessions, memory, logger, catalog, siteContext, requests });
   const limiter = createRateLimiter(config.rateLimit);
   /**
    * Voz: balde próprio de limite.
@@ -78,6 +118,11 @@ export function createKiranaServer(overrides = {}) {
    */
   const voiceLimiter = createRateLimiter({
     max: Math.max(config.rateLimit.max * 6, 60),
+    windowMs: config.rateLimit.windowMs,
+  });
+
+  const requestLimiter = createRateLimiter({
+    max: Math.max(Math.round(config.rateLimit.max / 2), 6),
     windowMs: config.rateLimit.windowMs,
   });
 
@@ -128,6 +173,23 @@ export function createKiranaServer(overrides = {}) {
     const result = voiceLimiter.check(clientIp(req));
     if (!result.allowed) {
       throw new HttpError(429, 'rate_limited', 'Muitas requisições de voz em pouco tempo. Aguarde um instante.', {
+        retryAfterMs: Math.round(result.retryAfterMs),
+      });
+    }
+  }
+
+  /**
+   * Balde próprio para upload/remoção de arquivo.
+   *
+   * Upload é a rota mais cara do servidor (corpo grande + disco): se usasse o
+   * mesmo balde do chat, um anexo consumiria a cota da conversa; se não tivesse
+   * balde próprio, seria o caminho mais fácil de abuso. Limite menor e janela
+   * própria, proporcional ao tamanho do arquivo permitido.
+   */
+  function checkRequestRate(req) {
+    const result = requestLimiter.check(clientIp(req));
+    if (!result.allowed) {
+      throw new HttpError(429, 'rate_limited', 'Muitos envios de arquivo em pouco tempo. Aguarde um instante.', {
         retryAfterMs: Math.round(result.retryAfterMs),
       });
     }
@@ -376,6 +438,100 @@ export function createKiranaServer(overrides = {}) {
         documentos: knowledge?.docs.map((doc) => ({ id: doc.id, titulo: doc.title, fonte: doc.source, capturadoEm: doc.capturedAt })) ?? [],
         servicos: knowledge?.services() ?? [],
       });
+      return;
+    }
+
+    /* ------------------- solicitações da Fase 5 (tarefas) ---------------- */
+    /**
+     * Leitura do estado da tarefa pela interface.
+     *
+     * O `sessionId` é obrigatório e a leitura passa pelo store, que confere o
+     * dono. Sem isso a rota seria um vazamento entre visitantes.
+     */
+    if (route === '/api/requests' && method === 'GET') {
+      assertAuth(req);
+      checkRate(req);
+      const sessionId = url.searchParams.get('sessionId') || '';
+      if (!isSessionId(sessionId)) throw new HttpError(400, 'invalid_session', 'Informe um sessionId válido.');
+      sendJson(res, 200, {
+        solicitacoes: requestStore.list(sessionId).map((request) => ({
+          id: request.id,
+          serviceId: request.serviceId,
+          estado: request.state,
+          criadaEm: request.createdAt,
+          atualizadaEm: request.updatedAt,
+          arquivos: (request.files ?? []).length,
+        })),
+      });
+      return;
+    }
+
+    const requestMatch = route.match(/^\/api\/requests\/(REQ-\d{4}-[A-Z0-9]{6})$/);
+    if (requestMatch && method === 'GET') {
+      assertAuth(req);
+      checkRate(req);
+      const sessionId = url.searchParams.get('sessionId') || '';
+      if (!isSessionId(sessionId)) throw new HttpError(400, 'invalid_session', 'Informe um sessionId válido.');
+      const request = requestStore.get(requestMatch[1], sessionId);
+      if (!request) throw new HttpError(404, 'request_not_found', 'Solicitação não encontrada nesta conversa.');
+      sendJson(res, 200, {
+        id: request.id,
+        serviceId: request.serviceId,
+        serviceTitle: request.serviceTitle,
+        estado: request.state,
+        dados: request.data,
+        arquivos: (request.files ?? []).map((file) => ({ id: file.id, nome: file.name, tamanho: file.size, expiraEm: file.expiresAt })),
+        enviadaEm: request.submittedAt,
+        externalId: request.externalId,
+        historico: (request.history ?? []).slice(-20),
+      });
+      return;
+    }
+
+    const fileMatch = route.match(/^\/api\/requests\/(REQ-\d{4}-[A-Z0-9]{6})\/files$/);
+    if (fileMatch && method === 'POST') {
+      assertAuth(req);
+      assertSameOrigin(req);
+      checkRequestRate(req);
+      // 1 MB de folga para o base64 (que infla ~33%) sobre o limite do arquivo.
+      const body = await readJsonBody(req, { maxBytes: Math.min(config.maxBodyBytes, fileStore.maxBytes * 2 + 64 * 1024) });
+      const request = requestStore.get(fileMatch[1], typeof body.sessionId === 'string' ? body.sessionId : '');
+      if (!request) throw new HttpError(404, 'request_not_found', 'Solicitação não encontrada nesta conversa.');
+      if (!requestStore.canEdit(request)) throw new HttpError(409, 'request_closed', `A solicitação está em ${request.state} e não aceita arquivos.`);
+      if (typeof body.filename !== 'string' || typeof body.dataBase64 !== 'string') {
+        throw new HttpError(400, 'invalid_upload', 'Informe filename e dataBase64.');
+      }
+      let buffer;
+      try {
+        buffer = Buffer.from(body.dataBase64, 'base64');
+      } catch {
+        throw new HttpError(400, 'invalid_upload', 'Conteúdo do arquivo inválido.');
+      }
+      const saved = fileStore.save(request, { filename: body.filename, contentType: body.contentType, buffer });
+      if (!saved.ok) throw new HttpError(400, saved.code, saved.message);
+      // O store é quem registra o metadado e o histórico (e quem barra estado fechado).
+      const attached = requestStore.addFile(request.id, request.sessionId, saved.file);
+      if (!attached.ok) {
+        fileStore.remove(request.id, saved.file); // não deixa arquivo órfão no disco
+        throw new HttpError(409, attached.error.code, attached.error.message);
+      }
+      sendJson(res, 201, { arquivo: { id: saved.file.id, nome: saved.file.name, tamanho: saved.file.size, expiraEm: saved.file.expiresAt } });
+      return;
+    }
+
+    const fileDeleteMatch = route.match(/^\/api\/requests\/(REQ-\d{4}-[A-Z0-9]{6})\/files\/(f_[a-z0-9]{6,20})$/);
+    if (fileDeleteMatch && method === 'DELETE') {
+      assertAuth(req);
+      assertSameOrigin(req);
+      checkRequestRate(req);
+      const sessionId = url.searchParams.get('sessionId') || '';
+      const request = requestStore.get(fileDeleteMatch[1], sessionId);
+      if (!request) throw new HttpError(404, 'request_not_found', 'Solicitação não encontrada nesta conversa.');
+      if (!requestStore.canEdit(request)) throw new HttpError(409, 'request_closed', `A solicitação está em ${request.state} e não aceita alterações.`);
+      const removed = requestStore.removeFile(request.id, sessionId, fileDeleteMatch[2]);
+      if (!removed.ok) throw new HttpError(404, removed.error.code, removed.error.message);
+      fileStore.remove(request.id, removed.file);
+      sendJson(res, 200, { removido: true, id: removed.file.id });
       return;
     }
 

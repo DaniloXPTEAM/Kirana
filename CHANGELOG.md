@@ -1,5 +1,62 @@
 # Changelog — Kirana
 
+## 0.5.1 — 26/10/2026 (Fase 5: a Kirana executa solicitações de serviço)
+
+A Kirana deixa de só explicar: ela **conduz uma solicitação de serviço dentro do
+site** — escolhe o serviço, consulta requisitos, coleta dados, recebe arquivos,
+preenche o formulário, valida, pede confirmação, tenta enviar e informa o
+resultado real. Relatórios em `docs/FASE5-*.md`.
+
+### Adicionado
+- **8 ferramentas operacionais** (`src/site/request-tools.js`):
+  `get_service_requirements`, `start_service_request`, `fill_site_form`,
+  `request_file_upload`, `validate_service_request`,
+  `submit_service_request` (escrita, HITL), `get_request_status`,
+  `cancel_service_request` (escrita, HITL). Total: **24 ferramentas**
+  (17 declaradas em `site.json`).
+- **`src/requests/store.js`** — máquina de estados
+  (`draft → collecting_information → waiting_for_upload → validating →
+  waiting_for_approval → submitting → submitted | failed | cancelled`),
+  isolamento por sessão, uma solicitação ativa por sessão, anti-duplicidade de
+  envio, histórico de 60 entradas, persistência atômica em `data/requests`.
+- **`src/requests/files.js`** — upload real com extensão + MIME + **assinatura**,
+  bloqueio de 21 extensões perigosas, 5 MB, 5 arquivos, pasta por solicitação,
+  `0o600`, contenção de path, remoção e retenção de 30 dias. **Nada é
+  executado.**
+- **`src/requests/requirements.js`** + `sites/opportunity-ai/requirements.json`
+  — requisitos por serviço, separando campo do formulário oficial de campo
+  operacional, com `requisitosPublicados.disponivel: false` (o site não publica
+  requisitos) e motivo/fonte.
+- **Rotas:** `GET /api/requests`, `GET /api/requests/:id`,
+  `POST /api/requests/:id/files` (base64), `DELETE /api/requests/:id/files/:fileId`.
+- **Grafo:** nó `task` e canal `taskState` para retomar a tarefa em andamento.
+- **Ponte do navegador:** `fill_form` (escreve em campo real, **nunca** envia) e
+  `request_upload` (abre o seletor do visitante), além de `uploadFile`/`pickFile`.
+- **Interface:** cartão de anexo com tipos/limite e status real do servidor;
+  pílula de preenchimento; ponte resolvida em tempo de uso.
+- **Testes:** 4 suítes novas (`requests-store`, `requests-validation`,
+  `request-tools`, `requests-http`) + `test/browser/site-v5.mjs`. Suíte total:
+  **429/429**; navegador: **26/26 + 18/18 + 8/8 + 15/15**.
+
+### Alterado
+- `request_user_input` virou **coleta progressiva**: filtra os campos que a
+  solicitação já tem, em vez de repetir o formulário inteiro.
+- `get_site_context` informa a política de upload e se o envio está disponível.
+- `permissions.denied` ficou vazio: upload deixou de ser negado e passou a ter
+  política explícita.
+
+### Não mudou
+- Gateway local (1455), modelos, voz, `.env`, `data/`, configurações e o site
+  publicado. Nenhuma dependência nova. Nada foi publicado em
+  `https://opportunity.ia.br`.
+
+### Limitações declaradas
+- **Não há endpoint real de solicitações:** `submit_service_request` responde
+  `enviado: false` com `motivo: endpoint_nao_configurado` e mantém o rascunho.
+- Requisitos não publicados pelo site são marcados como operacionais.
+- Sem antivírus; retenção de 30 dias; arquivos nunca executados.
+- `/api/copilot/info` continua 405; voz real no Windows segue pendente.
+
 ## 0.5.0 — 26/10/2026 (Fase 4: agente residente no site Opportunity AI)
 
 A Kirana passa a atender **dentro** do site publicado: reconhece a página, conhece

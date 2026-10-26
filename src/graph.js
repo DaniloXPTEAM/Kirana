@@ -36,6 +36,12 @@ const TurnState = Annotation.Root({
   activeModel: Annotation(),
   fallbackUsed: Annotation(),
   pendingAnnounced: Annotation(),
+  /**
+   * Fase 5: estado da tarefa (solicitação) carregado a cada rodada.
+   * O nome do canal não pode coincidir com o nome do nó (limite do LangGraph:
+   * `task` já é nó), por isso `taskState`.
+   */
+  taskState: Annotation(),
   error: Annotation(),
   trace: Annotation(),
 });
@@ -64,6 +70,29 @@ export function createTurnGraph(primitives) {
       ...prepared, // { messages, toolSchemas, activeTools }
       rounds,
       trace: bump(state.trace, 'prepare'),
+    };
+  }
+
+  /**
+   * Nó `task` — estado da tarefa (Fase 5).
+   *
+   * Por que no grafo e não no prompt: o briefing pede que o LangGraph mantenha o
+   * estado da tarefa. Aqui ele é **carregado a cada rodada** (o visitante pode
+   * ter anexado um arquivo, corrigido um dado ou cancelado no meio do turno) e
+   * viaja no estado até o nó `model`, que o injeta no contexto. A persistência
+   * real é o store de solicitações; o grafo só carrega e transporta.
+   */
+  async function task(state) {
+    if (typeof primitives.loadTask !== 'function') return {};
+    let snapshot = null;
+    try {
+      snapshot = await primitives.loadTask(state);
+    } catch (error) {
+      primitives.logger?.warn?.('Falha ao carregar estado da tarefa', { message: error?.message });
+    }
+    return {
+      taskState: snapshot ?? null,
+      trace: bump(state.trace, 'task'),
     };
   }
 
@@ -163,12 +192,14 @@ export function createTurnGraph(primitives) {
 
   return new StateGraph(TurnState)
     .addNode('prepare', prepare)
+    .addNode('task', task)
     .addNode('model', model)
     .addNode('tools', tools)
     .addNode('overflow', overflow)
     .addNode('finalize', done)
     .addEdge(START, 'prepare')
-    .addEdge('prepare', 'model')
+    .addEdge('prepare', 'task')
+    .addEdge('task', 'model')
     .addConditionalEdges('model', routeAfterModel, {
       tools: 'tools',
       overflow: 'overflow',

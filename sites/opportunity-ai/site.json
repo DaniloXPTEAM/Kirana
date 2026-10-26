@@ -14,11 +14,33 @@
     "location": "Fortaleza, Ceará, Brasil",
     "note": "Conteúdo derivado das páginas publicadas em 26/10/2026. Preços e prazos não são publicados."
   },
-  "visual": { "accent": "#080d19", "position": "right" },
-  "features": { "tools": true, "sharedState": true, "generativeUi": true, "hitl": true },
-  "stateKeys": ["page", "path", "serviceId", "section"],
-  "generativeComponents": ["serviceCard", "contactSummary", "requestInput"],
-  "allowedOrigins": ["https://opportunity.ia.br", "https://www.opportunity.ia.br", "http://localhost:3000", "http://127.0.0.1:3000"],
+  "visual": {
+    "accent": "#080d19",
+    "position": "right"
+  },
+  "features": {
+    "tools": true,
+    "sharedState": true,
+    "generativeUi": true,
+    "hitl": true
+  },
+  "stateKeys": [
+    "page",
+    "path",
+    "serviceId",
+    "section"
+  ],
+  "generativeComponents": [
+    "serviceCard",
+    "contactSummary",
+    "requestInput"
+  ],
+  "allowedOrigins": [
+    "https://opportunity.ia.br",
+    "https://www.opportunity.ia.br",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
+  ],
   "routes": {
     "allowlist": [
       "/",
@@ -48,32 +70,223 @@
     "source": "https://opportunity.ia.br/sitemap.xml (lido em 2026-10-26)"
   },
   "pages": [
-    { "id": "home", "path": "/", "title": "Opportunity AI — início", "summary": "Apresentação da empresa, as seis frentes de trabalho e o fluxo de atendimento (contato, qualificação, CRM, pessoa assume).", "aliases": ["inicio", "home", "principal", "capa"] },
-    { "id": "solucoes", "path": "/solucoes/", "title": "Soluções", "summary": "Lista das seis soluções com problema e aplicação de cada uma.", "aliases": ["solucoes", "servicos", "produtos"] },
-    { "id": "solucao-agentes-ia", "path": "/solucoes/agentes-ia", "title": "Agentes de IA personalizados", "summary": "Assistentes para tarefas específicas, com consulta a dados e execução supervisionada.", "aliases": ["agentes", "agentes de ia", "ia personalizada"], "serviceId": "agentes-ia" },
-    { "id": "solucao-atendimento", "path": "/solucoes/atendimento", "title": "Atendimento digital e WhatsApp", "summary": "Perguntas frequentes, triagem, qualificação e encaminhamento humano.", "aliases": ["atendimento", "whatsapp", "atendimento digital"], "serviceId": "atendimento" },
-    { "id": "solucao-crm-vendas", "path": "/solucoes/crm-vendas", "title": "CRM e automação de vendas", "summary": "Contatos, funil, follow-up, histórico e relatórios.", "aliases": ["crm", "vendas", "funil"], "serviceId": "crm-vendas" },
-    { "id": "solucao-automacao", "path": "/solucoes/automacao", "title": "Workflows e automação", "summary": "Processos de navegador, dados, arquivos e integração entre sistemas, com logs.", "aliases": ["automacao", "workflows", "integracao"], "serviceId": "automacao" },
-    { "id": "solucao-relatorios", "path": "/solucoes/relatorios", "title": "Relatórios inteligentes", "summary": "Coleta, organização, síntese, dashboards e apresentações.", "aliases": ["relatorios", "dashboards", "indicadores"], "serviceId": "relatorios" },
-    { "id": "solucao-voz", "path": "/solucoes/voz", "title": "Agentes de voz e Android", "summary": "Fala natural em português do Brasil, baixa latência e avatares.", "aliases": ["voz", "android", "agente de voz"], "serviceId": "voz" },
-    { "id": "labs", "path": "/labs/", "title": "Opportunity Labs", "summary": "Laboratório: pesquisa, prototipagem, produtos próprios e experiências criativas.", "aliases": ["labs", "laboratorio", "projetos"] },
-    { "id": "labs-kirana", "path": "/labs/kirana", "title": "Kirana (Labs)", "summary": "Plataforma de agentes para sites, aplicativos e sistemas: conversa, orienta a navegação e executa ações autorizadas.", "aliases": ["kirana", "plataforma kirana"] },
-    { "id": "labs-opportunity-crm", "path": "/labs/opportunity-crm", "title": "Opportunity CRM (Labs)", "summary": "Gestão comercial com contatos, oportunidades, funil e automações — em conceito.", "aliases": ["opportunity crm"] },
-    { "id": "labs-cineforma", "path": "/labs/cineforma", "title": "CineForma (Labs)", "summary": "Produção de vídeo com IA: roteiro, storyboard, vídeos e montagem final.", "aliases": ["cineforma"] },
-    { "id": "labs-gabi", "path": "/labs/gabi", "title": "Gabi (Labs)", "summary": "Pesquisa de assistente por voz em Android.", "aliases": ["gabi"] },
-    { "id": "labs-creators", "path": "/labs/creators", "title": "Opportunity Creators (Labs)", "summary": "Personagens digitais e produção audiovisual com IA.", "aliases": ["creators", "personagens digitais"] },
-    { "id": "tecnologia", "path": "/tecnologia", "title": "Tecnologia", "summary": "Como um agente funciona por dentro: canais, contexto, ferramentas e humano no circuito.", "aliases": ["tecnologia", "arquitetura"] },
-    { "id": "sobre", "path": "/sobre", "title": "Sobre", "summary": "Identidade, missão, marcas (AI, Labs, Creators), valores e fundador.", "aliases": ["sobre", "empresa", "quem somos"] },
-    { "id": "contato", "path": "/contato", "title": "Contato", "summary": "Formulário de contato (nome, e-mail, WhatsApp, empresa, interesse, mensagem) e WhatsApp direto.", "aliases": ["contato", "formulario", "falar com a equipe"] },
-    { "id": "privacidade", "path": "/privacidade", "title": "Privacidade", "summary": "Política de Privacidade: dados do formulário, finalidade, consentimento e direitos.", "aliases": ["privacidade", "lgpd", "dados"] },
-    { "id": "termos", "path": "/termos", "title": "Termos", "summary": "Termos de uso do site.", "aliases": ["termos", "condicoes"] }
+    {
+      "id": "home",
+      "path": "/",
+      "title": "Opportunity AI — início",
+      "summary": "Apresentação da empresa, as seis frentes de trabalho e o fluxo de atendimento (contato, qualificação, CRM, pessoa assume).",
+      "aliases": [
+        "inicio",
+        "home",
+        "principal",
+        "capa"
+      ]
+    },
+    {
+      "id": "solucoes",
+      "path": "/solucoes/",
+      "title": "Soluções",
+      "summary": "Lista das seis soluções com problema e aplicação de cada uma.",
+      "aliases": [
+        "solucoes",
+        "servicos",
+        "produtos"
+      ]
+    },
+    {
+      "id": "solucao-agentes-ia",
+      "path": "/solucoes/agentes-ia",
+      "title": "Agentes de IA personalizados",
+      "summary": "Assistentes para tarefas específicas, com consulta a dados e execução supervisionada.",
+      "aliases": [
+        "agentes",
+        "agentes de ia",
+        "ia personalizada"
+      ],
+      "serviceId": "agentes-ia"
+    },
+    {
+      "id": "solucao-atendimento",
+      "path": "/solucoes/atendimento",
+      "title": "Atendimento digital e WhatsApp",
+      "summary": "Perguntas frequentes, triagem, qualificação e encaminhamento humano.",
+      "aliases": [
+        "atendimento",
+        "whatsapp",
+        "atendimento digital"
+      ],
+      "serviceId": "atendimento"
+    },
+    {
+      "id": "solucao-crm-vendas",
+      "path": "/solucoes/crm-vendas",
+      "title": "CRM e automação de vendas",
+      "summary": "Contatos, funil, follow-up, histórico e relatórios.",
+      "aliases": [
+        "crm",
+        "vendas",
+        "funil"
+      ],
+      "serviceId": "crm-vendas"
+    },
+    {
+      "id": "solucao-automacao",
+      "path": "/solucoes/automacao",
+      "title": "Workflows e automação",
+      "summary": "Processos de navegador, dados, arquivos e integração entre sistemas, com logs.",
+      "aliases": [
+        "automacao",
+        "workflows",
+        "integracao"
+      ],
+      "serviceId": "automacao"
+    },
+    {
+      "id": "solucao-relatorios",
+      "path": "/solucoes/relatorios",
+      "title": "Relatórios inteligentes",
+      "summary": "Coleta, organização, síntese, dashboards e apresentações.",
+      "aliases": [
+        "relatorios",
+        "dashboards",
+        "indicadores"
+      ],
+      "serviceId": "relatorios"
+    },
+    {
+      "id": "solucao-voz",
+      "path": "/solucoes/voz",
+      "title": "Agentes de voz e Android",
+      "summary": "Fala natural em português do Brasil, baixa latência e avatares.",
+      "aliases": [
+        "voz",
+        "android",
+        "agente de voz"
+      ],
+      "serviceId": "voz"
+    },
+    {
+      "id": "labs",
+      "path": "/labs/",
+      "title": "Opportunity Labs",
+      "summary": "Laboratório: pesquisa, prototipagem, produtos próprios e experiências criativas.",
+      "aliases": [
+        "labs",
+        "laboratorio",
+        "projetos"
+      ]
+    },
+    {
+      "id": "labs-kirana",
+      "path": "/labs/kirana",
+      "title": "Kirana (Labs)",
+      "summary": "Plataforma de agentes para sites, aplicativos e sistemas: conversa, orienta a navegação e executa ações autorizadas.",
+      "aliases": [
+        "kirana",
+        "plataforma kirana"
+      ]
+    },
+    {
+      "id": "labs-opportunity-crm",
+      "path": "/labs/opportunity-crm",
+      "title": "Opportunity CRM (Labs)",
+      "summary": "Gestão comercial com contatos, oportunidades, funil e automações — em conceito.",
+      "aliases": [
+        "opportunity crm"
+      ]
+    },
+    {
+      "id": "labs-cineforma",
+      "path": "/labs/cineforma",
+      "title": "CineForma (Labs)",
+      "summary": "Produção de vídeo com IA: roteiro, storyboard, vídeos e montagem final.",
+      "aliases": [
+        "cineforma"
+      ]
+    },
+    {
+      "id": "labs-gabi",
+      "path": "/labs/gabi",
+      "title": "Gabi (Labs)",
+      "summary": "Pesquisa de assistente por voz em Android.",
+      "aliases": [
+        "gabi"
+      ]
+    },
+    {
+      "id": "labs-creators",
+      "path": "/labs/creators",
+      "title": "Opportunity Creators (Labs)",
+      "summary": "Personagens digitais e produção audiovisual com IA.",
+      "aliases": [
+        "creators",
+        "personagens digitais"
+      ]
+    },
+    {
+      "id": "tecnologia",
+      "path": "/tecnologia",
+      "title": "Tecnologia",
+      "summary": "Como um agente funciona por dentro: canais, contexto, ferramentas e humano no circuito.",
+      "aliases": [
+        "tecnologia",
+        "arquitetura"
+      ]
+    },
+    {
+      "id": "sobre",
+      "path": "/sobre",
+      "title": "Sobre",
+      "summary": "Identidade, missão, marcas (AI, Labs, Creators), valores e fundador.",
+      "aliases": [
+        "sobre",
+        "empresa",
+        "quem somos"
+      ]
+    },
+    {
+      "id": "contato",
+      "path": "/contato",
+      "title": "Contato",
+      "summary": "Formulário de contato (nome, e-mail, WhatsApp, empresa, interesse, mensagem) e WhatsApp direto.",
+      "aliases": [
+        "contato",
+        "formulario",
+        "falar com a equipe"
+      ]
+    },
+    {
+      "id": "privacidade",
+      "path": "/privacidade",
+      "title": "Privacidade",
+      "summary": "Política de Privacidade: dados do formulário, finalidade, consentimento e direitos.",
+      "aliases": [
+        "privacidade",
+        "lgpd",
+        "dados"
+      ]
+    },
+    {
+      "id": "termos",
+      "path": "/termos",
+      "title": "Termos",
+      "summary": "Termos de uso do site.",
+      "aliases": [
+        "termos",
+        "condicoes"
+      ]
+    }
   ],
   "tools": [
     {
       "name": "get_site_context",
       "description": "Informa em qual site a Kirana está atendendo e qual página o visitante está vendo agora (página, caminho, serviço em foco).",
       "category": "read",
-      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
     },
     {
       "name": "list_site_pages",
@@ -81,7 +294,17 @@
       "category": "read",
       "parameters": {
         "type": "object",
-        "properties": { "grupo": { "type": "string", "enum": ["todas", "solucoes", "labs", "institucional"] } },
+        "properties": {
+          "grupo": {
+            "type": "string",
+            "enum": [
+              "todas",
+              "solucoes",
+              "labs",
+              "institucional"
+            ]
+          }
+        },
         "additionalProperties": false
       }
     },
@@ -92,8 +315,14 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "path": { "type": "string", "maxLength": 120 },
-          "pageId": { "type": "string", "maxLength": 60 }
+          "path": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "pageId": {
+            "type": "string",
+            "maxLength": 60
+          }
         },
         "additionalProperties": false
       }
@@ -102,13 +331,21 @@
       "name": "explain_current_page",
       "description": "Explica o conteúdo da página em que o visitante está, usando o conhecimento do site.",
       "category": "read",
-      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
     },
     {
       "name": "list_services",
       "description": "Apresenta as soluções oferecidas pela Opportunity AI, com resumo de cada uma.",
       "category": "read",
-      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
     },
     {
       "name": "explain_service",
@@ -116,8 +353,15 @@
       "category": "read",
       "parameters": {
         "type": "object",
-        "properties": { "serviceId": { "type": "string", "maxLength": 40 } },
-        "required": ["serviceId"],
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "serviceId"
+        ],
         "additionalProperties": false
       }
     },
@@ -127,8 +371,15 @@
       "category": "navigation",
       "parameters": {
         "type": "object",
-        "properties": { "serviceId": { "type": "string", "maxLength": 40 } },
-        "required": ["serviceId"],
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "serviceId"
+        ],
         "additionalProperties": false
       }
     },
@@ -139,24 +390,50 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "motivo": { "type": "string", "maxLength": 200 },
+          "motivo": {
+            "type": "string",
+            "maxLength": 200
+          },
           "campos": {
             "type": "array",
             "maxItems": 6,
             "items": {
               "type": "object",
               "properties": {
-                "nome": { "type": "string", "maxLength": 40 },
-                "rotulo": { "type": "string", "maxLength": 80 },
-                "tipo": { "type": "string", "enum": ["texto", "email", "telefone", "opcao", "mensagem"] },
-                "obrigatorio": { "type": "boolean" }
+                "nome": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "rotulo": {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                "tipo": {
+                  "type": "string",
+                  "enum": [
+                    "texto",
+                    "email",
+                    "telefone",
+                    "opcao",
+                    "mensagem"
+                  ]
+                },
+                "obrigatorio": {
+                  "type": "boolean"
+                }
               },
-              "required": ["nome", "rotulo"],
+              "required": [
+                "nome",
+                "rotulo"
+              ],
               "additionalProperties": false
             }
           }
         },
-        "required": ["motivo", "campos"],
+        "required": [
+          "motivo",
+          "campos"
+        ],
         "additionalProperties": false
       }
     },
@@ -168,21 +445,152 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "acao": { "type": "string", "maxLength": 120 },
-          "resumo": { "type": "string", "maxLength": 400 }
+          "acao": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "resumo": {
+            "type": "string",
+            "maxLength": 400
+          }
         },
-        "required": ["acao", "resumo"],
+        "required": [
+          "acao",
+          "resumo"
+        ],
         "additionalProperties": false
       }
+    },
+    {
+      "name": "get_service_requirements",
+      "description": "Requisitos reais de um serviço; informa quando o site não publica.",
+      "category": "read"
+    },
+    {
+      "name": "start_service_request",
+      "description": "Cria/retoma o rascunho local de solicitação (não envia nada).",
+      "category": "read"
+    },
+    {
+      "name": "validate_service_request",
+      "description": "Confere dados e aponta o que falta antes da confirmação.",
+      "category": "read"
+    },
+    {
+      "name": "get_request_status",
+      "description": "Estado real da solicitação e histórico; nunca estima prazo.",
+      "category": "read"
+    },
+    {
+      "name": "fill_site_form",
+      "description": "Preenche campos do formulário real do site; não envia.",
+      "category": "navigation"
+    },
+    {
+      "name": "request_file_upload",
+      "description": "Pede arquivo ao visitante; validação e retenção no servidor.",
+      "category": "navigation"
+    },
+    {
+      "name": "submit_service_request",
+      "description": "Envia a solicitação — exige endpoint autorizado e aprovação.",
+      "category": "sensitive"
+    },
+    {
+      "name": "cancel_service_request",
+      "description": "Cancela o rascunho e remove arquivos; exige confirmação.",
+      "category": "sensitive"
     }
   ],
   "permissions": {
-    "read": ["get_site_context", "list_site_pages", "explain_current_page", "list_services", "explain_service", "request_user_input"],
-    "navigation": ["navigate_to_page", "open_service_page"],
-    "effects": ["show_confirmation"],
-    "denied": ["request_file_upload"],
-    "deniedReasons": {
-      "request_file_upload": "O site não tem endpoint seguro de upload; arquivos devem ser enviados pelo formulário/WhatsApp oficiais."
+    "read": [
+      "get_site_context",
+      "list_site_pages",
+      "explain_current_page",
+      "list_services",
+      "explain_service",
+      "request_user_input",
+      "get_service_requirements",
+      "start_service_request",
+      "validate_service_request",
+      "get_request_status"
+    ],
+    "navigation": [
+      "navigate_to_page",
+      "open_service_page",
+      "fill_site_form",
+      "request_file_upload"
+    ],
+    "effects": [
+      "show_confirmation",
+      "submit_service_request",
+      "cancel_service_request"
+    ],
+    "denied": [],
+    "deniedReasons": {}
+  },
+  "forms": {
+    "contato": {
+      "page": "/contato",
+      "target": "#contato form",
+      "submit": "manual",
+      "fields": {
+        "nome": "#nome",
+        "email": "#email",
+        "whatsapp": "#whatsapp",
+        "empresa": "#empresa",
+        "interesse": "#interesse",
+        "mensagem": "#mensagem",
+        "consent": "#consent"
+      },
+      "interesseOpcoes": [
+        "Agentes de IA personalizados",
+        "Atendimento digital e WhatsApp",
+        "CRM e automação de vendas",
+        "Workflows e automação",
+        "Relatórios inteligentes",
+        "Agentes de voz e Android",
+        "Opportunity Labs / parcerias",
+        "Outro assunto"
+      ],
+      "observacao": "Campos e opções verificados no HTML publicado em 26/10/2026. O envio é sempre do visitante."
     }
+  },
+  "endpoints": {
+    "submitRequest": null
+  },
+  "uploads": {
+    "enabled": true,
+    "maxMb": 5,
+    "maxFiles": 5,
+    "retentionDays": 30,
+    "allowed": [
+      "pdf",
+      "png",
+      "jpg",
+      "jpeg",
+      "webp",
+      "txt",
+      "csv",
+      "docx",
+      "xlsx"
+    ],
+    "storage": "local:data/uploads/<requestId>",
+    "executaArquivos": false
+  },
+  "requests": {
+    "requirementsFile": "requirements.json",
+    "oneActivePerSession": true,
+    "states": [
+      "draft",
+      "collecting_information",
+      "waiting_for_upload",
+      "validating",
+      "waiting_for_approval",
+      "submitting",
+      "submitted",
+      "failed",
+      "cancelled"
+    ]
   }
 }

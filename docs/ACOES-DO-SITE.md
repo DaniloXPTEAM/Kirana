@@ -1,5 +1,10 @@
 # Ações do site (ferramentas de frontend)
 
+> **Fase 5 (v0.5.1):** além das ações abaixo, a ponte `public/site-agent.js`
+> executa `fill_form` (preenche o formulário real, nunca envia) e
+> `request_upload` (abre o seletor do visitante; o servidor valida e guarda).
+> Detalhes em [`FASE5-SOLICITACOES.md`](FASE5-SOLICITACOES.md) §1.1 e §1.2.
+
 Toda ação abaixo é **implementada de verdade** em `public/demo/demo.js`
 (`window.KiranaSite.actions`) e exposta ao modelo via CopilotKit/AG-UI. O modelo só vê as
 ações permitidas pelo site (`sites/<id>/site.json`) **e** declaradas pelo widget.

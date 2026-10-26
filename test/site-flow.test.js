@@ -186,7 +186,7 @@ test('/api/site/info expõe páginas, rotas e limites — e nenhuma credencial',
   }
 });
 
-test('as 9 ferramentas do site entram no /api/tools sem quebrar as existentes', async () => {
+test('as ferramentas do site (Fase 4 + Fase 5) entram no /api/tools sem quebrar as existentes', async () => {
   const gateway = await startFakeGateway({ script: () => ({ text: 'ok' }) });
   const kirana = await startKirana({ gatewayUrl: gateway.url });
   try {
@@ -208,7 +208,20 @@ test('as 9 ferramentas do site entram no /api/tools sem quebrar as existentes', 
     }
     // Ferramentas da v0.4.x continuam lá.
     assert.ok(names.length >= 9);
-    assert.equal(names.includes('request_file_upload'), false);
+    // Fase 5: upload passou a existir com infraestrutura própria — a asserção
+    // da Fase 4 ("não registrada") virou a asserção oposta, e é intencional.
+    for (const expected of [
+      'get_service_requirements',
+      'start_service_request',
+      'validate_service_request',
+      'get_request_status',
+      'fill_site_form',
+      'request_file_upload',
+      'submit_service_request',
+      'cancel_service_request',
+    ]) {
+      assert.ok(names.includes(expected), `${expected} deveria estar exposta`);
+    }
   } finally {
     await kirana.close();
     await gateway.close();

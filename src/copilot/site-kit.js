@@ -86,7 +86,80 @@ export function normalizeSite(raw, { fallbackId } = {}) {
       ? raw.generativeComponents.filter((k) => typeof k === 'string').slice(0, 24)
       : [],
     allowedOrigins: Array.isArray(raw.allowedOrigins) ? raw.allowedOrigins.filter((o) => typeof o === 'string') : [],
+
+    /**
+     * Fase 5 — operação de solicitações.
+     *
+     * Preservados de propósito com validação: `endpoints.submitRequest` só é
+     * aceito como URL http(s) (é para onde dados do visitante vão), `forms`
+     * mapeia campo → seletor CSS interno e `uploads` carrega a política de
+     * arquivos. Nada aqui vem do navegador: tudo é lido do `site.json`.
+     */
+    endpoints: {
+      submitRequest:
+        typeof raw.endpoints?.submitRequest === 'string' && /^https?:\/\//i.test(raw.endpoints.submitRequest)
+          ? raw.endpoints.submitRequest.slice(0, 300)
+          : null,
+    },
+    forms: normalizeForms(raw.forms),
+    uploads: {
+      enabled: raw.uploads?.enabled === true,
+      maxMb: clampNumber(raw.uploads?.maxMb, 1, 25, 5),
+      maxFiles: clampNumber(raw.uploads?.maxFiles, 1, 10, 5),
+      retentionDays: clampNumber(raw.uploads?.retentionDays, 1, 365, 30),
+      allowed: Array.isArray(raw.uploads?.allowed)
+        ? raw.uploads.allowed.filter((ext) => typeof ext === 'string' && /^[a-z0-9]{2,5}$/i.test(ext)).slice(0, 20)
+        : [],
+      executaArquivos: raw.uploads?.executaArquivos === true,
+      reason: typeof raw.uploads?.reason === 'string' ? raw.uploads.reason.slice(0, 200) : null,
+    },
+    requests: {
+      requirementsFile: typeof raw.requests?.requirementsFile === 'string'
+        ? raw.requests.requirementsFile.replace(/[^a-zA-Z0-9_.-]/g, '').slice(0, 60)
+        : 'requirements.json',
+      oneActivePerSession: raw.requests?.oneActivePerSession !== false,
+    },
   };
+}
+
+function clampNumber(value, min, max, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(Math.max(number, min), max);
+}
+
+/**
+ * Mapeia formulários: `{ contato: { page, target, fields: { nome: '#nome' } } }`.
+ *
+ * Os seletores são restringidos a CSS simples e interno (`#id`, `[name=…]`,
+ * `.classe`, `form …`). Componente arbitrário/`javascript:` nunca entra — o
+ * navegador só pode escrever em campo de formulário.
+ */
+function normalizeForms(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [name, form] of Object.entries(raw)) {
+    if (!/^[a-z0-9_-]{2,40}$/i.test(name)) continue;
+    const fields = {};
+    for (const [field, selector] of Object.entries(form?.fields ?? {})) {
+      if (!/^[a-z0-9_]{2,40}$/i.test(field)) continue;
+      if (typeof selector !== 'string' || selector.length > 80) continue;
+      if (!/^[#.\[]?[a-zA-Z0-9_\-[\]="'. #>:-]+$/.test(selector)) continue;
+      if (/javascript:|<|>|\(|\)/i.test(selector)) continue;
+      fields[field] = selector;
+    }
+    out[name] = {
+      page: typeof form?.page === 'string' ? form.page.slice(0, 120) : null,
+      target: typeof form?.target === 'string' ? form.target.slice(0, 120) : null,
+      submit: form?.submit === 'manual' ? 'manual' : 'manual',
+      fields,
+      interesseOpcoes: Array.isArray(form?.interesseOpcoes)
+        ? form.interesseOpcoes.filter((option) => typeof option === 'string').slice(0, 20)
+        : [],
+      observacao: typeof form?.observacao === 'string' ? form.observacao.slice(0, 300) : null,
+    };
+  }
+  return out;
 }
 
 export function createSiteKit({ sitesDir, logger } = {}) {

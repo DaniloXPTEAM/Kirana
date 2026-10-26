@@ -15,7 +15,14 @@ import { createVoiceController } from './voice.js';
  * enviada em cada turno (e no carregamento), mas quem valida é o servidor:
  * aqui não há allowlist, só transporte.
  */
-const siteBridge = window.KiranaSite?.bridge ?? null;
+/**
+ * Ponte do site (Fase 4/5).
+ *
+ * Resolvida a cada uso, não no carregamento: quem embute a Kirana pode anexar
+ * `window.KiranaSite = { bridge }` depois do script principal (é o caso do
+ * widget). Sem ponte, as ações do site continuam sendo apenas exibidas.
+ */
+const siteBridgeNow = () => window.KiranaSite?.bridge ?? null;
 const siteConfig = window.KIRANA_SITE ?? { id: '', path: '', pageId: '' };
 
 function currentSitePayload() {
@@ -409,9 +416,56 @@ function renderInputRequest(container, action) {
   );
   if (action.path) {
     const open = el('button', { class: 'btn btn-ghost', type: 'button', text: 'Abrir formulário do site' });
-    open.addEventListener('click', () => siteBridge?.apply({ type: 'navigate', path: action.path }));
+    open.addEventListener('click', () => siteBridgeNow()?.apply({ type: 'navigate', path: action.path }));
     card.appendChild(open);
   }
+  container.appendChild(card);
+  scrollToBottom(true);
+}
+
+/**
+ * Pedido de arquivo (Fase 5).
+ *
+ * O botão abre o seletor nativo; o arquivo vai por `bridge.uploadFile` para o
+ * endpoint da solicitação, onde tipo, tamanho e assinatura são conferidos. A
+ * interface nunca afirma sucesso sem a resposta do servidor — e mostra o erro
+ * real quando há um.
+ */
+function renderUploadRequest(container, action) {
+  const card = el('div', { class: 'confirm-card input-card upload-card' });
+  card.appendChild(el('p', { class: 'confirm-title', text: 'Anexar arquivo' }));
+  if (action.motivo) card.appendChild(el('p', { class: 'confirm-note', text: action.motivo }));
+  card.appendChild(
+    el('p', {
+      class: 'confirm-note',
+      text: `Aceitos: ${action.accept || 'arquivos comuns'} · até ${action.maxMb ?? 5} MB · máximo ${action.maxFiles ?? 5} arquivo(s). O arquivo é guardado só nesta solicitação e não é executado.`,
+    }),
+  );
+
+  const status = el('p', { class: 'confirm-note' });
+  const button = el('button', { class: 'btn btn-primary', type: 'button', text: 'Escolher arquivo' });
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    status.textContent = 'Abrindo seletor de arquivo…';
+    const picked = await (siteBridgeNow()?.pickFile?.({ accept: action.accept, maxMb: action.maxMb ?? 5 }) ?? { ok: false, reason: 'no_bridge' });
+    if (!picked.ok) {
+      status.textContent =
+        picked.reason === 'cancelled' ? 'Nenhum arquivo escolhido.' : picked.message || `Não foi possível anexar (${picked.reason}).`;
+      button.disabled = false;
+      return;
+    }
+    status.textContent = 'Enviando para o servidor…';
+    const uploaded = await siteBridgeNow().uploadFile({ requestId: action.requestId, file: picked.file, sessionId: state.sessionId });
+    if (uploaded.ok) {
+      status.textContent = `Anexado: ${uploaded.file.nome} (${Math.round(uploaded.file.tamanho / 1024)} KB).`;
+    } else {
+      status.textContent = uploaded.message || `O servidor recusou o arquivo (${uploaded.reason}).`;
+      button.disabled = false;
+    }
+  });
+
+  card.appendChild(button);
+  card.appendChild(status);
   container.appendChild(card);
   scrollToBottom(true);
 }
@@ -680,7 +734,26 @@ async function sendMessage(text) {
             renderInputRequest(shell.node.querySelector('.msg-body'), action);
             break;
           }
-          const result = siteBridge ? siteBridge.apply(action) : { ok: false, reason: 'no_bridge' };
+          if (action.type === 'request_upload') {
+            shell.bubble.classList.remove('cursor');
+            renderUploadRequest(shell.node.querySelector('.msg-body'), action);
+            break;
+          }
+          const bridge = siteBridgeNow();
+          const result = bridge ? bridge.apply(action) : { ok: false, reason: 'no_bridge' };
+          if (action.type === 'fill_form') {
+            // Preencher não envia: o cartão diz o que foi escrito e nada mais.
+            const filled = Array.isArray(result?.fields) ? result.fields : [];
+            shell.meta.appendChild(
+              el('span', {
+                class: 'pill',
+                text: filled.length
+                  ? `Preenchi ${filled.length} campo(s) do formulário (nada foi enviado)`
+                  : 'Não há esse formulário nesta tela — nada foi preenchido',
+              }),
+            );
+            break;
+          }
           if (result?.ok && action.type === 'navigate') {
             shell.meta.appendChild(el('span', { class: 'pill', text: `Navegando para ${result.path}` }));
           } else if (action.type === 'navigate') {

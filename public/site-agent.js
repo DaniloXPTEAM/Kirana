@@ -20,8 +20,14 @@
  *  - ação desconhecida é registrada e ignorada (o teste cobre isso).
  */
 
-/** Tipos de ação que esta ponte sabe executar. */
-export const SITE_ACTIONS = ['navigate', 'request_input', 'confirmation_granted'];
+/**
+ * Tipos de ação que esta ponte sabe executar.
+ *
+ * Fase 5 acrescentou `fill_form` e `request_upload`: as duas continuam sem
+ * executar nada sozinhas — preencher campo não envia formulário, e pedir arquivo
+ * abre o seletor do visitante. Quem grava o arquivo é o servidor, com validação.
+ */
+export const SITE_ACTIONS = ['navigate', 'request_input', 'confirmation_granted', 'fill_form', 'request_upload', 'show_summary'];
 
 /** Normaliza caminho: interno, sem `..`, sem esquema. */
 export function safePath(raw) {
@@ -48,6 +54,8 @@ export function createSiteBridge({
   headers = () => ({}),
   onNavigate = null,
   onInputRequest = null,
+  onUploadRequest = null,
+  onSummary = null,
   onContext = null,
   onUnknownAction = null,
   fetchImpl = (...args) => fetch(...args),
@@ -82,6 +90,133 @@ export function createSiteBridge({
     return 'none';
   }
 
+  /**
+   * Preenche campos de formulário REAIS do site.
+   *
+   * Regras que tornam isto seguro:
+   *  - o seletor vem do `site.json` (servidor), nunca do modelo;
+   *  - só `input`, `select` e `textarea` são aceitos — nada de escrever em
+   *    botão, link ou `contenteditable`;
+   *  - o evento `input`/`change` é disparado para o site reagir como reagiria a
+   *    uma digitação humana;
+   *  - **nunca** chama `submit()` nem clica em botão de envio.
+   */
+  function fillForm(action) {
+    const doc = documentImpl;
+    if (!doc?.querySelector) return { ok: false, reason: 'no_document' };
+    const filled = [];
+    const skipped = [];
+    for (const item of action.fields ?? []) {
+      const selector = safeSelector(item?.selector);
+      if (!selector) {
+        skipped.push({ field: item?.field, reason: 'unsafe_selector' });
+        continue;
+      }
+      let node = null;
+      try {
+        node = doc.querySelector(selector);
+      } catch {
+        skipped.push({ field: item?.field, reason: 'invalid_selector' });
+        continue;
+      }
+      if (!node) {
+        skipped.push({ field: item?.field, reason: 'not_found' });
+        continue;
+      }
+      const tag = String(node.tagName ?? '').toLowerCase();
+      if (!['input', 'select', 'textarea'].includes(tag)) {
+        skipped.push({ field: item?.field, reason: 'not_a_field' });
+        continue;
+      }
+      const type = String(node.type ?? '').toLowerCase();
+      if (type === 'hidden' || type === 'submit' || type === 'button' || type === 'file') {
+        skipped.push({ field: item?.field, reason: `type_${type}` });
+        continue;
+      }
+      const value = String(item.value ?? '');
+      if (type === 'checkbox' || type === 'radio') {
+        node.checked = value === 'true' || value === '1' || value === 'on';
+      } else {
+        node.value = value;
+      }
+      node.dispatchEvent?.(new globalThis.Event('input', { bubbles: true }));
+      node.dispatchEvent?.(new globalThis.Event('change', { bubbles: true }));
+      filled.push(item.field);
+    }
+    return {
+      ok: filled.length > 0,
+      form: action.form ?? null,
+      fields: filled,
+      skipped,
+      submitted: false,
+      reason: filled.length ? undefined : 'nothing_to_fill',
+    };
+  }
+
+  /** Só aceita seletor CSS simples apontando para id/atributo/classe. */
+  function safeSelector(raw) {
+    const value = String(raw ?? '').trim();
+    if (!value || value.length > 80) return null;
+    if (/[<>(){};]|javascript:|url\(/i.test(value)) return null;
+    return /^[#.\[a-zA-Z]/.test(value) ? value : null;
+  }
+
+  /**
+   * Envia o arquivo escolhido pelo visitante para a solicitação.
+   *
+   * `sessionId` pode vir daqui (a página que embute a Kirana é quem sabe a
+   * sessão) ou da configuração da ponte. Sem sessão, o servidor recusa — é o
+   * que impede anexar em solicitação de outra pessoa.
+   */
+  async function uploadFile({ requestId, file, sessionId: sessionFromCaller = null }) {
+    if (!requestId || !file) return { ok: false, reason: 'missing_params' };
+    const sessionId = sessionFromCaller ?? sessionIdOf();
+    const buffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
+    const response = await fetchImpl(`${apiBase}/api/requests/${requestId}/files`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers() },
+      body: JSON.stringify({
+        sessionId,
+        filename: file.name,
+        contentType: file.type || 'application/octet-stream',
+        dataBase64: globalThis.btoa(binary),
+      }),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      return { ok: false, reason: payload?.error?.code ?? `http_${response.status}`, message: payload?.error?.message ?? null };
+    }
+    return { ok: true, file: payload.arquivo };
+  }
+
+  /** Abre o seletor de arquivo do visitante (a escolha é sempre dele). */
+  function pickFile({ accept = '', maxMb = 5 } = {}) {
+    const doc = documentImpl;
+    if (!doc?.createElement) return Promise.resolve({ ok: false, reason: 'no_document' });
+    return new Promise((resolve) => {
+      const input = doc.createElement('input');
+      input.type = 'file';
+      input.accept = accept;
+      input.style.display = 'none';
+      input.addEventListener('change', () => {
+        const file = input.files?.[0] ?? null;
+        if (!file) return resolve({ ok: false, reason: 'cancelled' });
+        if (file.size > maxMb * 1024 * 1024) {
+          return resolve({ ok: false, reason: 'file_too_large', message: `O limite é ${maxMb} MB.` });
+        }
+        return resolve({ ok: true, file });
+      });
+      doc.body?.appendChild(input);
+      input.click();
+    });
+  }
+
+  /** Sessão atual: a da ponte ou a que a interface guardou. */
+  const sessionIdOf = () => sessionId ?? globalThis.localStorage?.getItem?.('kirana.session') ?? null;
+
   /** Executa uma diretiva vinda de uma ferramenta. */
   function apply(action) {
     if (!action || typeof action !== 'object' || !action.type) {
@@ -115,6 +250,24 @@ export function createSiteBridge({
       return { ok: true };
     }
 
+    if (action.type === 'fill_form') {
+      const result = fillForm(action);
+      applied.push({ type: 'fill_form', form: action.form, fields: result.fields, at: now() });
+      return result;
+    }
+
+    if (action.type === 'request_upload') {
+      applied.push({ type: 'request_upload', requestId: action.requestId, at: now() });
+      onUploadRequest?.(action);
+      return { ok: true, requestId: action.requestId ?? null };
+    }
+
+    if (action.type === 'show_summary') {
+      applied.push({ type: 'show_summary', at: now() });
+      onSummary?.(action);
+      return { ok: true };
+    }
+
     // confirmation_granted: a interface só sinaliza; nada externo é disparado.
     applied.push({ type: 'confirmation_granted', at: now() });
     return { ok: true };
@@ -141,6 +294,9 @@ export function createSiteBridge({
   return {
     apply,
     announce,
+    uploadFile,
+    pickFile,
+    fillForm: (action) => apply({ type: 'fill_form', ...action }),
     get context() {
       return current;
     },

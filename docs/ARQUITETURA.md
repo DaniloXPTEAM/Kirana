@@ -18,6 +18,20 @@ Kirana-ChatGPT-Gateway v0.2.0  →  modelo autorizado da conta ChatGPT
 O gateway **não foi alterado**. A Kirana apenas consome `GET /health`, `GET /v1/models` e
 `POST /v1/chat/completions` (formato OpenAI, `stream: true`).
 
+## 1.1 Fase 5 — onde a solicitação vive
+
+```text
+Navegador (ponte do site)            Servidor da Kirana                Disco local
+  fill_form / request_upload  ──►  src/site/request-tools.js
+  uploadFile ───────────────────►  POST /api/requests/:id/files ──►  data/uploads/<REQ>/
+                                   src/requests/{store,requirements,files}.js
+  GET /api/requests/:id  ◄──────   estado + histórico  ◄──────────   data/requests/<REQ>.json
+```
+
+O grafo continua sendo o único orquestrador: `prepare → task → model → tools →
+finalize`, com o canal `taskState` carregando a solicitação em andamento entre
+turnos e páginas. Ver [`FASE5-SOLICITACOES.md`](FASE5-SOLICITACOES.md) §2.
+
 ## 2. Componentes
 
 | Arquivo | Responsabilidade |

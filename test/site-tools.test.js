@@ -53,9 +53,13 @@ test('get_site_context devolve identidade, página atual e o que não está disp
   assert.equal(result.paginaConhecida, true);
   assert.ok(result.rotasPermitidas >= 20);
   assert.equal(result.conhecimento.documentos, 14);
-  // Upload não existe: a ferramenta informa, não finge.
-  assert.equal(result.uploads.disponivel, false);
-  assert.ok(result.uploads.motivo.length > 5);
+  // Fase 5: upload existe com política declarada (e nunca executa arquivo).
+  assert.equal(result.uploads.disponivel, true);
+  assert.equal(result.uploads.maxMb, 5);
+  assert.equal(result.uploads.maxFiles, 5);
+  // Envio segue sem endpoint autorizado: pedido fica em rascunho.
+  assert.equal(result.solicitacao.envioDisponivel, false);
+  assert.match(result.solicitacao.motivo, /rascunho/i);
   // Nada de credencial/segredo na resposta.
   assert.equal(/api[_-]?key|token|secret/i.test(JSON.stringify(result)), false);
 });
@@ -186,7 +190,9 @@ test('show_confirmation exige confirmação e não executa efeito externo', () =
   assert.match(result.motivo, /nada foi enviado/i);
 });
 
-test('nenhuma ferramenta de upload é registrada (limitação declarada, não simulada)', () => {
+test('request_file_upload não pertence ao módulo da Fase 4 (mora nas ferramentas operacionais)', () => {
+  // A Fase 5 registrou a ferramenta em `src/site/request-tools.js`, com endpoint
+  // e política próprios; aqui só se garante que não foi duplicada.
   assert.equal(tools.some((entry) => entry.name === 'request_file_upload'), false);
   assert.equal(enabledFor(SITE).some((entry) => entry.name === 'request_file_upload'), false);
 });

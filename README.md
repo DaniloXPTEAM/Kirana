@@ -1,9 +1,9 @@
 # Kirana — agente conversacional da Opportunity AI
 
-**Versão:** 0.5.0 (Fase 4: agente residente no site — `docs/FASE4-AUDITORIA.md`)
+**Versão:** 0.5.1 (Fase 5: a Kirana executa solicitações de serviço — `docs/FASE5-SOLICITACOES.md`)
 **Organização:** Opportunity AI
 **Gateway utilizado:** `Kirana-ChatGPT-Gateway v0.2.0` (não modificado)
-**Data desta entrega:** 24/10/2026
+**Data desta entrega:** 26/10/2026
 
 A Kirana é um agente conversacional com identidade própria, sessões, streaming, ferramentas
 com permissões separadas e confirmação obrigatória para ações de escrita. Ela conversa com o
@@ -32,7 +32,8 @@ ao navegador.
 | Rate limiting, validação de entrada, CORS/origem, CSP | ✅ implementado e testado |
 | CopilotKit + AG-UI + sites por cliente (Marco 2) | ✅ implementado e testado |
 | **Voz conversacional: ouvir, falar, interromper (Marco 3)** | ✅ implementado e testado em Chromium real |
-| Testes automatizados | ✅ 340 testes, 0 falhas |
+| **Solicitações de serviço: rascunho, coleta, arquivo, formulário, validação, confirmação e cancelamento (Fase 5)** | ✅ implementado e testado (envio real depende de endpoint autorizado) |
+| Testes automatizados | ✅ 429 testes, 0 falhas (+ 67 verificações de navegador) |
 | Validação com o gateway ChatGPT real | ⏳ pendente — depende da sua máquina |
 | Meta de 2 s para a primeira resposta útil | ⏳ não medida em condição real |
 
@@ -165,6 +166,23 @@ Todas as variáveis são opcionais, exceto a chave do gateway. Valores padrão e
   um cartão na conversa. Se você clicar *Não* ou simplesmente continuar a conversa, nada é gravado.
 - **Memória:** botão *Memória* mostra o que está guardado; você pode adicionar (com caixa de
   consentimento obrigatória), corrigir e apagar.
+
+### Ferramentas da Fase 5 (solicitações)
+
+| Ferramenta | Tipo | O que faz |
+|---|---|---|
+| `get_service_requirements` | leitura | Requisitos do serviço; **diz** quando o site não publica requisitos |
+| `start_service_request` | leitura (estado local) | Cria ou **retoma** o rascunho da solicitação na sessão |
+| `fill_site_form` | navegação | Preenche o formulário real com os dados coletados — **nunca envia** |
+| `request_file_upload` | navegação | Pede o arquivo; o servidor valida tipo, tamanho e assinatura |
+| `validate_service_request` | leitura | Válidos, ausentes, erros, próxima ação e próximo campo |
+| `submit_service_request` | **escrita (confirmação)** | Só envia com dados válidos, aprovação e endpoint autorizado |
+| `get_request_status` | leitura | Estado real e histórico — sem prazo estimado |
+| `cancel_service_request` | **escrita (confirmação)** | Cancela e descarta dados e arquivos |
+
+Sem `endpoints.submitRequest` configurado — o caso de hoje — a Kirana **não
+envia**: mantém o rascunho e informa o canal oficial. Inventário completo das 24
+ferramentas em [`docs/FASE5-AUDITORIA-FERRAMENTAS.md`](docs/FASE5-AUDITORIA-FERRAMENTAS.md).
 
 ### Ferramentas da Fase 1
 

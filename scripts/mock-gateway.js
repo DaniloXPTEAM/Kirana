@@ -198,6 +198,79 @@ const server = http.createServer(async (req, res) => {
               ? 'automacao'
               : 'agentes-ia';
 
+    /**
+     * Fase 5 — gatilhos das ferramentas operacionais.
+     *
+     * O mock não tem memória: o id da solicitação é lido do próprio histórico
+     * da conversa (o resultado da ferramenta anterior está nas mensagens). É o
+     * suficiente para exercitar o caminho real sem inventar estado.
+     */
+    const historico = JSON.stringify(messages);
+    const requestId = (historico.match(/REQ-\d{4}-[A-Z0-9]{6}/) ?? [])[0] ?? null;
+    const fase5 = {
+      start: tools.includes('start_service_request') && /colocar uma ia|contratar|quero um (agente|site)|implantar/i.test(userText),
+      validate: tools.includes('validate_service_request') && /validar|est[aá] completo|falta/i.test(userText),
+      fill: tools.includes('fill_site_form') && /preench|formul[aá]rio/i.test(userText) && !/enviar|envie/i.test(userText),
+      upload: tools.includes('request_file_upload') && /anexar|arquivo|briefing|documento/i.test(userText),
+      submit: tools.includes('submit_service_request') && /(pode|quero|vamos) enviar|envie|manda/i.test(userText),
+      status: tools.includes('get_request_status') && /andamento|status|como est[aá]/i.test(userText),
+      cancel: tools.includes('cancel_service_request') && /cancelar|desistir|deixa pra depois/i.test(userText),
+    };
+
+    if (!alreadyCalledTool && Object.values(fase5).some(Boolean)) {
+      const call = fase5.start
+        ? {
+            name: 'start_service_request',
+            args: {
+              serviceId: serviceGuess,
+              dados: {
+                nome: 'Ana Demo',
+                email: 'ana.demo@exemplo.com',
+                interesse: 'Agentes de IA',
+                mensagem: 'Quero um agente no meu site para qualificar contatos.',
+                consent: true,
+                endereco_site: 'https://exemplo.com',
+                funcao_do_agente: 'Responder dúvidas e encaminhar orçamentos',
+              },
+            },
+          }
+        : fase5.fill
+          ? { name: 'fill_site_form', args: { form: 'contato' } }
+          : fase5.upload
+            ? { name: 'request_file_upload', args: { motivo: 'Envie o briefing do projeto em PDF.' } }
+            : fase5.validate
+              ? { name: 'validate_service_request', args: {} }
+              : fase5.submit
+                ? { name: 'submit_service_request', args: { requestId: requestId ?? 'REQ-0000-000000' } }
+                : fase5.status
+                  ? { name: 'get_request_status', args: {} }
+                  : { name: 'cancel_service_request', args: { motivo: 'pedido do visitante' } };
+
+      await sleep(DELAY);
+      sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null }] });
+      sse(res, {
+        id,
+        object: 'chat.completion.chunk',
+        model: body.model,
+        choices: [
+          {
+            index: 0,
+            delta: {
+              tool_calls: [
+                { index: 0, id: `call_${Date.now()}`, type: 'function', function: { name: call.name, arguments: JSON.stringify(call.args) } },
+              ],
+            },
+            finish_reason: null,
+          },
+        ],
+      });
+      sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] });
+      res.write('data: [DONE]\n\n');
+      res.end();
+      console.log(`[mock-gateway] ferramenta operacional: ${call.name}`);
+      return;
+    }
+
     if (!alreadyCalledTool && (siteTools.list || siteTools.explain || siteTools.openService || siteTools.page || siteTools.input || siteTools.confirm)) {
       const call = siteTools.list
         ? { name: 'list_services', args: {} }
@@ -301,6 +374,23 @@ const server = http.createServer(async (req, res) => {
         answer = `Abrindo ${dados.siteAction.title || dados.siteAction.path}. Quando carregar, posso explicar o que tem na página.`;
       } else if (dados?.siteAction?.type === 'request_input') {
         answer = 'Deixei os campos na tela. Nada é enviado até você preencher e confirmar no formulário do site.';
+      } else if (dados?.solicitacao) {
+        // Fase 5: a resposta do mock repete o estado REAL devolvido pela
+        // ferramenta — inclusive quando ela diz que nada foi enviado.
+        const sol = dados.solicitacao;
+        answer = `Solicitação ${sol.id} (${sol.serviceTitle || sol.serviceId}) no estado ${sol.estado}. ${dados.mensagem || ''}`.trim();
+      } else if (dados?.siteAction?.type === 'fill_form') {
+        answer = `Preenchi ${dados.camposPreenchidos?.length ?? 0} campo(s) do formulário ${dados.form}. O envio continua com você — nada foi submetido.`;
+      } else if (dados?.siteAction?.type === 'request_upload') {
+        answer = 'Deixei o botão de anexo na tela. Escolha o arquivo quando quiser; o servidor confere tipo, tamanho e conteúdo antes de guardar.';
+      } else if (dados?.completo === true) {
+        answer = 'Validei os dados: está tudo preenchido. Posso pedir sua confirmação para enviar.';
+      } else if (dados?.completo === false) {
+        answer = `Ainda falta: ${(dados.faltando ?? []).join('; ') || 'alguns campos'}. Quer completar agora?`;
+      } else if (dados?.enviado === false) {
+        answer = dados.erro || 'Não foi possível enviar. A solicitação continua como rascunho nesta conversa.';
+      } else if (dados?.cancelada) {
+        answer = `Solicitação ${dados.requestId} cancelada. Nada havia sido enviado.`;
       } else if (dados?.siteAction?.type === 'confirmation_granted') {
         answer = 'Autorização registrada. O envio em si acontece no formulário do site — nada saiu do servidor.';
       } else if (dados?.pagina || dados?.serviceId) {

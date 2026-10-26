@@ -49,18 +49,27 @@ test('a config do site é validada: identidade, URL, conhecimento e ferramentas'
   assert.ok(site.pages.length >= 15, 'páginas declaradas');
   assert.ok(site.routes.allowlist.length >= 20, 'allowlist do sitemap');
   assert.ok(site.routes.allowlist.every((route) => route.startsWith('/')), 'allowlist só com caminhos internos');
+  // Fase 5: 9 ferramentas da Fase 4 + 8 operacionais.
   assert.deepEqual(
     site.tools.map((tool) => tool.name).sort(),
     [
+      'cancel_service_request',
       'explain_current_page',
       'explain_service',
+      'fill_site_form',
+      'get_request_status',
+      'get_service_requirements',
       'get_site_context',
       'list_services',
       'list_site_pages',
       'navigate_to_page',
       'open_service_page',
+      'request_file_upload',
       'request_user_input',
       'show_confirmation',
+      'start_service_request',
+      'submit_service_request',
+      'validate_service_request',
     ],
   );
   // Toda ferramenta declarada tem categoria; ações com efeito são explícitas.
@@ -68,9 +77,17 @@ test('a config do site é validada: identidade, URL, conhecimento e ferramentas'
     assert.ok(['read', 'navigation', 'sensitive'].includes(tool.category), `${tool.name}: categoria`);
   }
   assert.equal(site.tools.find((tool) => tool.name === 'show_confirmation').category, 'sensitive');
-  // Upload não é oferecido porque não existe endpoint seguro (declarado, não fingido).
-  assert.equal(site.tools.some((tool) => tool.name === 'request_file_upload'), false);
-  assert.match(site.permissions.deniedReasons.request_file_upload, /upload|arquivo/i);
+  // Fase 5: upload existe, com política explícita e sem execução de arquivos.
+  assert.equal(site.tools.some((tool) => tool.name === 'request_file_upload'), true);
+  assert.equal(site.uploads.enabled, true);
+  assert.equal(site.uploads.executaArquivos, false);
+  assert.equal(site.uploads.maxMb, 5);
+  assert.equal(site.uploads.maxFiles, 5);
+  assert.equal(site.uploads.retentionDays, 30);
+  // Envio continua sem endpoint autorizado: a solicitação permanece rascunho.
+  assert.equal(site.endpoints.submitRequest, null);
+  // Formulário real mapeado (campos verificados no HTML publicado).
+  assert.deepEqual(Object.keys(site.forms.contato.fields), ['nome', 'email', 'whatsapp', 'empresa', 'interesse', 'mensagem', 'consent']);
 });
 
 test('site desconhecido não é resolvido (isolamento por siteId)', () => {

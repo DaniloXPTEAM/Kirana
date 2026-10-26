@@ -1,0 +1,130 @@
+{
+  "_comentario": "Requisitos por serviço. Regra: só entra aqui o que o site publica. O que a empresa ainda não cadastrou fica explicitamente marcado com disponivel:false — a Kirana informa a lacuna em vez de inventar exigência.",
+  "siteId": "opportunity-ai",
+  "capturedAt": "2026-10-26",
+  "fonteGeral": "https://opportunity.ia.br/contato",
+  "limiteTamanhoArquivoMb": 5,
+  "maximoArquivos": 5,
+  "servicos": [
+    {
+      "serviceId": "agentes-ia",
+      "titulo": "Agentes de IA personalizados",
+      "path": "/solucoes/agentes-ia",
+      "requisitosPublicados": {
+        "disponivel": false,
+        "motivo": "A página do serviço descreve problema, proposta e entregáveis, mas não publica lista de requisitos para contratar.",
+        "fonte": "https://opportunity.ia.br/solucoes/agentes-ia"
+      },
+      "camposDoFormulario": ["nome", "email", "whatsapp", "empresa", "interesse", "mensagem", "consent"],
+      "camposDeCaso": [
+        { "nome": "endereco_site", "rotulo": "Endereço do site onde o agente vai atuar", "tipo": "texto", "obrigatorio": true, "origem": "operacional" },
+        { "nome": "funcao_do_agente", "rotulo": "Qual função o agente deve desempenhar", "tipo": "mensagem", "obrigatorio": true, "origem": "operacional" },
+        { "nome": "canais", "rotulo": "Canais de atendimento desejados (site, WhatsApp, voz, e-mail)", "tipo": "texto", "obrigatorio": false, "origem": "operacional" }
+      ],
+      "arquivos": {
+        "necessarios": false,
+        "aceitos": ["pdf", "png", "jpg", "jpeg", "txt", "docx", "xlsx", "csv"],
+        "observacao": "O site não exige arquivo para este serviço. Anexar é opcional."
+      }
+    },
+    {
+      "serviceId": "atendimento",
+      "titulo": "Atendimento digital e WhatsApp",
+      "path": "/solucoes/atendimento",
+      "requisitosPublicados": {
+        "disponivel": false,
+        "motivo": "A página do serviço não publica requisitos nem pré-requisitos técnicos; informa apenas que o WhatsApp é atendido pela API oficial.",
+        "fonte": "https://opportunity.ia.br/solucoes/atendimento"
+      },
+      "camposDoFormulario": ["nome", "email", "whatsapp", "empresa", "interesse", "mensagem", "consent"],
+      "camposDeCaso": [
+        { "nome": "volume_atendimento", "rotulo": "Volume aproximado de atendimentos por dia", "tipo": "texto", "obrigatorio": false, "origem": "operacional" },
+        { "nome": "duvidas_frequentes", "rotulo": "Principais dúvidas que o atendimento precisa resolver", "tipo": "mensagem", "obrigatorio": true, "origem": "operacional" }
+      ],
+      "arquivos": {
+        "necessarios": false,
+        "aceitos": ["pdf", "png", "jpg", "jpeg", "txt", "docx", "xlsx", "csv"],
+        "observacao": "Anexo opcional (por exemplo, uma lista de perguntas frequentes já existente)."
+      }
+    },
+    {
+      "serviceId": "crm-vendas",
+      "titulo": "CRM e automação de vendas",
+      "path": "/solucoes/crm-vendas",
+      "requisitosPublicados": {
+        "disponivel": false,
+        "motivo": "O Opportunity CRM é apresentado no site como projeto em fase de conceito; não há requisitos de contratação publicados.",
+        "fonte": "https://opportunity.ia.br/solucoes/crm-vendas"
+      },
+      "camposDoFormulario": ["nome", "email", "whatsapp", "empresa", "interesse", "mensagem", "consent"],
+      "camposDeCaso": [
+        { "nome": "processo_atual", "rotulo": "Como o funil comercial é acompanhado hoje", "tipo": "mensagem", "obrigatorio": true, "origem": "operacional" },
+        { "nome": "ferramentas_atuais", "rotulo": "Ferramentas usadas hoje (planilha, CRM, WhatsApp)", "tipo": "texto", "obrigatorio": false, "origem": "operacional" }
+      ],
+      "arquivos": {
+        "necessarios": false,
+        "aceitos": ["pdf", "png", "jpg", "jpeg", "txt", "docx", "xlsx", "csv"],
+        "observacao": "Anexo opcional (por exemplo, uma planilha de exemplo do funil, sem dados sensíveis)."
+      }
+    },
+    {
+      "serviceId": "automacao",
+      "titulo": "Workflows e automação",
+      "path": "/solucoes/automacao",
+      "requisitosPublicados": {
+        "disponivel": false,
+        "motivo": "A página descreve aplicações (dados, arquivos, integração entre sistemas) mas não publica requisitos formais.",
+        "fonte": "https://opportunity.ia.br/solucoes/automacao"
+      },
+      "camposDoFormulario": ["nome", "email", "whatsapp", "empresa", "interesse", "mensagem", "consent"],
+      "camposDeCaso": [
+        { "nome": "processo_a_automatizar", "rotulo": "Qual processo deve ser automatizado", "tipo": "mensagem", "obrigatorio": true, "origem": "operacional" },
+        { "nome": "sistemas_envolvidos", "rotulo": "Sistemas envolvidos e se possuem API", "tipo": "texto", "obrigatorio": false, "origem": "operacional" }
+      ],
+      "arquivos": {
+        "necessarios": false,
+        "aceitos": ["pdf", "png", "jpg", "jpeg", "txt", "docx", "xlsx", "csv"],
+        "observacao": "Anexo opcional (ex.: planilha de exemplo ou captura de tela do processo)."
+      }
+    },
+    {
+      "serviceId": "relatorios",
+      "titulo": "Relatórios inteligentes",
+      "path": "/solucoes/relatorios",
+      "requisitosPublicados": {
+        "disponivel": false,
+        "motivo": "A página não publica requisitos de dados, formatos ou prazos.",
+        "fonte": "https://opportunity.ia.br/solucoes/relatorios"
+      },
+      "camposDoFormulario": ["nome", "email", "whatsapp", "empresa", "interesse", "mensagem", "consent"],
+      "camposDeCaso": [
+        { "nome": "dados_disponiveis", "rotulo": "De onde vêm os dados e em que formato", "tipo": "mensagem", "obrigatorio": true, "origem": "operacional" },
+        { "nome": "relatorio_desejado", "rotulo": "Que relatório ou indicador é necessário", "tipo": "mensagem", "obrigatorio": true, "origem": "operacional" }
+      ],
+      "arquivos": {
+        "necessarios": false,
+        "aceitos": ["pdf", "png", "jpg", "jpeg", "txt", "docx", "xlsx", "csv"],
+        "observacao": "Anexo opcional (ex.: modelo de relatório atual ou planilha de exemplo, sem dados pessoais)."
+      }
+    },
+    {
+      "serviceId": "voz",
+      "titulo": "Agentes de voz e Android",
+      "path": "/solucoes/voz",
+      "requisitosPublicados": {
+        "disponivel": false,
+        "motivo": "O site declara a área como pesquisa e prototipagem; não há requisitos de contratação publicados.",
+        "fonte": "https://opportunity.ia.br/solucoes/voz"
+      },
+      "camposDoFormulario": ["nome", "email", "whatsapp", "empresa", "interesse", "mensagem", "consent"],
+      "camposDeCaso": [
+        { "nome": "uso_do_agente_de_voz", "rotulo": "Onde e para que o agente de voz seria usado", "tipo": "mensagem", "obrigatorio": true, "origem": "operacional" }
+      ],
+      "arquivos": {
+        "necessarios": false,
+        "aceitos": ["pdf", "png", "jpg", "jpeg", "txt", "docx", "xlsx", "csv"],
+        "observacao": "Anexo opcional."
+      }
+    }
+  ]
+}
