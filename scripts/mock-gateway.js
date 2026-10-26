@@ -167,6 +167,87 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    /**
+     * Fase 4 — gatilhos das ferramentas do site.
+     *
+     * O mock só pede uma ferramenta quando ela existe no turno (`tools`) e o
+     * texto do visitante casa com um gatilho. É um roteiro fixo, não um modelo:
+     * existe para exercitar o caminho real (servidor → ferramenta → diretiva →
+     * navegador) no teste de navegador.
+     */
+    const siteTools = {
+      list: tools.includes('list_services') && /servi[cç]os|oferecem|o que voc[eê]s fazem/i.test(userText),
+      explain: tools.includes('explain_service') && /detalh|explic|como funciona/i.test(userText) && !/p[aá]gina/i.test(userText),
+      openService:
+        tools.includes('open_service_page') && /conhecer|abrir|abra|quero ver|me leve/i.test(userText),
+      page: tools.includes('explain_current_page') && /p[aá]gina|aqui/i.test(userText),
+      input: tools.includes('request_user_input') && /preciso enviar|o que preciso|quais dados|documentos/i.test(userText),
+      confirm:
+        tools.includes('show_confirmation') &&
+        /(pode|quero|vamos) (enviar|registrar)|enviar (o )?formul[aá]rio|confirmo/i.test(userText),
+    };
+    const serviceGuess = /crm|vendas/i.test(userText)
+      ? 'crm-vendas'
+      : /voz|[aá]udio/i.test(userText)
+        ? 'voz'
+        : /whatsapp|atendimento/i.test(userText)
+          ? 'atendimento'
+          : /relat[oó]rio/i.test(userText)
+            ? 'relatorios'
+            : /automa[cç][aã]o|workflow/i.test(userText)
+              ? 'automacao'
+              : 'agentes-ia';
+
+    if (!alreadyCalledTool && (siteTools.list || siteTools.explain || siteTools.openService || siteTools.page || siteTools.input || siteTools.confirm)) {
+      const call = siteTools.list
+        ? { name: 'list_services', args: {} }
+        : siteTools.explain
+          ? { name: 'explain_service', args: { serviceId: serviceGuess } }
+          : siteTools.openService
+            ? { name: 'open_service_page', args: { serviceId: serviceGuess } }
+            : siteTools.page
+              ? { name: 'explain_current_page', args: {} }
+              : siteTools.input
+                ? {
+                    name: 'request_user_input',
+                    args: {
+                      motivo: 'iniciar um atendimento',
+                      campos: [
+                        { nome: 'nome', rotulo: 'Seu nome', tipo: 'texto', obrigatorio: true },
+                        { nome: 'email', rotulo: 'E-mail', tipo: 'email', obrigatorio: true },
+                      ],
+                    },
+                  }
+                : {
+                    name: 'show_confirmation',
+                    args: { acao: 'enviar formulário de contato', resumo: 'Enviar nome e e-mail para a Opportunity AI.' },
+                  };
+
+      await sleep(DELAY);
+      sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null }] });
+      sse(res, {
+        id,
+        object: 'chat.completion.chunk',
+        model: body.model,
+        choices: [
+          {
+            index: 0,
+            delta: {
+              tool_calls: [
+                { index: 0, id: `call_${Date.now()}`, type: 'function', function: { name: call.name, arguments: JSON.stringify(call.args) } },
+              ],
+            },
+            finish_reason: null,
+          },
+        ],
+      });
+      sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] });
+      res.write('data: [DONE]\n\n');
+      res.end();
+      console.log(`[mock-gateway] ferramenta de site: ${call.name}`);
+      return;
+    }
+
     if (!alreadyCalledTool && (wantsServices || wantsInterest)) {
       const name = wantsServices ? 'consultar_servicos' : 'registrar_interesse_comercial';
       const toolArgs = wantsServices
@@ -213,7 +294,18 @@ const server = http.createServer(async (req, res) => {
       } catch {
         parsed = null;
       }
-      if (parsed?.status === 'aguardando_confirmacao') {
+      const dados = parsed?.dados ?? {};
+      if (dados?.servicos?.length) {
+        answer = `Temos ${dados.servicos.length} frentes: ${dados.servicos.map((s) => s.nome).join('; ')}. Qual delas você quer conhecer?`;
+      } else if (dados?.siteAction?.type === 'navigate') {
+        answer = `Abrindo ${dados.siteAction.title || dados.siteAction.path}. Quando carregar, posso explicar o que tem na página.`;
+      } else if (dados?.siteAction?.type === 'request_input') {
+        answer = 'Deixei os campos na tela. Nada é enviado até você preencher e confirmar no formulário do site.';
+      } else if (dados?.siteAction?.type === 'confirmation_granted') {
+        answer = 'Autorização registrada. O envio em si acontece no formulário do site — nada saiu do servidor.';
+      } else if (dados?.pagina || dados?.serviceId) {
+        answer = `Sobre ${dados.nome || dados.pagina?.title || 'esta página'}: ${dados.resumo || dados.pagina?.summary || 'conteúdo do site'}.`;
+      } else if (parsed?.status === 'aguardando_confirmacao') {
         answer = 'Preparei o registro do seu interesse e deixei tudo pronto. Só preciso da sua confirmação na tela para concluir — nada é gravado antes disso.';
       } else if (parsed?.ok && parsed?.dados?.protocolo) {
         answer = `Pronto, o interesse foi registrado localmente com o protocolo ${parsed.dados.protocolo}. A equipe da Opportunity AI dará continuidade ao contato.`;

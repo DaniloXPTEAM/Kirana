@@ -1,5 +1,64 @@
 # Changelog — Kirana
 
+## 0.5.0 — 26/10/2026 (Fase 4: agente residente no site Opportunity AI)
+
+A Kirana passa a atender **dentro** do site publicado: reconhece a página, conhece
+o conteúdo real, navega por ferramenta autorizada, pede dados e continua como chat
+e voz. Relatório completo em `docs/FASE4-AUDITORIA.md`.
+
+### Auditoria antes de mexer
+Site verificado em 26/10/2026: **HTML estático** (sem Next/React/Astro), um único
+`site.js` de 5.198 B, 23 rotas no sitemap, nenhum preço/prazo/case publicado.
+CopilotKit e LangGraph já existiam; faltava a camada de site.
+
+### Adicionado
+- `sites/opportunity-ai/site.json`: identidade, `siteUrl`, `agentName`, 19 páginas,
+  allowlist de 23 rotas do sitemap, 9 ferramentas com categoria, `permissions`
+  (upload negado com justificativa).
+- `sites/opportunity-ai/knowledge/`: 14 documentos Markdown com `source` e
+  `capturedAt`, derivados do conteúdo real do site.
+- `src/knowledge/index.js`: recuperação estruturada + **BM25** (sem dependência
+  nova, sem serviço pago), radical curto de português, prompt enxuto e
+  rastreável. Palavras vazias normalizadas (bug de acento corrigido).
+- `src/site/context.js`: normalização de caminho (recusa `..`/esquema/query),
+  allowlist obrigatória, resolução de página por id/alias/título/caminho,
+  conhecimento em cache com `refreshIfStale()` (gancho da atualização automática).
+- `src/site/tools.js`: **9 ferramentas com handlers reais** (`get_site_context`,
+  `list_site_pages`, `explain_current_page`, `list_services`, `explain_service`,
+  `request_user_input`, `navigate_to_page`, `open_service_page`,
+  `show_confirmation`) + guarda de isolamento por site.
+- `public/site-agent.js`: ponte do navegador (executa `navigate` com caminho
+  validado, apresenta `request_input`, ignora ação desconhecida — sem `eval`).
+- `public/app.js`: contexto de página em cada turno, cartão de pedido de dados,
+  aviso de navegação no modo autônomo.
+- `widget/src/main-v2.jsx` → `public/widget/kirana-v2.js` (**CopilotKit v2**:
+  `CopilotKitCoreReact`/`CopilotKitContext`, `useAgent`, `useAgentContext`,
+  `useFrontendTool`), build com `node scripts/build-widget.mjs --v2`.
+- `scripts/site-sync.mjs`: compara site publicado × config × conhecimento
+  (`--check` falha em divergência; `--write-snapshots` salva texto para revisão).
+- Endpoints: `POST /api/site/context`, `GET /api/site/knowledge`; `/api/site/info`
+  passa a expor páginas, rotas, permissões e o estado do conhecimento.
+- Contrato: evento `site_action` (`navigate`, `request_input`,
+  `confirmation_granted`) no SSE, também no caminho de confirmação HITL.
+
+### Corrigido no caminho (achado por teste)
+- `normalizePath` mantinha query/hash no caminho.
+- `samePath` tratava caminho inválido como igual à home (`/..` navegava para `/`).
+- `explain_service`/`open_service_page` recusavam apelido de parâmetro aceito pelo
+  modelo (`servico`) e devolviam "solução não existe".
+- Cartão de pedido de dados lia `label/name` e ignorava `rotulo/nome` da ferramenta.
+
+### Preservado
+Gateway, reconhecimento de voz, TTS, atalhos, configurações e `data/` intocados.
+Suíte: **383/383** (340 da v0.4.4 + 43 novos). Navegador: `site-flow 18/18`,
+`site-v2 8/8`, `demo-flow 15/15`, `voice-flow 60/60`.
+
+### Limitações declaradas
+Upload de arquivo não existe (`request_file_upload` fora do registro); site não foi
+reescrito nem publicado; `GET /api/copilot/info` responde 405 no runtime 1.79.1;
+navegação no site publicado não foi exercitada neste ambiente; pendências de voz
+(microfone real no Windows) seguem fora do escopo.
+
 ## 0.4.4 — 25/10/2026 (barge-in por voz: "Kirana, pare")
 
 Auditoria e correção do defeito em que a Kirana ignorava a ordem de parar.

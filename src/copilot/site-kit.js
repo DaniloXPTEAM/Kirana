@@ -36,9 +36,40 @@ export function normalizeSite(raw, { fallbackId } = {}) {
     });
   }
 
+  /** Páginas conhecidas (Fase 4): id, caminho, título, resumo, aliases. */
+  const pages = [];
+  for (const page of Array.isArray(raw.pages) ? raw.pages : []) {
+    if (!page || typeof page.path !== 'string') continue;
+    pages.push({
+      id: String(page.id || page.path).slice(0, 60),
+      path: String(page.path).slice(0, 160),
+      title: String(page.title || page.path).slice(0, 140),
+      summary: String(page.summary || '').slice(0, 400),
+      aliases: Array.isArray(page.aliases) ? page.aliases.filter((a) => typeof a === 'string').slice(0, 12) : [],
+      serviceId: typeof page.serviceId === 'string' ? page.serviceId.slice(0, 40) : null,
+    });
+  }
+
+  const allowlist = Array.isArray(raw.routes?.allowlist)
+    ? raw.routes.allowlist.filter((route) => typeof route === 'string' && route.startsWith('/')).slice(0, 200)
+    : [];
+
   return {
     id,
     name: String(raw.name || id),
+    siteUrl: typeof raw.siteUrl === 'string' ? raw.siteUrl.slice(0, 200) : null,
+    agentName: typeof raw.agentName === 'string' ? raw.agentName.slice(0, 60) : null,
+    knowledgeDir: typeof raw.knowledgeDir === 'string' ? raw.knowledgeDir.replace(/[^a-zA-Z0-9_.-]/g, '').slice(0, 60) : 'knowledge',
+    knowledgeSource: typeof raw.knowledgeSource === 'string' ? raw.knowledgeSource.slice(0, 40) : 'site-config',
+    pages,
+    routes: { allowlist, source: typeof raw.routes?.source === 'string' ? raw.routes.source.slice(0, 200) : null },
+    permissions: {
+      read: Array.isArray(raw.permissions?.read) ? raw.permissions.read.filter((n) => typeof n === 'string').slice(0, 40) : [],
+      navigation: Array.isArray(raw.permissions?.navigation) ? raw.permissions.navigation.filter((n) => typeof n === 'string').slice(0, 20) : [],
+      effects: Array.isArray(raw.permissions?.effects) ? raw.permissions.effects.filter((n) => typeof n === 'string').slice(0, 20) : [],
+      denied: Array.isArray(raw.permissions?.denied) ? raw.permissions.denied.filter((n) => typeof n === 'string').slice(0, 20) : [],
+      deniedReasons: raw.permissions?.deniedReasons && typeof raw.permissions.deniedReasons === 'object' ? raw.permissions.deniedReasons : {},
+    },
     persona: String(raw.persona || 'Kirana'),
     greeting: String(raw.greeting || ''),
     identity: raw.identity && typeof raw.identity === 'object' ? raw.identity : {},

@@ -35,7 +35,7 @@ export function createSessionStore({ dataDir, logger }) {
   const store = {
     dir: sessionsDir,
 
-    create({ id, title, model } = {}) {
+    create({ id, title, model, siteId: optsSiteId } = {}) {
       const now = new Date().toISOString();
       // `id` explícito permite sessões estáveis por thread/site (V2 CopilotKit),
       // sem alterar o comportamento de quem cria sessão aleatória.
@@ -48,6 +48,10 @@ export function createSessionStore({ dataDir, logger }) {
         model: model || null,
         messages: [],
         pendingAction: null,
+        // Fase 4: em qual site esta conversa acontece e qual página o visitante
+        // está vendo. Persistido para o contexto sobreviver a recarregar a página.
+        siteId: typeof optsSiteId === 'string' ? optsSiteId : null,
+        siteState: null,
         stats: { turns: 0, aborted: 0, errors: 0, toolCalls: 0, ttftMs: [], totalMs: [] },
       };
       persist(session);
@@ -63,6 +67,8 @@ export function createSessionStore({ dataDir, logger }) {
         session.stats = { turns: 0, aborted: 0, errors: 0, toolCalls: 0, ttftMs: [], totalMs: [], ...(session.stats || {}) };
         session.messages = Array.isArray(session.messages) ? session.messages : [];
         session.pendingAction = session.pendingAction || null;
+        session.siteId = typeof session.siteId === 'string' ? session.siteId : null;
+        session.siteState = session.siteState && typeof session.siteState === 'object' ? session.siteState : null;
         return session;
       } catch {
         return null;

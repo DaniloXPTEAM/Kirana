@@ -8,6 +8,26 @@
 import { createStreamState, applyEvent, finalize, composerView } from './stream-state.js';
 import { createVoiceController } from './voice.js';
 
+/**
+ * Fase 4: contexto do site e execução de ações autorizadas.
+ *
+ * A Kirana só sabe onde o visitante está se o navegador contar. A página é
+ * enviada em cada turno (e no carregamento), mas quem valida é o servidor:
+ * aqui não há allowlist, só transporte.
+ */
+const siteBridge = window.KiranaSite?.bridge ?? null;
+const siteConfig = window.KIRANA_SITE ?? { id: '', path: '', pageId: '' };
+
+function currentSitePayload() {
+  const params = new URLSearchParams(location.search);
+  const path = siteConfig.path || params.get('path') || location.pathname;
+  const pageId = params.get('page') || '';
+  // Sem siteId explícito, o servidor usa o site configurado (KIRANA_SITE_ID) —
+  // a interface aberta sozinha continua funcionando como antes.
+  if (!siteConfig.id && !path && !pageId) return {};
+  return { ...(siteConfig.id ? { siteId: siteConfig.id } : {}), path, pageId };
+}
+
 const state = {
   sessionId: null,
   sessionTitle: '',
@@ -352,6 +372,50 @@ function renderConfirmation(action, { resolved = false, outcome = '' } = {}) {
   return card;
 }
 
+/**
+ * Pedido de dados da Kirana.
+ *
+ * Deliberadamente NÃO é um formulário que envia sozinho: os campos vêm do
+ * conhecimento do site, e o envio acontece onde o site já trata dados
+ * (formulário de contato ou WhatsApp). Assim a Kirana pede, mas não coleta
+ * nem armazena dado do visitante por conta própria.
+ */
+function renderInputRequest(container, action) {
+  const campos = Array.isArray(action.campos) ? action.campos : [];
+  const card = el('div', { class: 'confirm-card input-card' });
+  // A ferramenta manda `motivo` + `campos[{nome,rotulo,tipo,obrigatorio}]`.
+  card.appendChild(el('p', { class: 'confirm-title', text: action.titulo || action.motivo || 'Dados necessários para começar' }));
+  if (campos.length) {
+    const list = el('ul', { class: 'input-list' });
+    for (const campo of campos) {
+      if (typeof campo === 'string') {
+        list.appendChild(el('li', { text: campo }));
+        continue;
+      }
+      const label = campo.rotulo || campo.label || campo.nome || campo.name || '';
+      if (!label) continue;
+      const required = campo.obrigatorio ? ' *' : '';
+      const why = campo.porque ? ` — ${campo.porque}` : campo.tipo ? ` (${campo.tipo})` : '';
+      list.appendChild(el('li', { text: `${label}${required}${why}` }));
+    }
+    card.appendChild(list);
+  }
+  if (action.observacao) card.appendChild(el('p', { class: 'confirm-note', text: action.observacao }));
+  card.appendChild(
+    el('p', {
+      class: 'confirm-note',
+      text: 'Nada é enviado automaticamente. Os dados são preenchidos por você no formulário do site ou no WhatsApp indicado.',
+    }),
+  );
+  if (action.path) {
+    const open = el('button', { class: 'btn btn-ghost', type: 'button', text: 'Abrir formulário do site' });
+    open.addEventListener('click', () => siteBridge?.apply({ type: 'navigate', path: action.path }));
+    card.appendChild(open);
+  }
+  container.appendChild(card);
+  scrollToBottom(true);
+}
+
 function markCardResolved(card, outcome) {
   card.classList.add('resolved');
   const actions = card.querySelector('.confirm-actions');
@@ -568,7 +632,7 @@ async function sendMessage(text) {
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: apiHeaders({ 'Content-Type': 'application/json', Accept: 'text/event-stream' }),
-      body: JSON.stringify({ sessionId: state.sessionId, message: clean }),
+      body: JSON.stringify({ sessionId: state.sessionId, message: clean, ...currentSitePayload() }),
       signal: controller.signal,
     });
 
@@ -607,6 +671,25 @@ async function sendMessage(text) {
         case 'confirmation':
           pendingActionFromTurn = event.action;
           break;
+        case 'site_action': {
+          // O servidor autorizou; o navegador executa. Se a ação for
+          // desconhecida, a ponte registra e ignora — nada de `eval`.
+          const action = event.action || {};
+          if (action.type === 'request_input') {
+            shell.bubble.classList.remove('cursor');
+            renderInputRequest(shell.node.querySelector('.msg-body'), action);
+            break;
+          }
+          const result = siteBridge ? siteBridge.apply(action) : { ok: false, reason: 'no_bridge' };
+          if (result?.ok && action.type === 'navigate') {
+            shell.meta.appendChild(el('span', { class: 'pill', text: `Navegando para ${result.path}` }));
+          } else if (action.type === 'navigate') {
+            // Modo autônomo (interface sem site embutido): mostra a intenção sem
+            // navegar de verdade — a interface não é o site.
+            shell.meta.appendChild(el('span', { class: 'pill', text: `Ação do site: abrir ${action.path}` }));
+          }
+          break;
+        }
         case 'done':
           if (event.ttftMs) shell.meta.appendChild(el('span', { class: 'pill', text: `${formatMs(event.ttftMs)} até 1º token` }));
           if (event.totalMs) shell.meta.appendChild(el('span', { class: 'pill', text: `${formatMs(event.totalMs)} total` }));

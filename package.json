@@ -1,6 +1,6 @@
 {
   "name": "kirana-agent",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "private": true,
   "description": "Kirana — agente conversacional da Opportunity AI (Fase 2, execução local, com voz)",
   "type": "module",
@@ -17,7 +17,9 @@
     "bench": "node scripts/benchmark.mjs",
     "test": "node scripts/run-tests.mjs",
     "test:legacy": "node --test test/*.test.js",
-    "voice:bench": "node scripts/voice-bench.mjs"
+    "voice:bench": "node scripts/voice-bench.mjs",
+    "build:widget:v2": "node scripts/build-widget.mjs --v2",
+    "site:sync": "node scripts/site-sync.mjs"
   },
   "keywords": [
     "kirana",

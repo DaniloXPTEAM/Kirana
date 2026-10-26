@@ -12,6 +12,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { buildSystemPrompt } from './prompts.js';
+import { buildKnowledgePrompt } from './knowledge/index.js';
 import { buildContextMessages } from './sessions.js';
 import { validateGatewayPayload } from './contract.js';
 import { createTurnGraph, initialTurnState } from './graph.js';
@@ -27,6 +28,9 @@ export const EVENTS = {
   // executa. A Kirana não executa nada nesse caso — só repassa a chamada.
   externalTool: 'external_tool',
   confirmation: 'confirmation',
+  // Fase 4: diretiva para o NAVEGADOR (abrir página, pedir dados ao visitante).
+  // O servidor só autoriza; quem executa é a interface do site.
+  siteAction: 'site_action',
   done: 'done',
   error: 'error',
 };
@@ -39,7 +43,7 @@ class TurnError extends Error {
   }
 }
 
-export function createAgent({ config, gateway, registry, sessions, memory, logger, catalog }) {
+export function createAgent({ config, gateway, registry, sessions, memory, logger, catalog, siteContext = null }) {
   const log = logger?.child?.('agent') ?? logger;
   /** 'langgraph' (padrão) ou 'legacy' — permite rollback e teste de paridade. */
   const orchestrator = config.agent.orchestrator === 'legacy' ? 'legacy' : 'langgraph';
@@ -77,11 +81,48 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
 
   /* ------------------------------- contexto ------------------------------- */
 
+  /**
+   * Bloco do site integrado (Fase 4).
+   *
+   * Diz ao modelo ONDE ele está atendendo e QUAL página o visitante vê, além de
+   * lembrar as regras de permissão. Fica separado do bloco de ferramentas porque
+   * muda a cada turno (o visitante navega) e não deve invalidar cache de prompt.
+   */
+  function buildSiteBlock(session) {
+    if (!siteContext) return '';
+    const site = siteContext.site(session?.siteId ?? '');
+    if (!site) return '';
+    const current = siteContext.currentContext(site.id, session?.siteState ?? {});
+    const knowledge = siteContext.knowledgeFor(site.id);
+    const lines = [
+      `## Site em que você está atendendo`,
+      '',
+      `Você é a agente residente do site **${site.name}** (${site.siteUrl ?? 'URL não informada'}).`,
+      `Página atual do visitante: ${current.page ? `**${current.page.title}** (${current.page.path})` : 'não informada'}.`,
+    ];
+    if (current.page?.summary) lines.push(`Resumo da página: ${current.page.summary}`);
+    if (current.service) lines.push(`Solução em foco: ${current.service.title} (${current.service.serviceId}).`);
+    if (knowledge && !knowledge.empty) {
+      lines.push('', buildKnowledgePrompt(knowledge, site));
+      lines.push(
+        '',
+        'Regras de conduta no site:',
+        '- Consulte as ferramentas antes de afirmar qualquer informação do site.',
+        '- Preços, prazos e clientes NÃO são publicados: diga isso em vez de estimar.',
+        '- Navegação só em páginas autorizadas; a ação é executada pelo navegador do visitante.',
+        '- Ações com efeito exigem confirmação na tela; você nunca envia formulário sozinha.',
+        '- Upload de arquivo não está disponível: oriente o uso do formulário/WhatsApp oficial.',
+      );
+    }
+    return lines.join('\n');
+  }
+
   function buildApiMessages(session, { activeToolsDescription, contextNote }) {
     const system = buildSystemPrompt({
       memoryItems: memory.promptItems(config.agent.memoryMaxChars),
       activeTools: activeToolsDescription,
       catalogMeta: catalog.meta,
+      siteBlock: buildSiteBlock(session),
     }) + (contextNote ? `\n\n${contextNote}` : '');
     const history = buildContextMessages(session.messages, config.agent.historyLimit);
     const messages = [{ role: 'system', content: system }, ...history.map(toApiMessage)];
@@ -171,7 +212,8 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
       : { ok: false, erro: { codigo: result.error.code, mensagem: result.error.message, detalhes: result.error.details } };
     const content = toolResultContent(payload);
     cache.set(key, content);
-    return { content, ok: result.ok, name, errorCode: result.ok ? null : result.error.code };
+    // `data` também é devolvido para o chamador poder reagir (ex.: site_action).
+    return { content, ok: result.ok, name, data: result.data, errorCode: result.ok ? null : result.error.code };
   }
 
   /* ------------------------- ações pendentes (escrita) -------------------- */
@@ -340,7 +382,23 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
 
     if (tool.kind === 'read') {
       const out = await runReadTool(call, io.ctx, io.toolCache);
-      emit({ type: EVENTS.toolResult, name, title: tool.title, ok: out.ok, cached: Boolean(out.cached), errorCode: out.errorCode || null });
+      emit({
+        type: EVENTS.toolResult,
+        name,
+        title: tool.title,
+        ok: out.ok,
+        cached: Boolean(out.cached),
+        errorCode: out.errorCode || null,
+        // Só ferramentas marcadas expõem o resultado bruto (conteúdo público do
+        // site). Ferramentas internas continuam mandando apenas o status.
+        ...(tool.expose && out.data ? { data: out.data } : {}),
+      });
+      // Diretiva para o navegador (abrir página / pedir dados). O servidor só
+      // autorizou: quem executa é o cliente, e ele confirma o resultado depois.
+      const action = out.data?.siteAction;
+      if (action && typeof action === 'object' && !out.cached) {
+        emit({ type: EVENTS.siteAction, tool: name, action });
+      }
       return { content: out.content };
     }
 
@@ -471,7 +529,17 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
       session,
       temperatureOverride,
       startedAt,
-      ctx: { sessionId: session.id, memory, sessions, config, catalog, logger },
+      ctx: {
+        sessionId: session.id,
+        memory,
+        sessions,
+        config,
+        catalog,
+        logger,
+        // Fase 4: o site vem da sessão (não do modelo) e a página, do navegador.
+        siteId: session.siteId ?? null,
+        siteState: session.siteState ?? null,
+      },
       toolCache: new Map(),
       contextNote: contextNote || null,
       externalTools: externalList.map((t) => t.schema).filter(Boolean),
@@ -520,7 +588,17 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
     const toolMessage = session.messages.find((m) => m.role === 'tool' && m.toolCallId === action.toolCallId);
     session.pendingAction = null;
 
-    const ctx = { sessionId: session.id, memory, sessions, config, catalog, logger };
+    const ctx = {
+      sessionId: session.id,
+      memory,
+      sessions,
+      config,
+      catalog,
+      logger,
+      // Fase 4: as ferramentas do site precisam saber o site e a página atual.
+      siteId: session.siteId ?? null,
+      siteState: session.siteState ?? null,
+    };
     const startedAt = Date.now();
 
     if (!approve) {
@@ -563,6 +641,13 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
       errorCode: result.ok ? null : result.error.code,
       executed: true,
     });
+
+    // Fase 4: a interface do site também precisa saber que a autorização saiu.
+    // A ação em si continua sendo executada pelo site (formulário), não aqui.
+    const granted = result.data?.siteAction;
+    if (granted && typeof granted === 'object') {
+      emit({ type: EVENTS.siteAction, tool: action.tool, action: granted });
+    }
 
     // Pede ao modelo uma resposta natural sobre o resultado, usando só leitura.
     try {

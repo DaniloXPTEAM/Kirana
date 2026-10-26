@@ -70,7 +70,7 @@ export function loadConfig(env = process.env) {
 
   const config = {
     appName: 'Kirana',
-    version: '0.4.4',
+    version: '0.5.0',
     env: env.KIRANA_ENV || 'local',
     host: env.KIRANA_HOST || '127.0.0.1',
     port: toInt(env.KIRANA_PORT, 3000),
@@ -82,6 +82,17 @@ export function loadConfig(env = process.env) {
       windowMs: toInt(env.KIRANA_RATE_LIMIT_WINDOW_MS, 60_000),
     },
     maxBodyBytes: toInt(env.KIRANA_MAX_BODY_BYTES, 32 * 1024),
+    /**
+     * Fase 4 — site em que a Kirana atende.
+     *
+     * `id` é o nome do diretório em `sites/` (a config valida a existência).
+     * `publicUrl` é a URL que o visitante vê (usada na navegação do widget).
+     * Nada de segredo aqui: esta configuração chega ao navegador.
+     */
+    site: {
+      id: (env.KIRANA_SITE_ID || 'opportunity-ai').trim(),
+      publicUrl: (env.KIRANA_SITE_URL || 'https://opportunity.ia.br').trim(),
+    },
     // Apenas para prévias em sandbox/iframe de outra origem. Não usar em produção.
     allowEmbed: toBool(env.KIRANA_ALLOW_EMBED, false),
     gateway: {
@@ -142,6 +153,7 @@ export function publicApiConfig(config, extras = {}) {
       memory: true,
       confirmations: true,
     },
+    site: { id: config.site?.id ?? null, publicUrl: config.site?.publicUrl ?? null },
     limits: config.rateLimit,
     timeouts: { firstTokenMs: config.gateway.firstTokenTimeoutMs },
   };

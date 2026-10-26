@@ -18,6 +18,8 @@ import { createMemoryStore, MemoryError } from './memory.js';
 import { createInterestStore } from './interests.js';
 import { loadCatalog } from './catalog/index.js';
 import { createToolRegistry } from './tools/registry.js';
+import { createSiteContext } from './site/context.js';
+import { createSiteTools } from './site/tools.js';
 import { createToolDefinitions } from './tools/definitions.js';
 import { createAgent, mapError } from './agent.js';
 import { createSiteKit } from './copilot/site-kit.js';
@@ -46,9 +48,23 @@ export function createKiranaServer(overrides = {}) {
   const memory = overrides.memory ?? createMemoryStore({ dataDir: config.dataDir, limits: config.agent, logger });
   const interests = overrides.interests ?? createInterestStore({ dataDir: config.dataDir, logger });
   const gateway = overrides.gateway ?? createGatewayClient({ config, logger });
-  const tools = overrides.tools ?? createToolDefinitions({ catalog, memory, interests, logger });
+  const siteKit = overrides.siteKit ?? createSiteKit({ sitesDir: path.join(PROJECT_ROOT, 'sites'), logger });
+  const baseTools = overrides.tools ?? createToolDefinitions({ catalog, memory, interests, logger });
+
+  /**
+   * Fase 4 — camada do site.
+   *
+   * `siteContext` resolve o site da conversa e carrega o conhecimento;
+   * `siteTools` são as ferramentas de contexto, navegação e confirmação. As duas
+   * convivem com as ferramentas da Fase 1: nada foi removido.
+   */
+  const siteContext =
+    overrides.siteContext ??
+    (overrides.disableSite ? null : createSiteContext({ siteKit, sitesDir: path.join(PROJECT_ROOT, 'sites'), logger }));
+  const siteTools = overrides.siteTools ?? (siteContext ? createSiteTools({ siteContext, logger, defaultSiteId: config.site?.id ?? null }).tools : []);
+  const tools = overrides.tools ?? [...baseTools, ...siteTools];
   const registry = overrides.registry ?? createToolRegistry({ tools, logger });
-  const agent = overrides.agent ?? createAgent({ config, gateway, registry, sessions, memory, logger, catalog });
+  const agent = overrides.agent ?? createAgent({ config, gateway, registry, sessions, memory, logger, catalog, siteContext });
   const limiter = createRateLimiter(config.rateLimit);
   /**
    * Voz: balde próprio de limite.
@@ -64,7 +80,7 @@ export function createKiranaServer(overrides = {}) {
     max: Math.max(config.rateLimit.max * 6, 60),
     windowMs: config.rateLimit.windowMs,
   });
-  const siteKit = overrides.siteKit ?? createSiteKit({ sitesDir: path.join(PROJECT_ROOT, 'sites'), logger });
+
   const demoContact = overrides.demoContact ?? createDemoContact({ interests, logger });
   // Voz: modalidade da MESMA agente. Só sintetiza texto; não orquestra nada.
   const voice = overrides.voice ?? createVoiceService({ logger });
@@ -227,6 +243,18 @@ export function createKiranaServer(overrides = {}) {
                 tools: site.tools.map((t) => ({ name: t.name, description: t.description, requiresConfirmation: t.requiresConfirmation })),
                 stateKeys: site.stateKeys,
                 generativeComponents: site.generativeComponents,
+                url: site.siteUrl ?? null,
+                agentName: site.agentName ?? site.persona,
+                knowledge: (() => {
+                  const knowledge = siteContext?.knowledgeFor(site.id);
+                  return knowledge
+                    ? { documentos: knowledge.docs.length, atualizadoEm: knowledge.docs[0]?.capturedAt ?? null }
+                    : null;
+                })(),
+                pages: (site.pages ?? []).map((p) => ({ id: p.id, path: p.path, title: p.title })),
+                routes: site.routes?.allowlist ?? [],
+                permissions: site.permissions ?? null,
+                uploads: { available: false, reason: site.permissions?.deniedReasons?.request_file_upload ?? null },
               },
               copilotkit: '/api/copilot',
               sites: siteKit.list().map((x) => x.id),
@@ -293,6 +321,61 @@ export function createKiranaServer(overrides = {}) {
     if (route === '/api/config' && method === 'GET') {
       const models = await agent.resolveActiveModel();
       sendJson(res, 200, publicApiConfig(config, { activeModel: models.active }));
+      return;
+    }
+
+    /* --------------------- contexto do site (Fase 4) ------------------ */
+    /**
+     * O navegador informa em que página o visitante está.
+     *
+     * Por que um endpoint e não só o corpo do /api/chat: a Kirana precisa saber
+     * a página ATUAL mesmo antes da primeira mensagem (para explicar a página,
+     * sugerir navegação e não inventar contexto). A resposta é o contexto já
+     * validado — o cliente nunca decide sozinho o que é página conhecida.
+     */
+    if (route === '/api/site/context' && method === 'POST') {
+      assertAuth(req);
+      assertSameOrigin(req);
+      checkRate(req);
+      const body = await readJsonBody(req, { maxBytes: config.maxBodyBytes });
+      const site = siteContext?.site(typeof body.siteId === 'string' ? body.siteId : config.site?.id);
+      if (!site) throw new HttpError(404, 'site_not_found', 'Site não integrado.');
+      const state = {
+        path: typeof body.path === 'string' ? body.path.slice(0, 200) : '',
+        pageId: typeof body.pageId === 'string' ? body.pageId.slice(0, 60) : '',
+      };
+      const current = siteContext.currentContext(site.id, state);
+      if (typeof body.sessionId === 'string' && body.sessionId) {
+        const session = sessions.get(body.sessionId);
+        if (session) {
+          session.siteId = site.id;
+          session.siteState = { path: current.path, pageId: current.page?.id ?? null };
+          sessions.save(session);
+        }
+      }
+      sendJson(res, 200, {
+        site: current.site,
+        page: current.page,
+        service: current.service,
+        matched: current.matched,
+        informedPath: current.informedPath,
+      });
+      return;
+    }
+
+    if (route === '/api/site/knowledge' && method === 'GET') {
+      assertAuth(req);
+      checkRate(req);
+      const site = siteContext?.site(url.searchParams.get('site') || config.site?.id);
+      if (!site) throw new HttpError(404, 'site_not_found', 'Site não integrado.');
+      const reloaded = siteContext.refreshIfStale(site.id);
+      const knowledge = siteContext.knowledgeFor(site.id);
+      sendJson(res, 200, {
+        site: site.id,
+        reloaded,
+        documentos: knowledge?.docs.map((doc) => ({ id: doc.id, titulo: doc.title, fonte: doc.source, capturadoEm: doc.capturedAt })) ?? [],
+        servicos: knowledge?.services() ?? [],
+      });
       return;
     }
 
@@ -414,6 +497,18 @@ export function createKiranaServer(overrides = {}) {
 
       const session = sessions.get(sessionId);
       if (!session) throw new HttpError(404, 'session_not_found', 'Sessão não encontrada. Crie uma nova conversa.');
+
+      // Fase 4: o site e a página vêm do navegador, mas são validados aqui.
+      const requestedSite = typeof body.siteId === 'string' && body.siteId ? body.siteId : config.site?.id;
+      const site = siteContext?.site(requestedSite);
+      if (site) {
+        session.siteId = site.id;
+        if (typeof body.path === 'string' || typeof body.pageId === 'string') {
+          const current = siteContext.currentContext(site.id, { path: body.path, pageId: body.pageId });
+          session.siteState = { path: current.path, pageId: current.page?.id ?? null };
+        }
+        sessions.save(session);
+      }
 
       await streamAgentTurn({ req, res, session, run: (emit, signal) => agent.runTurn({ session, text: message, emit, signal }) });
       return;

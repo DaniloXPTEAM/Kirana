@@ -1,6 +1,6 @@
 # Kirana — agente conversacional da Opportunity AI
 
-**Versão:** 0.2.1 (Fase 1 validada + LangGraph + correção do indicador de geração)
+**Versão:** 0.5.0 (Fase 4: agente residente no site — `docs/FASE4-AUDITORIA.md`)
 **Organização:** Opportunity AI
 **Gateway utilizado:** `Kirana-ChatGPT-Gateway v0.2.0` (não modificado)
 **Data desta entrega:** 24/10/2026

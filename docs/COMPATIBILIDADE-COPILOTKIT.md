@@ -1,4 +1,4 @@
-# Compatibilidade e limitações — CopilotKit na Kirana V2 (v0.3.0)
+# Compatibilidade e limitações — CopilotKit na Kirana V2 (atualizado na v0.5.0)
 
 ## 1. O que está validado
 
@@ -19,33 +19,32 @@
 
 ## 2. Limitações declaradas (não são "integração completa")
 
-### 2.1 Bundle do `@copilotkit/react-core` não compila neste ambiente
+### 2.1 Bundle do `@copilotkit/react-core` — CORRIGIDO na Fase 4 (v0.5.0)
 
-- **Sintoma:** `esbuild` é encerrado pelo sistema (`Error: The service was stopped`) após
-  ~3 min de build; memória do sandbox = 1,9 GB total.
-- **Medições:** `react` + `react-dom` = 1,1 MB em 0,4 s; `react-core` (entry completo)
-  estoura; `react-core/v2/headless` compila em 0,6 s mas não é autossuficiente (a árvore de
-  contexto vem do chunk pesado).
-- **Consequência prática:** o widget entregue (`widget/src/main-lite.jsx` → `public/widget/kirana-widget.js`,
-  199 KB) fala **o protocolo do runtime oficial** (`POST /api/copilot`,
-  `{method:"agent/run"}`, eventos AG-UI). O runtime oficial é quem executa o agente — a
-  integração é real, mas **a camada de hooks React do CopilotKit não está em uso no navegador**.
-- **Não declaramos** integração completa com `@copilotkit/react-core`.
-- **Caminho para fechar:** em máquina com ≥4 GB livres, `node scripts/build-widget.mjs`
-  (variante `copilotkit`, entrada `widget/src/main.jsx`) e revalidar os mesmos 15 testes de
-  navegador. Nenhuma mudança de backend é necessária.
+> **Atualização (26/10/2026, Fase 4).** A limitação descrita abaixo era do
+> ambiente de validação da v0.3.0 e **não se reproduz** com a API v2. O
+> `@copilotkit/react-core/v2/headless` + `/v2/context` compilam em menos de 1 s
+> e o widget v2 funciona de ponta a ponta (ver `docs/FASE4-AUDITORIA.md §7`).
 
-### 2.2 Modelo simulado nos testes
-
-O gateway **simulado** (`scripts/mock-gateway.js`) é usado apenas no ambiente de teste e na
-demo: **somente o modelo é simulado**. Streaming, protocolo AG-UI, sessões, ferramentas,
-HITL e SSE são reais. Com o gateway real (porta 1455 do proprietário), a diferença é a
-qualidade da resposta do modelo — o caminho de código é o mesmo.
-
-### 2.3 Sem deploy
-
-Nada foi publicado no `opportunity.ia.br`. O site de demonstração é local
-(`/demo/index.html`) e reproduz a estrutura do site real, não o site real.
+- **Antes (v0.3.0 → v0.4.x):** `esbuild` morria com `Error: The service was stopped`
+  ao empacotar o entry completo do `react-core` v1; por isso o widget daquela fase
+  fala o protocolo do runtime por conta própria (`public/widget/kirana-widget.js`,
+  ~199 KB).
+- **Agora (v0.5.0):** `widget/src/main-v2.jsx` → `public/widget/kirana-v2.js`
+  (**961 KB, build em 292 ms**) usando `CopilotKitCoreReact` + `CopilotKitContext`
+  (`/v2/context`) e `useAgent` / `useAgentContext` / `useFrontendTool`
+  (`/v2/headless`). O entry `v2` **completo** (`/v2` raiz) ainda é pesado
+  (15,8 MB, 2,1 s) porque importa a UI pronta e o CSS — a Kirana usa só o
+  headless, que é a camada de hooks.
+- **Achado do teste real:** na v2 o agente precisa ser nomeado. O runtime da
+  Kirana expõe `kirana`, não `default`; `useAgent({ agentId: 'kirana' })` é
+  obrigatório, senão o hook falha com
+  `Agent 'default' not found after runtime sync`.
+- **Limitação restante (declarada):** `GET /api/copilot/info` responde **405**
+  no `@copilotkit/runtime` 1.79.1 (a rota de metadados da v2 não é servida por
+  essa versão). O cliente v2 sincroniza mesmo assim e o turno funciona — os
+  testes de navegador provam o caminho completo. Fica registrado para quando o
+  runtime for atualizado.
 
 ## 3. Contrato do runtime
 

@@ -1,3 +1,9 @@
+> **Fase 4 (v0.5.0):** este documento descreve a integração da v0.3.x (widget
+> CopilotKit v1 + ações de demonstração). Para o agente residente no site
+> Opportunity AI — conhecimento real, contexto de página, allowlist de rotas,
+> ferramentas de site e widget v2 — leia **`docs/FASE4-AUDITORIA.md`**. O que está
+> aqui continua válido para os sites de demonstração.
+
 # Integração com o site (Fase F — ainda não executada)
 
 Este documento **não autoriza publicação**. Ele registra o caminho técnico previsto para
