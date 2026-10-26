@@ -1,5 +1,51 @@
 # Changelog — Kirana
 
+## 0.4.4 — 25/10/2026 (barge-in por voz: "Kirana, pare")
+
+Auditoria e correção do defeito em que a Kirana ignorava a ordem de parar.
+Relatório completo em `docs/AUDITORIA-VOZ-V0.4.4.md`.
+
+### Causa comprovada (não presumida)
+O controlador era **meia-duplex por projeto**: ao enviar o turno, `finishUtterance()`
+chamava `suspendMic('turn_started')` e abortava o reconhecedor; `onresult`
+descartava qualquer resultado durante a resposta **antes de analisar o texto**; e
+não existia nenhum vocabulário de comando no projeto. O `interrupt()` funcionava,
+mas só era alcançável pelo botão. Reproduzido em teste: durante a fala,
+`isRecognizerLive() === false` e a ordem virava `result_from_stale_session`.
+
+### Adicionado
+- `public/voice-commands.js`: reconhecimento **local** de comandos de parada, sem
+  chamar o modelo. Absorve acento, caixa, pontuação e erro fonético
+  (Quirana, Kimara, Kirara), trata "para" ambíguo e recusa perguntas e negações
+  ("por que o WhatsApp para de funcionar?", "não pare").
+- Barge-in de ponta a ponta: microfone **aberto** durante a resposta, comando
+  detectado em resultado final **ou interino**, cancelamento de áudio dos dois
+  motores, fila e requisições, e volta ao estado de escuta.
+- Continuação depois do comando: "Kirana, pare — e o CRM?" é transcrito.
+- Diagnóstico: `kiranaVoice.bargeIns` com latência medida, evento
+  `kirana:voice-bargein`, tabela nova no `kiranaVoiceReport()`.
+
+### Corrigido no caminho
+- Botão de interromper deixava o estado preso em "interrompido" (com a sessão de
+  reconhecimento persistente não havia `onstart` para reabrir) — novo
+  `resumeListeningAfter()`.
+- `drainQueue` sem geração: um `await` antigo podia liberar `speaking` da execução
+  nova e sobrepor dois áudios depois de interrupções rápidas.
+- Comando repetido (interino + final) gerava três interrupções e três avisos.
+- Áudio de resposta atrasada agora é recusado na entrada de `playResponse` e de
+  `playBrowserSegment`.
+- Histórico de estados passa a gravar o motivo de cada transição.
+
+### Testes
+- `node scripts/run-tests.mjs`: **298 → 340** (22 de vocabulário + 19 de integração
+  + 1 novo cenário no comportamento; 2 reescritos para o contrato novo).
+- Navegador de voz: **48 → 60** (12 verificações reais de barge-in).
+- Demo: 15/15.
+
+### Não validado aqui (declarado)
+Microfone e alto-falante reais no Windows; latência percebida; se o reconhecedor
+do Edge ouve a própria voz. Roteiro A–G na seção 5 do relatório.
+
 ## 0.4.3 — 25/10/2026 (P1 markdown na fala, P2 interface, P3 transcrição)
 
 Correções dos três problemas do teste real de Windows da v0.4.2. Relatório

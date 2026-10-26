@@ -465,7 +465,81 @@ try {
     check('P2: Esc fecha o painel sem mexer no tamanho do chat', !depoisEsc.aberto && depoisEsc.alturaChat === antesEsc, `${antesEsc} → ${depoisEsc.alturaChat}`);
 
     await context.close();
+  }  /* ------------- 6. v0.4.4: barge-in POR VOZ ("Kirana, pare") ------------
+     Fica por último de propósito: o gateway falso deste arquivo responde por
+     ordem de chamada (a 3ª chamada é a que pede confirmação), então um turno
+     novo não pode entrar no meio dos cenários de HITL.                        */
+  {
+    const { context, page } = await newPage({
+      init: [
+        () => {
+          window.__bargeEvents = [];
+          window.addEventListener('kirana:voice-bargein', (event) => window.__bargeEvents.push(event.detail));
+        },
+      ],
+    });
+    await page.locator('#voice-btn').click();
+    await waitState(page, 'ouvindo', 15000);
+    await page.evaluate(() => window.__voiceTest.emit('Fale sobre os serviços da Opportunity', true));
+    await waitState(page, 'falando', 30000);
+    await page.waitForFunction(() => window.__audioLog.some((entry) => entry.event === 'play'), null, { timeout: 40000 }).catch(() => {});
+
+    const durante = await page.evaluate(() => ({
+      microfoneAberto: window.kiranaVoice._internal.isRecognizerLive(),
+      janela: window.kiranaVoice._internal.commandWindow(),
+    }));
+    check('P4: microfone continua aberto durante a fala (é o que ouve o comando)', durante.microfoneAberto === true, String(durante.janela));
+
+    // Falso positivo primeiro: pergunta que CONTÉM "para" não pode interromper.
+    await page.evaluate(() => window.__voiceTest.emit('por que o WhatsApp para de funcionar?', true));
+    await page.waitForTimeout(400);
+    const semFalsoPositivo = await page.evaluate(() => window.kiranaVoice.history.bargeIns);
+    check('P4: pergunta com "para" não interrompe (sem falso positivo)', semFalsoPositivo === 0, `${semFalsoPositivo} interrupção(ões)`);
+    check('P4: depois da pergunta, a Kirana continua falando', (await voiceState(page)) === 'falando', await voiceState(page));
+
+    const mensagensAntes = await page.evaluate(() => document.querySelectorAll('.msg.user').length);
+    const pedidosAntes = await page.evaluate(() => window.__voiceTest.started);
+
+    // O comando, por resultado FINAL do reconhecedor.
+    await page.evaluate(() => window.__voiceTest.emit('Kirana, pare', true));
+    const interrompido = await page.waitForFunction(
+      () => (window.kiranaVoice?.history?.states || []).some((entry) => entry.to === 'interrompido' && entry.reason === 'voice_command'),
+      null,
+      { timeout: 8000, polling: 50 },
+    ).then(() => true).catch(() => false);
+    check('P4: "Kirana, pare" registra interrupção por comando de voz', interrompido);
+
+    const depois = await page.evaluate(() => ({
+      bargeIns: window.kiranaVoice.bargeIns,
+      eventos: window.__bargeEvents,
+      mensagens: document.querySelectorAll('.msg.user').length,
+      pausas: window.__audioLog.filter((e) => e.event === 'pause').length,
+      estado: window.kiranaVoice.state,
+      reconhecedoresCriados: window.__voiceTest.started,
+    }));
+    check('P4: o áudio reproduzido é pausado de verdade', depois.pausas >= 1, `${depois.pausas} pause(s)`);
+    check('P4: o comando NÃO vira mensagem do usuário', depois.mensagens === mensagensAntes, `${mensagensAntes} → ${depois.mensagens}`);
+    check('P4: o comando não abre um novo turno no modelo', depois.reconhecedoresCriados === pedidosAntes);
+    check('P4: evento público de barge-in é emitido', (depois.eventos || []).length === 1, JSON.stringify((depois.eventos || [])[0] || {}).slice(0, 90));
+    const latencia = depois.bargeIns[0]?.latencyMs;
+    check('P4: latência comando → áudio silenciado medida', typeof latencia === 'number' && latencia >= 0, `${latencia} ms`);
+    check('P4: comando registra a palavra reconhecida', depois.bargeIns[0]?.keyword === 'pare', depois.bargeIns[0]?.keyword);
+
+    const volta = await waitState(page, 'ouvindo', 15000);
+    check('P4: depois do comando, volta a ouvir', volta === 'ouvindo', volta);
+
+    // continuação: a conversa segue sem recarregar a página
+    const mensagensAntesDeContinuar = await page.evaluate(() => document.querySelectorAll('.msg.user').length);
+    await page.evaluate(() => window.__voiceTest.emit('E sobre o CRM?', true));
+    const continuou = await page.waitForFunction(
+      (antes) => document.querySelectorAll('.msg.user').length > antes,
+      mensagensAntesDeContinuar,
+      { timeout: 15000 },
+    ).then(() => true).catch(() => false);
+    check('P4: conversa continua depois da interrupção por voz', continuou);
+    await context.close();
   }
+
 } catch (error) {
   failures += 1;
   console.log(`✗ erro inesperado: ${error?.message}`);

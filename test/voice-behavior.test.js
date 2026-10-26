@@ -147,12 +147,22 @@ function setup({ ttsDelayMs = 0, holdAudio = false, ttsFail = false, tuning = {}
  * fechada durante todo o turno e só a reabre depois do áudio + janela surda
  * (`muteAfterSpeechMs`). Testes que falam de novo precisam esperar isso.
  */
+/**
+ * Espera o microfone voltar a aceitar FALA (não só a sessão existir).
+ *
+ * v0.4.4 — a sessão de reconhecimento deixou de ser destruída a cada turno:
+ * ela fica aberta para ouvir "Kirana, pare". Então o que os testes esperam não
+ * é mais "um reconhecedor novo", e sim "a transcrição voltou a valer" — isto é,
+ * fora da janela de comando (`commandWindow()`).
+ */
 async function waitForMic(controller, timeoutMs = 2000) {
   const inicio = Date.now();
   for (;;) {
-    if (controller._internal.isRecognizerLive()) return FakeRecognition.instances.at(-1);
+    if (controller._internal.isRecognizerLive() && !controller._internal.commandWindow()) {
+      return FakeRecognition.instances.at(-1);
+    }
     if (Date.now() - inicio > timeoutMs) {
-      throw new Error('o microfone não reabriu dentro do prazo');
+      throw new Error('o microfone não voltou a aceitar fala dentro do prazo');
     }
     await sleep(10);
   }
@@ -445,9 +455,11 @@ test('12. escuta contínua: um único reconhecedor ativo por vez', async () => {
   controller.dispose();
 });
 
-test('13. prevenção de autoescuta: a própria voz não vira mensagem do usuário', async () => {
-  // Janela surda padrão (600 ms): logo depois da resposta o microfone continua
-  // fechado, que é o que impede o alto-falante de virar entrada.
+test('13. prevenção de autoescuta: o microfone fica aberto, mas a própria voz não vira pergunta', async () => {
+  // CONTRATO v0.4.4 — antes (v0.4.3) este teste exigia o microfone FECHADO
+  // durante a resposta. Isso impedia a autoescuta e, junto, impedia o barge-in:
+  // sem microfone aberto não existe "Kirana, pare". Agora o microfone fica
+  // ABERTO e a proteção é o roteamento: durante o turno, só comando entra.
   const { controller, sent } = setup();
   await controller.start();
   const microfoneDoUsuario = FakeRecognition.instances.at(-1);
@@ -458,18 +470,22 @@ test('13. prevenção de autoescuta: a própria voz não vira mensagem do usuár
   await sleep(30);
   controller.appendDelta('Também faz atendimento no WhatsApp. ');
   await sleep(30);
+
+  // O microfone continua vivo (é o que permite interromper por voz)…
+  assert.equal(controller._internal.isRecognizerLive(), true, 'o microfone precisa continuar aberto durante a resposta');
+
+  // …e o que o alto-falante devolve ao microfone NÃO vira nada.
+  microfoneDoUsuario.hear('também faz atendimento no whatsapp', { isFinal: true });
+  microfoneDoUsuario.hear('a opportunity ai trabalha com agentes de ia', { isFinal: false });
+  await sleep(40);
+  assert.equal(controller.history.echoBlocked + controller.history.phantomBlocked >= 1, true, 'o eco precisa ser contado');
+  assert.equal(controller._internal.transcript, '', 'nada pode ser acumulado durante a resposta');
+
   controller.endTurn({ aborted: false, error: false });
   await sleep(40);
-
-  // o reconhecedor do turno anterior ainda entrega o que captou dos alto-falantes
-  assert.equal(controller._internal.isRecognizerLive(), false, 'o microfone precisa estar fechado depois da resposta');
-  microfoneDoUsuario.hear('também faz atendimento no whatsapp', { isFinal: true });
-  await sleep(40);
-
   assert.deepEqual(sent, ['quero saber sobre agentes de ia'], 'a voz da Kirana virou turno do usuário');
-  assert.ok(controller.history.phantomBlocked >= 1);
 
-  // só depois da janela surda o microfone volta a aceitar fala
+  // só depois da janela surda o microfone volta a aceitar fala comum
   const reaberto = await waitForMic(controller);
   reaberto.hear('e sobre o crm?', { isFinal: true });
   await sleep(30);
@@ -477,16 +493,27 @@ test('13. prevenção de autoescuta: a própria voz não vira mensagem do usuár
   controller.dispose();
 });
 
-test('13b. o microfone fica fechado entre frases (fila vazia no meio da resposta)', async () => {
-  const { controller } = setup();
+test('13b. entre frases da mesma resposta nada é acumulado (fila vazia no meio do turno)', async () => {
+  const { controller, sent } = setup();
   await controller.start();
   const primeira = FakeRecognition.instances.at(-1);
   primeira.hear('pergunta', { isFinal: true });
   await sleep(15);
   controller.appendDelta('Primeira frase da resposta. ');
   await sleep(60); // fila esvaziou, mas o turno NÃO terminou
-  const vivos = FakeRecognition.instances.filter((r) => r.stopped === 0 && r.aborted === 0);
-  assert.equal(vivos.length, 0, 'não pode existir reconhecedor aberto no meio da resposta');
+
+  // v0.4.3 exigia "nenhum reconhecedor aberto". v0.4.4 exige "nada acumulado":
+  // é isso que impede a voz da Kirana de virar pergunta, com o microfone aberto.
+  primeira.hear('primeira frase da resposta', { isFinal: true });
+  await sleep(30);
+  assert.equal(controller._internal.transcript, '', 'o eco entre frases foi acumulado');
+  assert.deepEqual(sent, ['pergunta'], 'o eco entre frases virou mensagem');
+
+  // o comando de parada, no mesmo intervalo, continua funcionando
+  primeira.hear('Kirana, pare', { isFinal: true });
+  await sleep(30);
+  assert.equal(controller.state, VOICE_STATE.INTERRUPTED);
+  assert.equal(controller.history.bargeIns, 1);
   controller.dispose();
 });
 

@@ -1020,8 +1020,22 @@ function setupVoice() {
     }));
     console.table(linhas);
     console.log('motor:', report.settings?.engine, '· voz:', report.settings?.voice?.name, '· taxa:', report.settings?.rate);
-    console.log('estados:', report.states.map((s) => s.to).join(' → '));
+    console.log('estados:', report.states.map((s) => (s.reason ? `${s.to}(${s.reason})` : s.to)).join(' → '));
     console.log('navegador:', report.browser);
+    // v0.4.4 — interrupções por voz: latência medida do comando até o áudio parar.
+    if (report.bargeIns?.length) {
+      console.table(report.bargeIns.map((b) => ({
+        turno: b.turnId,
+        palavra: b.keyword,
+        tipo: b.kind,
+        motor: b.engine,
+        antes: b.stateBefore,
+        'latencia_ms': b.latencyMs,
+      })));
+    } else {
+      console.log('interrupções por voz:', 'nenhuma nesta sessão');
+    }
+    console.log('proteção de eco:', report.echoGuard);
     return report;
   };
 

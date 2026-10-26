@@ -1,5 +1,5 @@
 /**
- * Kirana — voz conversacional (cliente). v0.4.2
+ * Kirana — voz conversacional (cliente). v0.4.4
  *
  * Isto NÃO é uma segunda Kirana: usa as mesmas sessões, o mesmo /api/chat, as
  * mesmas ferramentas e a mesma memória. O módulo faz apenas três coisas:
@@ -39,12 +39,20 @@
  *     quando a voz some. A fila, a interrupção e o diagnóstico são os mesmos
  *     para os dois caminhos: só muda quem sintetiza.
  *
- * Meia-duplex é intencional nesta versão. Interromper por voz (barge-in com o
- * microfone aberto durante a fala) fica para depois: exige cancelamento de eco
- * (AEC) confiável, que o SpeechRecognition do navegador não expõe.
+ * (e) BARGE-IN POR VOZ (v0.4.4) — até a v0.4.3 a conversa era meia-duplex: ao
+ *     enviar o turno o reconhecedor era abortado e o microfone só voltava depois
+ *     da resposta. Isso resolvia a autoescuta, mas tornava impossível dizer
+ *     "Kirana, pare": não havia microfone aberto para ouvir e nenhum lugar no
+ *     código interpretava a ordem. Agora o microfone fica ABERTO durante a
+ *     resposta e quem impede a autoescuta é o ROTEAMENTO (ver `onresult`): com
+ *     um turno em andamento, um resultado só pode virar COMANDO de parada —
+ *     nunca transcrição, nunca mensagem. O comando é reconhecido localmente
+ *     (`public/voice-commands.js`, sem chamar o modelo) e cancela áudio, fila e
+ *     requisições pendentes antes de voltar a ouvir.
  */
 
 import { toSpeechText } from './speech-text.js';
+import { isEchoOf, isStopCommand, normalizeSpeech } from './voice-commands.js';
 import {
   ENGINE,
   PREVIEW_TEXT,
@@ -88,6 +96,21 @@ export const LISTEN_TUNING = {
    */
   interimGraceMs: 1_200,
   duplicateWindowMs: 2_000,
+  /**
+   * v0.4.4 — janela surda CURTA depois de uma interrupção por voz. Serve só
+   * para a cauda do alto-falante não voltar como fala; o microfone nunca é
+   * fechado (é ele que permite o próximo "Kirana, pare").
+   */
+  bargeInMuteMs: 250,
+  /**
+   * Depois de um barge-in, a continuação do usuário chega junto: ele diz
+   * "Kirana, pare" e emenda "e o CRM?". Durante este tempo os resultados
+   * voltam a ser transcritos (só o eco continua bloqueado), para a conversa
+   * seguir sem exigir uma nova fala.
+   */
+  bargeInListenMs: 2_500,
+  /** Janela em que a mesma ordem, no mesmo turno, não interrompe de novo. */
+  commandRepeatMs: 1_500,
 };
 
 /**
@@ -315,8 +338,13 @@ export function createVoiceController({
   let lastNotice = '';
   let lastUtterance = { text: '', at: 0 };
   let muted = false; // turno cancelado: não falar texto atrasado
+  let spokenText = ''; // o que a Kirana está falando neste turno (guarda de eco)
+  let drainGen = 0; // geração da fila de reprodução (callbacks velhos são ignorados)
+  let listenAfterBargeIn = 0; // até quando aceitar a continuação da fala
+  let lastCommand = { keyword: null, at: 0, turnId: -1 }; // evita interrupção repetida
   const activeRequests = new Set();
-  const history = { turns: 0, cancellations: 0, errors: 0, phantomBlocked: 0 };
+  const commandLog = []; // um registro por comando detectado (latência medida)
+  const history = { turns: 0, cancellations: 0, errors: 0, phantomBlocked: 0, bargeIns: 0, echoBlocked: 0, commandsIgnored: 0 };
 
   /* ------------------------- motores de fala (v0.4.2) -------------------- */
 
@@ -341,7 +369,9 @@ export function createVoiceController({
     if (state === next && !detail.force) return;
     const previous = state;
     state = next;
-    stateHistory.push({ from: previous, to: next, at: now(), turnId });
+    // `reason` entra no histórico: é o que permite, no teste real do Windows,
+    // saber POR QUE o estado mudou (comando, silêncio, erro, watchdog…).
+    stateHistory.push({ from: previous, to: next, at: now(), turnId, reason: detail.reason ?? null });
     if (stateHistory.length > 300) stateHistory.shift();
     for (const fn of listeners) {
       try {
@@ -362,14 +392,30 @@ export function createVoiceController({
   /* -------------------- regra central: quando o microfone pode -------------- */
 
   /**
-   * O microfone FICA FECHADO enquanto houver turno aberto, áudio tocando, fila
-   * pendente ou dentro da janela surda pós-fala. Esta é a correção da
-   * autoescuta: antes a condição era só "a fila está vazia agora?", que fica
-   * verdadeira no meio de uma resposta, entre duas frases.
+   * Há um turno em andamento (processando, falando, com fila, ou na janela
+   * surda)? Durante esta janela o microfone continua aberto, mas o destino dos
+   * resultados é só o COMANDO de parada.
+   *
+   * v0.4.4 — esta função substitui a regra antiga de meia-duplex. A v0.4.1
+   * fechava o microfone aqui para não ouvir a própria voz; era eficaz contra a
+   * autoescuta e, ao mesmo tempo, a razão de "Kirana, pare" nunca funcionar.
    */
-  function micSuspended() {
+  function commandWindow() {
     if (turnOpen || speaking || speechQueue.length > 0) return 'turn_busy';
     if (now() < muteUntil) return 'mute_window';
+    return false;
+  }
+
+  /**
+   * O microfone deve ficar FECHADO?
+   *
+   * Só quando a voz está desligada ou o microfone foi negado. Durante a
+   * resposta ele fica aberto de propósito (barge-in) — o que muda é o
+   * roteamento em `onresult`, não a captura.
+   */
+  function micSuspended() {
+    if (!active) return 'inactive';
+    if (micDenied) return 'mic_denied';
     return false;
   }
 
@@ -396,6 +442,11 @@ export function createVoiceController({
     startRecognition();
   }
 
+  /** O que a Kirana está falando neste turno (entra na guarda de eco). */
+  function rememberSpoken(text) {
+    spokenText = `${spokenText} ${text}`.replace(/\s+/g, ' ').trim().slice(-600);
+  }
+
   /**
    * Programa a reabertura do microfone para depois da janela surda. Sem isso,
    * `maybeResumeMic()` recusaria a abertura (mute_window) e nada tentaria de
@@ -406,11 +457,6 @@ export function createVoiceController({
     if (!active) return;
     resumeTimer = setTimeout(() => {
       if (!active) return;
-      const blocked = micSuspended();
-      if (blocked === 'mute_window') {
-        scheduleResume(80); // ainda dentro da janela: tenta de novo em breve
-        return;
-      }
       maybeResumeMic();
     }, delay);
   }
@@ -426,7 +472,9 @@ export function createVoiceController({
 
   function startRecognition() {
     if (!supported || !active) return;
-    if (micSuspended()) return;
+    if (micSuspended()) return; // desligado/negado: não abre
+    // Durante a resposta o microfone continua aberto: é por ele que chega o
+    // "Kirana, pare". O que chega só vira comando (ver `onresult`).
     // Um único recognizer vivo por vez: se já existe, não cria outro.
     if (recognizerLive) {
       mark('recognizer_already_live');
@@ -459,18 +507,12 @@ export function createVoiceController({
     };
 
     instance.onresult = (event) => {
-      // Descarta, na origem, tudo que vier de uma sessão que já foi suspensa.
+      // Descarta, na origem, tudo que vier de uma sessão que já foi encerrada.
       if (!isCurrent() || !active) {
         history.phantomBlocked += 1;
         mark('result_from_stale_session');
         return;
       }
-      if (micSuspended()) {
-        history.phantomBlocked += 1;
-        mark('result_while_suspended', { reason: micSuspended(), state });
-        return;
-      }
-      if (pendingTurn || state === VOICE_STATE.PROCESSING) return;
 
       // Junta TODOS os resultados do evento, separando final de interino.
       let interim = '';
@@ -482,6 +524,74 @@ export function createVoiceController({
         if (result.isFinal) finalText = finalText ? `${finalText} ${text}` : text;
         else interim = interim ? `${interim} ${text}` : text;
       }
+      const heard = finalText || interim;
+      if (!heard) return;
+
+      /* ---------------- ROTEAMENTO (v0.4.4) ----------------
+         Ordem das decisões, e por quê:
+           1. eco da própria voz  → descarta (autoescuta)
+           2. comando de parada   → interrompe (nunca vira pergunta)
+           3. turno em andamento  → descarta (não acumula, não envia)
+           4. resto               → transcrição normal
+         O passo 2 vem antes do 3: era exatamente a ordem invertida que fazia a
+         Kirana ignorar "Kirana, pare" enquanto falava.                        */
+
+      const window = commandWindow();
+
+      // 1. Eco: o que ela mesma está dizendo não pode virar nada.
+      if (window && isEchoOf(heard, spokenText)) {
+        history.echoBlocked += 1;
+        mark('result_echo_ignored', { words: heard.split(' ').length });
+        return;
+      }
+
+      // 2. Comando de parada (reconhecimento local, sem chamar o modelo).
+      const command = isStopCommand(heard, { interim: !finalText });
+      // "Há o que interromper?" — processando ou falando. Sem isso, um
+      // "Kirana, pare" dito no vácuo pintaria a tela de "interrompido" sem nada
+      // para interromper.
+      const haOQueInterromper = Boolean(window)
+        || state === VOICE_STATE.SPEAKING
+        || state === VOICE_STATE.PROCESSING;
+      if (command.matched && haOQueInterromper && (!command.requiresWindow || window)) {
+        // O reconhecedor entrega o MESMO comando várias vezes (interino, depois
+        // interino de novo, depois final). Sem esta trava, uma ordem virava três
+        // interrupções e três avisos. Uma ordem nova (depois de outro turno)
+        // passa normalmente.
+        const repetido = command.keyword === lastCommand.keyword
+          && lastCommand.turnId === turnId
+          && now() - lastCommand.at < TIMING.commandRepeatMs;
+        if (repetido) {
+          mark('command_repeated_ignored', { keyword: command.keyword });
+          return;
+        }
+        lastCommand = { keyword: command.keyword, at: now(), turnId };
+        if (finalText) transcript = '';
+        bargeIn(command, { detectedAt: now(), heard });
+        return;
+      }
+      if (command.matched) {
+        // "Kirana, pare" dito quando ela já terminou: não é pergunta e não deve
+        // ir para o modelo. Só avisa e limpa o buffer.
+        history.commandsIgnored += 1;
+        transcript = '';
+        interimText = '';
+        sawInterim = false;
+        mark('command_without_playback', { keyword: command.keyword });
+        notice('Não estou falando nada agora — pode mandar sua pergunta.');
+        return;
+      }
+
+      // 3. Turno em andamento: só comando entra; todo o resto é descartado.
+      // Exceção: logo depois de um barge-in o usuário costuma emendar a próxima
+      // frase ("Kirana, pare — e o CRM?"), então a transcrição volta a valer.
+      const continuation = window === 'mute_window' && now() < listenAfterBargeIn;
+      if (window && !continuation) {
+        history.phantomBlocked += 1;
+        mark('result_while_busy_ignored', { reason: window, state });
+        return;
+      }
+      if (pendingTurn || state === VOICE_STATE.PROCESSING) return;
 
       if (finalText) {
         const merged = mergeRecognition(transcript, finalText, { final: true });
@@ -531,7 +641,8 @@ export function createVoiceController({
         setState(VOICE_STATE.IDLE);
         return;
       }
-      if (micSuspended()) return; // não reabre durante a resposta
+      // Reabre sempre (inclusive durante a resposta): sem sessão viva não há
+      // como ouvir um comando de interrupção.
       setTimeout(() => {
         if (active && !recognizerLive && !micSuspended()) startRecognition();
       }, TIMING.restartDelayMs);
@@ -599,11 +710,16 @@ export function createVoiceController({
     }
     lastUtterance = { text, at };
 
-    // Fecha o microfone ANTES de enviar: daqui até o fim da resposta, a Kirana
-    // não pode ouvir nada (muito menos a própria voz).
-    suspendMic('turn_started');
-    recognizerLive = false;
-    recognition = null;
+    // v0.4.4 — o microfone NÃO é mais fechado ao enviar o turno: é ele que
+    // ouve o "Kirana, pare" durante a resposta. A proteção contra a própria voz
+    // passou a ser o roteamento em `onresult` (eco + comando) e, fora comandos,
+    // nada do que for ouvido neste período entra na transcrição.
+    // A sessão de reconhecimento é a MESMA: não recriar aqui evita a janela
+    // surda de ~220 ms em que a ordem do usuário seria perdida.
+    transcript = '';
+    interimText = '';
+    sawInterim = false;
+    spokenText = ''; // guarda de eco recomeça a cada turno
 
     pendingTurn = true;
     turnOpen = true;
@@ -655,6 +771,48 @@ export function createVoiceController({
       /* ignora */
     }
     releaseAudio = null;
+  }
+
+  /**
+   * Cancela TUDO o que está tocando ou a caminho — um único caminho para o
+   * botão e para o comando de voz.
+   *
+   * Cobre as quatro formas de áudio continuar depois da interrupção:
+   *   1. o MP3 tocando agora (pause + src removido);
+   *   2. a fila de segmentos ainda não pedidos (`speechQueue`);
+   *   3. as requisições HTTP já abertas (`activeRequests` → AbortController);
+   *   4. os callbacks atrasados (o `epoch` sobe e a geração da fila muda, então
+   *      nenhuma continuação antiga volta a tocar ou a mexer no estado).
+   *
+   * Devolve o instante em que o áudio foi efetivamente silenciado, para a
+   * medição de latência do barge-in.
+   */
+  function cancelPlayback({ engineHint = null } = {}) {
+    epoch += 1; // invalida pedidos/respostas antigas
+    drainGen += 1; // invalida o laço de reprodução em andamento
+    speechQueue = [];
+    buffer = '';
+    abortRequests();
+    releasePlayback();
+    try {
+      browserSpeech?.cancel?.();
+    } catch {
+      /* motor do navegador já parado */
+    }
+    if (currentAudio) {
+      try {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        currentAudio.removeAttribute?.('src');
+        currentAudio.load?.();
+      } catch {
+        /* áudio já liberado */
+      }
+    }
+    currentAudio = null;
+    releaseAudio = null;
+    speaking = false;
+    return now();
   }
 
   function canStreamMp3() {
@@ -875,6 +1033,11 @@ export function createVoiceController({
 
   /** Toca a resposta já pedida ao servidor (streaming quando possível). */
   async function playResponse(response, request, { myEpoch, onPlayStart }) {
+    // Resposta de rede que chegou depois da interrupção: não tocar nada.
+    if (myEpoch !== epoch) {
+      mark('stale_audio_dropped', { segmentId: request?.segment?.segmentId });
+      return;
+    }
     const { segment } = request;
     const audio = new AudioImpl();
     if (!audio?.play) throw new Error('Áudio não suportado neste navegador.');
@@ -1024,6 +1187,10 @@ export function createVoiceController({
    * registro de diagnóstico reflete isso (`ttsFirstByte === playbackStart`).
    */
   async function playBrowserSegment(segment, { myEpoch, onPlayStart }) {
+    if (myEpoch !== epoch) {
+      mark('stale_audio_dropped', { segmentId: segment.segmentId });
+      return;
+    }
     const settings = describeCurrent();
     const voice = settings.voice;
     const startedAt = now();
@@ -1093,6 +1260,11 @@ export function createVoiceController({
    */
   async function drainQueue(myEpoch) {
     if (speaking) return;
+    const myDrain = ++drainGen; // esta execução da fila
+    // Um `await` pode terminar depois de uma interrupção. Só a execução que
+    // ainda é a vigente pode falar, mexer no estado ou liberar `speaking` —
+    // sem isso, um callback atrasado reabria a fila e dois áudios se sobrepunham.
+    const stillCurrent = () => myEpoch === epoch && myDrain === drainGen;
     speaking = true;
     mark('drain_start', { myEpoch, epoch, queued: speechQueue.length });
     let upcoming = null;
@@ -1100,14 +1272,14 @@ export function createVoiceController({
     try {
       // A fila é a mesma para os dois motores; muda só como o segmento nasce.
       const next = () => {
-        if (myEpoch !== epoch || !speechQueue.length) return null;
+        if (!stillCurrent() || !speechQueue.length) return null;
         const segment = speechQueue.shift();
         if (resolveEngine() === ENGINE.BROWSER) return { browser: true, segment };
         const request = requestChunk(segment, myEpoch, { voice: voiceFor(ENGINE.EDGE)?.raw?.shortName ?? null });
         return request;
       };
       upcoming = next();
-      while (upcoming && myEpoch === epoch) {
+      while (upcoming && stillCurrent()) {
         const current = upcoming;
         upcoming = null;
         setState(VOICE_STATE.SPEAKING, { force: state !== VOICE_STATE.SPEAKING });
@@ -1116,8 +1288,9 @@ export function createVoiceController({
           mark('chunk_play_begin', { segmentId: current.segment.segmentId, engine: current.browser ? ENGINE.BROWSER : ENGINE.EDGE });
           if (current.browser) {
             await playBrowserSegment(current.segment, { myEpoch, onPlayStart: () => {
-              if (!upcoming && myEpoch === epoch) upcoming = next();
+              if (!upcoming && stillCurrent()) upcoming = next();
             } });
+            if (!stillCurrent()) return;
             if (!upcoming) upcoming = next();
             continue;
           }
@@ -1125,12 +1298,12 @@ export function createVoiceController({
             myEpoch,
             onPlayStart: () => {
               // Pipeline: já encomenda a próxima frase enquanto esta toca.
-              if (!upcoming && myEpoch === epoch) upcoming = next();
+              if (!upcoming && stillCurrent()) upcoming = next();
             },
           });
           mark('chunk_play_end');
         } catch (error) {
-          if (myEpoch !== epoch) return;
+          if (!stillCurrent()) return;
           const record = diagnostics.at(-1);
           if (record && record.outcome === 'started') record.outcome = error?.code || 'tts_failed';
           history.errors += 1;
@@ -1142,19 +1315,24 @@ export function createVoiceController({
       }
     } finally {
       upcoming?.controller?.abort?.();
-      clearTimeout(stallWatchdog);
-      speaking = false;
-      currentAudio = null;
-      releaseAudio = null;
-      mark('drain_end', { queued: speechQueue.length });
+      if (stillCurrent()) {
+        clearTimeout(stallWatchdog);
+        speaking = false;
+        currentAudio = null;
+        releaseAudio = null;
+      }
+      mark('drain_end', { queued: speechQueue.length, current: stillCurrent() });
     }
 
+    // Uma execução antiga (interrompida) não pode mexer no estado da nova.
+    if (!stillCurrent()) return;
     if (!active) {
       setState(VOICE_STATE.IDLE);
       return;
     }
     if (state === VOICE_STATE.SPEAKING || state === VOICE_STATE.INTERRUPTED) {
-      // Janela surda: absorve a cauda do alto-falante antes de reabrir o mic.
+      // Janela surda curta: absorve a cauda do alto-falante. O microfone
+      // continua aberto (barge-in) — só não aceita transcrição.
       muteUntil = now() + TIMING.muteAfterSpeechMs;
       setState(VOICE_STATE.LISTENING, { reason: 'answer_audio_finished' });
     }
@@ -1192,6 +1370,7 @@ export function createVoiceController({
     if (!spoken || !looksSpeakable(spoken)) return;
     const segment = newSegment(spoken);
     segment.displayed = String(text ?? '').trim();
+    rememberSpoken(spoken); // guarda de eco: isto é o que a Kirana vai dizer
     speechQueue.push(segment);
   }
 
@@ -1310,52 +1489,109 @@ export function createVoiceController({
     buffer = '';
     interimText = '';
     muteUntil = 0;
-    abortRequests();
-    releasePlayback();
-    browserSpeech?.cancel?.();
-    speaking = false;
+    cancelPlayback();
     stopRecognition();
-    if (currentAudio) {
-      try {
-        currentAudio.pause();
-        currentAudio.removeAttribute?.('src');
-        currentAudio.load?.();
-      } catch {
-        /* ignora */
-      }
-    }
-    currentAudio = null;
+    spokenText = '';
     if (!silent) setState(VOICE_STATE.IDLE, { force: true });
+  }
+
+  /**
+   * Barge-in POR VOZ: a Kirana para porque o usuário mandou parar.
+   *
+   * Diferenças em relação à interrupção manual: guarda a latência medida
+   * (detecção → áudio silenciado), não fecha o microfone e devolve o estado de
+   * escuta em seguida. O comando NUNCA é enviado ao modelo.
+   */
+  function bargeIn(command, { detectedAt = now(), heard = '' } = {}) {
+    const stateBefore = state;
+    const turn = turnId;
+    const engine = resolveEngine();
+    history.bargeIns += 1;
+    history.cancellations += 1;
+    muted = true; // nada de texto atrasado voltando a falar neste turno
+    turnOpen = false;
+    pendingTurn = false;
+    clearTimers();
+    clearTimeout(turnWatchdog);
+    clearTimeout(stallWatchdog);
+    transcript = '';
+    interimText = '';
+    sawInterim = false;
+
+    const stoppedAt = cancelPlayback({ engineHint: engine });
+    try {
+      stop?.(); // aborta a geração da resposta: o comando encerra o turno
+    } catch {
+      /* app sem geração ativa */
+    }
+
+    const entry = {
+      turnId: turn,
+      keyword: command?.keyword ?? null,
+      kind: command?.kind ?? null,
+      reason: command?.reason ?? null,
+      heardChars: String(heard ?? '').length,
+      stateBefore,
+      engine,
+      detectedAt,
+      audioStoppedAt: stoppedAt,
+      latencyMs: Math.max(0, stoppedAt - detectedAt),
+    };
+    commandLog.push(entry);
+    if (commandLog.length > 40) commandLog.shift();
+
+    mark('bargein', { keyword: entry.keyword, latencyMs: entry.latencyMs, engine });
+    notice('Parei. Pode falar.');
+    emit('kirana:voice-bargein', entry);
+
+    setState(VOICE_STATE.INTERRUPTED, { force: true, reason: 'voice_command', keyword: entry.keyword });
+    if (!active) return entry;
+
+    // Janela mínima só para a cauda do alto-falante; o microfone continua aberto
+    // e a continuação da fala é aceita (ver `bargeInListenMs` em `onresult`).
+    muteUntil = now() + TIMING.bargeInMuteMs;
+    listenAfterBargeIn = now() + TIMING.bargeInListenMs;
+    resumeListeningAfter(TIMING.bargeInMuteMs, 'after_bargein');
+    return entry;
   }
 
   /** Interrupção (barge-in manual): para o áudio e cancela a resposta. */
   function interrupt({ stopGeneration = true } = {}) {
     history.cancellations += 1;
     muted = true;
-    epoch += 1;
-    speechQueue = [];
-    buffer = '';
     turnOpen = false;
     pendingTurn = false;
     clearTimeout(turnWatchdog);
-    abortRequests();
-    releasePlayback();
-    browserSpeech?.cancel?.();
-    speaking = false;
-    if (currentAudio) {
-      try {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-      } catch {
-        /* ignora */
-      }
-    }
+    clearTimeout(stallWatchdog);
+    cancelPlayback();
+    transcript = '';
+    interimText = '';
+    sawInterim = false;
     if (stopGeneration) stop?.();
-    setState(VOICE_STATE.INTERRUPTED, { force: true });
+    setState(VOICE_STATE.INTERRUPTED, { force: true, reason: 'manual' });
     if (active) {
       muteUntil = now() + TIMING.muteAfterSpeechMs;
-      scheduleResume();
+      // v0.4.4 — a sessão de reconhecimento já não é recriada a cada turno,
+      // então não existe um `onstart` novo para levar o estado de "interrompido"
+      // de volta para "ouvindo". Quem faz isso agora é este temporizador (era o
+      // defeito que deixava o botão preso em "interrompido" depois do toque).
+      resumeListeningAfter(TIMING.muteAfterSpeechMs, 'after_interrupt');
     }
+  }
+
+  /**
+   * Volta ao estado de escuta depois de uma interrupção.
+   *
+   * Separado do `scheduleResume` porque o estado precisa mudar mesmo quando o
+   * reconhecedor continua vivo (sem sessão nova não há `onstart`).
+   */
+  function resumeListeningAfter(delay, reason) {
+    clearTimeout(resumeTimer);
+    resumeTimer = setTimeout(() => {
+      if (!active) return;
+      if (state === VOICE_STATE.INTERRUPTED) setState(VOICE_STATE.LISTENING, { reason });
+      maybeResumeMic();
+    }, delay);
   }
 
   /** Toque no botão: liga, interrompe (se falando/gerando) ou desliga. */
@@ -1397,6 +1633,10 @@ export function createVoiceController({
     get history() {
       return { ...history, states: stateHistory.slice() };
     },
+    /** Comandos de voz detectados, com latência medida (diagnóstico). */
+    get bargeIns() {
+      return commandLog.slice();
+    },
     get queueSize() {
       return speechQueue.length;
     },
@@ -1422,6 +1662,13 @@ export function createVoiceController({
         server,
         states: stateHistory.slice(),
         trace: trace.slice(),
+        bargeIns: commandLog.slice(),
+        counters: { ...history },
+        echoGuard: {
+          blocked: history.echoBlocked,
+          spokenChars: spokenText.length,
+          micDuringPlayback: !micSuspended(),
+        },
         settings: { ...describeCurrent(), voices: { browser: catalog.browser.length, edge: catalog.edge.length } },
       };
     },
@@ -1459,6 +1706,9 @@ export function createVoiceController({
       },
       takeSpeakableSentences,
       micSuspended,
+      commandWindow,
+      bargeIn,
+      isStopCommand,
       isRecognizerLive: () => recognizerLive,
       get transcript() {
         return transcript;

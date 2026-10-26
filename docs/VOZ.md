@@ -17,6 +17,21 @@ apenas a porta de entrada: em vez de digitar, o visitante fala.
                                     <audio> no navegador
 ```
 
+## Interromper por voz (v0.4.4)
+
+Diga **"Kirana, pare"** (ou "Quirana, pare", "pare", "pare de falar", "pode parar",
+"Kirana, silêncio", "stop") durante a resposta: o áudio para, a fila e as
+requisições pendentes são canceladas, o comando **não** é enviado ao modelo e a
+Kirana volta a ouvir — podendo emendar a próxima pergunta.
+
+- O reconhecimento do comando é **local** (`public/voice-commands.js`), sem
+  chamada ao modelo, e vale também para resultado interino.
+- O microfone fica **aberto** durante a resposta (antes era fechado, e por isso a
+  ordem não podia ser ouvida). A autoescuta é impedida pelo roteamento: durante a
+  resposta, o que chega só pode virar comando; nada entra na transcrição.
+- Perguntas que contêm "para" não interrompem; "não pare" também não.
+- `await window.kiranaVoiceReport()` mostra a latência medida de cada interrupção.
+
 ## Texto falado (v0.4.3)
 
 A limpeza do texto é **a mesma** para os dois motores (`public/speech-text.js`):
@@ -290,7 +305,7 @@ caminho, não na voz).
 ## Como testar
 
 ```bat
-testar.bat                      :: suíte completa (298 testes)
+testar.bat                      :: suíte completa (340 testes)
 node test\browser\voice-flow.mjs   :: 34 verificações de navegador com áudio real
 npm run voice:bench             :: mede o provedor de verdade
 ```

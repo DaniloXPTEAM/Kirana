@@ -70,7 +70,7 @@ export function loadConfig(env = process.env) {
 
   const config = {
     appName: 'Kirana',
-    version: '0.4.3',
+    version: '0.4.4',
     env: env.KIRANA_ENV || 'local',
     host: env.KIRANA_HOST || '127.0.0.1',
     port: toInt(env.KIRANA_PORT, 3000),

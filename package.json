@@ -1,6 +1,6 @@
 {
   "name": "kirana-agent",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "private": true,
   "description": "Kirana — agente conversacional da Opportunity AI (Fase 2, execução local, com voz)",
   "type": "module",
