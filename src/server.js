@@ -28,6 +28,7 @@ import { createToolDefinitions } from './tools/definitions.js';
 import { createAgent, mapError } from './agent.js';
 import { createSiteKit } from './copilot/site-kit.js';
 import { createCopilotHandler } from './copilot/runtime.js';
+import { createCopilotIntegration } from './copilot/http.js';
 import { createDemoContact } from './demo-contact.js';
 import { createRateLimiter } from './ratelimit.js';
 import { createVoiceService } from './voice/tts.js';
@@ -121,6 +122,29 @@ export function createKiranaServer(overrides = {}) {
     windowMs: config.rateLimit.windowMs,
   });
 
+  /**
+   * Balde do transporte do agente no navegador (`/api/copilot`, `/api/agui`).
+   * Fica desligado enquanto `KIRANA_AGENT_RATE_MAX` for 0 (padrão), o que
+   * preserva o comportamento das versões anteriores e das suítes de teste. Em
+   * produção define-se um valor finito — ver docs/PRODUCAO.md.
+   */
+  const agentLimiter = config.agentTransportRateLimit?.max > 0
+    ? createRateLimiter({
+        max: config.agentTransportRateLimit.max,
+        windowMs: config.agentTransportRateLimit.windowMs,
+      })
+    : null;
+
+  function checkAgentRate(req) {
+    if (!agentLimiter) return;
+    const result = agentLimiter.check(clientIp(req));
+    if (!result.allowed) {
+      throw new HttpError(429, 'rate_limited', 'Muitas requisições ao agente em pouco tempo. Aguarde um instante.', {
+        retryAfterMs: Math.round(result.retryAfterMs),
+      });
+    }
+  }
+
   const requestLimiter = createRateLimiter({
     max: Math.max(Math.round(config.rateLimit.max / 2), 6),
     windowMs: config.rateLimit.windowMs,
@@ -129,6 +153,16 @@ export function createKiranaServer(overrides = {}) {
   const demoContact = overrides.demoContact ?? createDemoContact({ interests, logger });
   // Voz: modalidade da MESMA agente. Só sintetiza texto; não orquestra nada.
   const voice = overrides.voice ?? createVoiceService({ logger });
+  // Adaptador AG-UI (`/api/agui`). Só é usado quando alguém chama esse caminho;
+  // não inicializa o CopilotKit e não interfere em `/api/copilot`.
+  const agui = overrides.agui ?? createCopilotIntegration({
+    config,
+    agent,
+    sessions,
+    siteKit,
+    logger,
+    getPort: () => server.address()?.port ?? config.port,
+  });
   // CopilotKit é opcional: se a inicialização falhar, a Kirana v0.2.1 segue no ar.
   let copilot = null;
   try {
@@ -325,11 +359,47 @@ export function createKiranaServer(overrides = {}) {
         return;
       }
 
+      /*
+       * NOTA DELIBERADA — `GET /api/copilot/info` responde 405 e isso está certo.
+       *
+       * O runtime do CopilotKit aqui é **single-route**: o cliente descobre o
+       * runtime por `POST /api/copilot {"method":"info"}`, que devolve
+       * `{version, agents:{kirana:…}, singleRoute:{…}}`.
+       *
+       * O cliente v2, em modo `transport: "auto"`, primeiro tenta
+       * `GET <runtimeUrl>/info`: se essa chamada responder 2xx ele assume o
+       * transporte **REST** (`/agent/run`, `/info`…) e passa a mandar requisições
+       * que este runtime não serve — o resultado medido foi HTTP 400
+       * "Missing method field" e painel preso em "conectando…". Com 405 (ou
+       * qualquer não-2xx) ele cai corretamente no single-route e funciona.
+       *
+       * Portanto: NÃO montar GET aqui. A informação do runtime é servida pelo
+       * envelope POST, e é isso que os testes verificam
+       * (`test/copilot-routes.test.js`).
+       */
+
       // CopilotKit / AG-UI (V2). Fica fora do handleApi para preservar o
       // fluxo antigo: nenhuma rota existente muda de comportamento.
       if (url.pathname.startsWith('/api/copilot')) {
         if (!copilot) return sendError(res, 503, 'copilot_unavailable', 'CopilotKit não disponível neste ambiente.');
+        checkAgentRate(req);
         await copilot.handler(req, res);
+        return;
+      }
+
+      /**
+       * POST /api/agui — protocolo AG-UI puro (SSE).
+       *
+       * Existe como transporte alternativo desde a Fase 4 (`npm run
+       * build:widget -- --agui` gera um widget que fala este caminho), mas
+       * nunca esteve montado no servidor: quem chamava recebia 404. A montagem
+       * é ISOLADA — o handler é o mesmo módulo testado (`createCopilotIntegration`)
+       * e só é chamado para o caminho exato; `/api/copilot` não passa por aqui.
+       */
+      if (url.pathname === '/api/agui' || url.pathname === '/api/agui/') {
+        if (!agui) return sendError(res, 503, 'agui_unavailable', 'AG-UI não disponível neste ambiente.');
+        checkAgentRate(req);
+        await agui.handle(req, res, url);
         return;
       }
 

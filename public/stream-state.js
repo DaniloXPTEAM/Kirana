@@ -131,3 +131,46 @@ export function composerView(state) {
 export function isSuccessful(state) {
   return state.sawDone === true && state.sawError !== true && state.reason === 'completed';
 }
+
+/* ------------------------------------------------------------------------- */
+/* Pílula de ferramenta — transporte x resultado                             */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * Rótulos curtos para o motivo real da falha.
+ *
+ * A pílula já foi o ponto onde a UI mentiu: mostrava "· ok" mesmo quando o
+ * evento `tool_result` vinha com `ok: false` (o caso do `unknown_tool` com o
+ * Gateway real). Aqui o rótulo depende do RESULTADO da ferramenta, não do fato
+ * de o stream ter chegado ao fim.
+ */
+const TOOL_ERROR_LABELS = {
+  unknown_tool: 'ferramenta não encontrada',
+  invalid_args: 'argumentos inválidos',
+  timeout: 'tempo esgotado',
+  confirmation_required: 'aguardando confirmação',
+  write_not_allowed: 'escrita bloqueada',
+  request_closed: 'solicitação fechada',
+  request_not_found: 'solicitação não encontrada',
+  endpoint_nao_configurado: 'sem destino configurado',
+  tool_error: 'falhou',
+};
+
+/**
+ * Visão da pílula para um evento de ferramenta.
+ *
+ * @param {{name?:string,title?:string,ok?:boolean,pending?:boolean,errorCode?:string|null}} event
+ * @returns {{label:string, tone:'ok'|'warn'|'fail'}}
+ */
+export function toolPillView({ name, title, ok, pending, errorCode } = {}) {
+  const base = String(title || name || 'ferramenta')
+    .replace(/^Consultar /i, '')
+    .trim() || 'ferramenta';
+
+  if (pending) return { label: `${base} · aguardando`, tone: 'warn' };
+  if (ok === false) {
+    const motivo = TOOL_ERROR_LABELS[errorCode] || 'falhou';
+    return { label: `${base} · ${motivo}`, tone: 'fail' };
+  }
+  return { label: `${base} · ok`, tone: 'ok' };
+}

@@ -26,6 +26,27 @@ const PORT = Number(getArg('port', process.env.MOCK_PORT || 1455));
 const HOST = getArg('host', process.env.MOCK_HOST || '127.0.0.1');
 const KEY = getArg('key', process.env.MOCK_KEY || 'local-mock');
 const DELAY = Number(getArg('delay', process.env.MOCK_DELAY_MS || 25));
+/**
+ * `--namespaced` imita o Gateway REAL v0.4.x: devolve o nome da ferramenta como
+ * `gateway.<nome>` (ver `toNamespacedTools`/`displayToolName` no pacote de
+ * `integrations/`). Serve para testar o caminho que o Windows usa de verdade —
+ * o mock sem essa flag devolve o nome cru e escondia o defeito da v0.5.1.
+ */
+const NAMESPACED = args.includes('--namespaced') || process.env.MOCK_NAMESPACED === 'true';
+const toolName = (name) => (NAMESPACED ? `gateway.${name}` : name);
+/**
+ * `--unknown-tool=<nome>` faz o roteiro pedir uma ferramenta que NÃO existe.
+ *
+ * Serve para verificar de ponta a ponta o caminho `unknown_tool`: o modelo
+ * pede (ex.: `pesquisar_na_web`, que a Kirana nunca teve), a Kirana recusa com
+ * mensagem acionável e a interface precisa mostrar FALHA — não "ok". Sem essa
+ * opção é impossível reproduzir a falha com um mock: ele só pede ferramentas
+ * que existem.
+ */
+const UNKNOWN_TOOL_ARG = args.find((arg) => arg.startsWith('--unknown-tool'));
+const UNKNOWN_TOOL = UNKNOWN_TOOL_ARG
+  ? (UNKNOWN_TOOL_ARG.includes('=') ? UNKNOWN_TOOL_ARG.split('=')[1] : 'pesquisar_na_web')
+  : process.env.MOCK_UNKNOWN_TOOL || '';
 
 const MODELS = ['gpt-6-luna', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-sol', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'];
 
@@ -71,7 +92,17 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok', mode: 'mock', uptime: Math.round(process.uptime()) }));
+    // Mesma forma do Gateway real: `authenticated` diz se a conta está
+    // autorizada. `MOCK_UNAUTHENTICATED=1` simula o Gateway sem consentimento.
+    res.end(
+      JSON.stringify({
+        status: 'ok',
+        mode: 'mock',
+        authenticated: process.env.MOCK_UNAUTHENTICATED !== '1',
+        version: 'mock',
+        uptime: Math.round(process.uptime()),
+      }),
+    );
     return;
   }
 
@@ -79,6 +110,37 @@ const server = http.createServer(async (req, res) => {
   if (!authorized) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: { message: 'Chave inválida no gateway simulado.', type: 'unauthorized' } }));
+    return;
+  }
+
+  /* Endpoints que o Gateway real expõe e que o preflight consulta. */
+  if (req.method === 'GET' && url.pathname === '/auth/status') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        authenticated: process.env.MOCK_UNAUTHENTICATED !== '1',
+        grantedScopes: ['openid', 'profile', 'email', 'offline_access', 'resource.invoke', 'chatgpt.tokens.use.direct'],
+      }),
+    );
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/v1/capabilities') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        capabilities: [
+          { id: 'text.chat' },
+          { id: 'files.create' },
+          { id: 'files.upload' },
+          { id: 'images.analyze' },
+          { id: 'images.generate' },
+          { id: 'video.analyze' },
+          { id: 'audio.transcribe' },
+          { id: 'audio.synthesize' },
+        ],
+      }),
+    );
     return;
   }
 
@@ -117,6 +179,10 @@ const server = http.createServer(async (req, res) => {
       .slice(Math.max(lastUserIndex, 0))
       .some((m) => m.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.length);
     const wantsServices = /servi[cç]o/i.test(userText) && tools.includes('consultar_servicos');
+    // Gatilho exclusivo do `scripts/preflight-gateway.mjs`: valida o contrato de
+    // ferramenta (nome + round-trip) sem depender de um modelo real.
+    const wantsProjectStatus =
+      /verificacao-contrato|status do projeto/i.test(userText) && tools.includes('consultar_status_projeto');
     const wantsInterest = /interesse|contato comercial|falar com a equipe/i.test(userText) && tools.includes('registrar_interesse_comercial');
 
     // Ferramentas de FRONTEND (declaradas pelo site via CopilotKit/AG-UI).
@@ -134,6 +200,22 @@ const server = http.createServer(async (req, res) => {
     });
 
     const id = `chatcmpl-mock-${Date.now()}`;
+
+    if (UNKNOWN_TOOL && !alreadyCalledTool) {
+      const toolCall = {
+        index: 0,
+        id: `call_${Date.now()}`,
+        type: 'function',
+        function: { name: toolName(UNKNOWN_TOOL), arguments: '{}' },
+      };
+      sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: { role: 'assistant', content: '' } }] });
+      sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: { tool_calls: [toolCall] } }] });
+      sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] });
+      sse(res, '[DONE]');
+      res.end();
+      console.log(`[mock-gateway] ferramenta inexistente solicitada: ${toolName(UNKNOWN_TOOL)}`);
+      return;
+    }
 
     if (!alreadyCalledTool && (frontend.navigate || frontend.fill || frontend.submit)) {
       const call = frontend.navigate
@@ -156,7 +238,7 @@ const server = http.createServer(async (req, res) => {
         index: 0,
         id: `call_${Date.now()}`,
         type: 'function',
-        function: { name: call.name, arguments: JSON.stringify(call.args) },
+        function: { name: toolName(call.name), arguments: JSON.stringify(call.args) },
       };
       sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: { role: 'assistant', content: '' } }] });
       sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: { tool_calls: [toolCall] } }] });
@@ -257,7 +339,7 @@ const server = http.createServer(async (req, res) => {
             index: 0,
             delta: {
               tool_calls: [
-                { index: 0, id: `call_${Date.now()}`, type: 'function', function: { name: call.name, arguments: JSON.stringify(call.args) } },
+                { index: 0, id: `call_${Date.now()}`, type: 'function', function: { name: toolName(call.name), arguments: JSON.stringify(call.args) } },
               ],
             },
             finish_reason: null,
@@ -307,7 +389,7 @@ const server = http.createServer(async (req, res) => {
             index: 0,
             delta: {
               tool_calls: [
-                { index: 0, id: `call_${Date.now()}`, type: 'function', function: { name: call.name, arguments: JSON.stringify(call.args) } },
+                { index: 0, id: `call_${Date.now()}`, type: 'function', function: { name: toolName(call.name), arguments: JSON.stringify(call.args) } },
               ],
             },
             finish_reason: null,
@@ -318,6 +400,37 @@ const server = http.createServer(async (req, res) => {
       res.write('data: [DONE]\n\n');
       res.end();
       console.log(`[mock-gateway] ferramenta de site: ${call.name}`);
+      return;
+    }
+
+    if (!alreadyCalledTool && wantsProjectStatus) {
+      await sleep(DELAY);
+      sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null }] });
+      sse(res, {
+        id,
+        object: 'chat.completion.chunk',
+        model: body.model,
+        choices: [
+          {
+            index: 0,
+            delta: {
+              tool_calls: [
+                {
+                  index: 0,
+                  id: `call_${Date.now()}`,
+                  type: 'function',
+                  function: { name: toolName('consultar_status_projeto'), arguments: JSON.stringify({ projeto: 'verificacao-contrato' }) },
+                },
+              ],
+            },
+            finish_reason: null,
+          },
+        ],
+      });
+      sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] });
+      res.write('data: [DONE]\n\n');
+      res.end();
+      console.log(`[mock-gateway] ferramenta de contrato: ${toolName('consultar_status_projeto')}`);
       return;
     }
 
@@ -345,7 +458,8 @@ const server = http.createServer(async (req, res) => {
             index: 0,
             delta: {
               tool_calls: [
-                { index: 0, id: `call_${Date.now()}`, type: 'function', function: { name, arguments: JSON.stringify(toolArgs) } },
+                // toolName(): o Gateway real prefixa TODAS as chamadas, não só as de site.
+                { index: 0, id: `call_${Date.now()}`, type: 'function', function: { name: toolName(name), arguments: JSON.stringify(toolArgs) } },
               ],
             },
             finish_reason: null,

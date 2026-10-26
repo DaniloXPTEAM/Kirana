@@ -1,0 +1,40 @@
+# HTTPS automático (Let's Encrypt) na frente da Kirana.
+#
+# O que este arquivo garante:
+#   - TLS terminado antes da Kirana (token nunca em texto claro);
+#   - cabeçalhos de segurança e nenhum vazamento de versão;
+#   - limite de corpo coerente com KIRANA_MAX_BODY_BYTES (32 KB no padrão);
+#   - SSE sem bufferização (o proxy NÃO pode segurar os eventos do agente).
+
+{$KIRANA_DOMAIN:kirana.example.com} {
+	encode zstd gzip
+
+	# Streaming do agente: sem compressão em SSE e sem buffer.
+	@sse path /api/copilot* /api/agui* /api/chat* /api/voice/*
+	reverse_proxy @sse kirana:3000 {
+		flush_interval -1
+		bufio 0
+	}
+
+	# O resto: tudo igual, corpo limitado.
+	reverse_proxy kirana:3000 {
+		header_up X-Forwarded-For {remote_host}
+	}
+
+	request_body {
+		max_size 8MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}

@@ -83,6 +83,20 @@ export function loadConfig(env = process.env) {
     },
     maxBodyBytes: toInt(env.KIRANA_MAX_BODY_BYTES, 32 * 1024),
     /**
+     * Limite próprio do transporte do agente no navegador (`/api/copilot` e
+     * `/api/agui`).
+     *
+     * Por que existe: essas rotas são públicas (o visitante do site não tem
+     * token) e, até a v0.5.1, passavam SEM limite nenhum — cada requisição
+     * dispara turno de modelo e consome plano do Gateway. O padrão é 0 =
+     * desligado, para preservar exatamente o comportamento testado; em produção
+     * define-se um valor finito (ex.: 60) e o balde passa a valer.
+     */
+    agentTransportRateLimit: {
+      max: toInt(env.KIRANA_AGENT_RATE_MAX, 0),
+      windowMs: toInt(env.KIRANA_RATE_LIMIT_WINDOW_MS, 60_000),
+    },
+    /**
      * Fase 4 — site em que a Kirana atende.
      *
      * `id` é o nome do diretório em `sites/` (a config valida a existência).

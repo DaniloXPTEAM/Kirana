@@ -1,8 +1,9 @@
 # Kirana — agente conversacional da Opportunity AI
 
-**Versão:** 0.5.1 (Fase 5: a Kirana executa solicitações de serviço — `docs/FASE5-SOLICITACOES.md`)
+**Versão:** 0.5.2 (integração com o Gateway real, rotas de contrato e produção — `CHANGELOG.md`)
 **Organização:** Opportunity AI
-**Gateway utilizado:** `Kirana-ChatGPT-Gateway v0.2.0` (não modificado)
+**Gateway utilizado:** `Kirana-ChatGPT-Gateway v0.4.x` (não modificado; contrato em
+[`docs/INTEGRACAO-GATEWAY-REAL.md`](docs/INTEGRACAO-GATEWAY-REAL.md))
 **Data desta entrega:** 26/10/2026
 
 A Kirana é um agente conversacional com identidade própria, sessões, streaming, ferramentas
@@ -14,6 +15,11 @@ ao navegador.
 > Windows (o gateway roda em `http://127.0.0.1:1455`). O que foi validado aqui está descrito em
 > [`docs/RELATORIO-VALIDACAO.md`](docs/RELATORIO-VALIDACAO.md), sem confundir teste simulado com
 > validação real.
+>
+> **Homologação em 3 comandos (Windows, com o Gateway ligado):**
+> `verificar-gateway.bat` → contrato do Gateway real (read-only) ·
+> `homologar.bat --full` → homologação completa, grava tudo em `homologacao/` ·
+> [`docs/HOMOLOGACAO-WINDOWS.md`](docs/HOMOLOGACAO-WINDOWS.md) → roteiro e critérios.
 
 ---
 
@@ -144,6 +150,7 @@ Todas as variáveis são opcionais, exceto a chave do gateway. Valores padrão e
 | `KIRANA_HOST` / `KIRANA_PORT` | Onde a Kirana escuta (`127.0.0.1` / `3000`) |
 | `KIRANA_ACCESS_TOKEN` | Token opcional entre navegador e backend (vazio) |
 | `KIRANA_RATE_LIMIT_MAX` / `_WINDOW_MS` | Limite por IP (`20` / `60000`) |
+| `KIRANA_AGENT_RATE_MAX` | Limite de `/api/copilot` e `/api/agui` por IP (`0` = desligado; use ~60 em produção) |
 | `KIRANA_FIRST_TOKEN_TIMEOUT_MS` | Tempo máximo para o 1º token (`20000`) |
 | `KIRANA_REQUEST_TIMEOUT_MS` | Tempo máximo da requisição (`120000`) |
 | `KIRANA_MAX_TOOL_ROUNDS` | Rodadas de ferramenta por mensagem (`4`) |
@@ -364,6 +371,36 @@ Nenhuma dependência de terceiros: só a biblioteca padrão do Node.
 4. Refinar o prompt com base em conversas reais (perguntas frequentes da Opportunity AI).
 5. Só depois: integração de envio real do interesse comercial e preparação do componente
    incorporável para `https://opportunity.ia.br`.
+
+---
+
+## 11.1 Integração com o Gateway real e produção
+
+| Documento | Conteúdo |
+|---|---|
+| [`docs/INTEGRACAO-GATEWAY-REAL.md`](docs/INTEGRACAO-GATEWAY-REAL.md) | nomes reais das variáveis, autenticação, modelos, streaming, o namespace `gateway.` e as 7 sondas do preflight |
+| [`docs/HOMOLOGACAO-WINDOWS.md`](docs/HOMOLOGACAO-WINDOWS.md) | roteiro de homologação no Windows, critérios de aprovação e o que enviar de volta |
+| [`docs/PRODUCAO.md`](docs/PRODUCAO.md) | arquitetura online, as três opções (com o que cada uma custa e arrisca), segredos, ordem de publicação e rollback |
+| [`docs/AUDITORIA-GATEWAY-v0.5.1.md`](docs/AUDITORIA-GATEWAY-v0.5.1.md) | diagnóstico do defeito do namespace, correções e evidências |
+| [`deploy/`](deploy/README.md) | `Dockerfile`, compose com Caddy, Caddyfile e `.env.production.example` |
+
+> **Por que `GET /api/copilot/info` responde 405:** o runtime é *single-route*. O
+> cliente v2 tenta `GET <runtimeUrl>/info` primeiro e, se receber 2xx, assume o
+> transporte REST — que este runtime não serve (HTTP 400 e painel preso em
+> "conectando…"). Com 405 ele usa o envelope `POST /api/copilot
+> {"method":"info"}`, que devolve `{version, agents:{kirana}, singleRoute}`.
+> Coberto por `test/copilot-routes.test.js`.
+
+**Endpoints de contrato** (nenhum deles devolve credencial):
+
+| Rota | Método | Para quê |
+|---|---|---|
+| `/health` | GET | estado do processo (sem chave) |
+| `/api/site/info` | GET | metadados do site (ferramentas, páginas, rotas, limites) |
+| `/api/copilot/info` | GET | **405 de propósito** — ver nota abaixo |
+| `/api/copilot` | POST | envelope do runtime: `{method:"info"}` devolve `{version, agents}` |
+| `/api/agui` | POST | transporte AG-UI puro (SSE), alternativo |
+| `/api/chat` | POST | SSE da interface vanilla |
 
 ---
 

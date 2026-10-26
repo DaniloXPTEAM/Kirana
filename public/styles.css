@@ -290,6 +290,8 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 .msg-meta .pill.tool-ok { color: #0b7a5b; border-color: #c8ecdf; background: #f1fbf7; }
 .msg-meta .pill.tool-warn { color: var(--warn); border-color: #f5ddbb; background: #fffbf3; }
+/* Falha de ferramenta (não é falha de transporte do stream). */
+.msg-meta .pill.tool-fail { color: #b42318; border-color: #f3c7c3; background: #fff5f4; }
 
 .cursor::after {
   content: ""; display: inline-block; width: 7px; height: 1.05em;

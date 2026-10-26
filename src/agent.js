@@ -16,6 +16,7 @@ import { buildKnowledgePrompt } from './knowledge/index.js';
 import { buildContextMessages } from './sessions.js';
 import { validateGatewayPayload } from './contract.js';
 import { createTurnGraph, initialTurnState } from './graph.js';
+import { canonicalToolName } from './tools/names.js';
 
 export const EVENTS = {
   session: 'session',
@@ -207,11 +208,28 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
 
   /* ------------------------------ ferramentas ----------------------------- */
 
-  function introspectToolCall(call) {
-    const name = call.function?.name;
-    const tool = registry.get(name);
-    const validation = registry.validate(name, call.function?.arguments);
-    return { name, tool, validation };
+  /**
+   * Resolve a chamada vinda do modelo para a ferramenta registrada.
+   *
+   * `rawName` é o que o Gateway devolveu (pode vir como `gateway.<nome>`);
+   * `name` é o nome canônico usado no registro, na interface e nos testes.
+   * Os dois são guardados porque a mensagem de assistente precisa repetir o
+   * nome que o gateway espera na próxima requisição.
+   */
+  function introspectToolCall(call, externalToolMap = null) {
+    const rawName = call.function?.name;
+    const canonical = canonicalToolName(rawName);
+    const tool = registry.get(rawName) ?? registry.get(canonical);
+    // Ferramenta de FRONTEND (declarada pelo site via AG-UI): o mapa é a fonte
+    // de verdade. O Gateway prefixa o nome do mesmo jeito, então a busca aceita
+    // `gateway.<nome>` e `<nome>` — e o evento sai com o nome do site, porque é
+    // esse nome que o navegador conhece.
+    const external = !tool ? (externalToolMap?.get(rawName) ?? externalToolMap?.get(canonical) ?? null) : null;
+    // Nome exibido/registrado: o da ferramenta da Kirana, o declarado pelo site
+    // ou, para nome desconhecido, o canônico (nunca `gateway.<nome>` na tela).
+    const name = tool ? tool.name : external ? external.schema.function.name : canonical || rawName;
+    const validation = tool ? registry.validate(name, call.function?.arguments) : null;
+    return { rawName, canonical, name, tool, external, validation };
   }
 
   async function runReadTool(call, ctx, cache) {
@@ -345,12 +363,14 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
    * Leitura roda de imediato; escrita só cria ação pendente.
    */
   async function handleToolCall({ call, io, allowWrite, pendingActionExists, emit }) {
-    const name = call.function?.name;
-    const tool = registry.get(name);
+    // O Gateway v0.4.x devolve `gateway.<nome>`; tudo daqui para baixo usa o
+    // nome canônico (registro, interface, site_action, HITL).
+    const { name, tool: resolved, external } = introspectToolCall(call, io.externalToolMap);
+    const tool = resolved;
 
     // Ferramenta de frontend: a Kirana apenas anuncia a chamada. Quem executa
     // é a interface do site, via CopilotKit/AG-UI. Nada roda no backend.
-    const externalTool = !tool ? (io.externalToolMap?.get(name) ?? null) : null;
+    const externalTool = external;
     if (externalTool) {
       const validation = externalTool.validate(call.function?.arguments);
       if (!validation.ok) {
@@ -387,7 +407,22 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
 
     if (!tool) {
       emit({ type: EVENTS.toolResult, name, title: name, ok: false, errorCode: 'unknown_tool' });
-      return { content: toolResultContent({ ok: false, erro: { codigo: 'unknown_tool', mensagem: `Ferramenta desconhecida: ${name}` } }) };
+      return {
+        content: toolResultContent({
+          ok: false,
+          erro: {
+            codigo: 'unknown_tool',
+            mensagem: `A ferramenta "${name}" não está registrada nesta instalação da Kirana. Nenhuma ação foi executada.`,
+            // O modelo precisa saber o que EXISTE para escolher outro caminho
+            // em vez de inventar que "a consulta falhou".
+            disponiveis: registry.names(),
+            orientacao:
+              'Use apenas as ferramentas listadas em disponiveis. A Kirana não tem acesso à internet nem pesquisa web: ' +
+              'para assuntos do site Opportunity AI use list_services, explain_service, explain_current_page e get_site_context ' +
+              '(conhecimento real capturado do site).',
+          },
+        }),
+      };
     }
 
     if (tool.kind === 'write' && !allowWrite) {

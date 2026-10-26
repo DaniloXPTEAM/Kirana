@@ -1,5 +1,82 @@
 # Changelog — Kirana
 
+## 0.5.2 — 26/10/2026 (integração com o Gateway real, rotas e produção)
+
+Versão de **correção e preparação**: conserta o defeito que só aparecia com o
+Gateway ChatGPT de verdade, fecha duas rotas que estavam quebradas e prepara a
+publicação. Relatório completo em `docs/AUDITORIA-GATEWAY-v0.5.1.md`,
+`docs/INTEGRACAO-GATEWAY-REAL.md` e `docs/PRODUCAO.md`.
+
+### Corrigido
+- **`unknown_tool` em TODA ferramenta com o Gateway real.** O Gateway v0.4.x
+  devolve o nome da chamada como `gateway.<nome>` (`toNamespacedTools` /
+  `displayToolName`, em `src/responses.js` do pacote). O registro procurava o
+  nome exato. Novo `src/tools/names.js` (`canonicalToolName`) remove **somente**
+  o prefixo `gateway.`; `registry.resolveName()` só aceita o resultado quando a
+  ferramenta existe de fato — nome desconhecido continua desconhecido.
+- **Interface dizia "ok" quando a ferramenta falhava.** `addToolPill` imprimia
+  `· ok` sempre que o evento não era `pending`, ignorando `ok: false`. Agora a
+  pílula deriva do **resultado** (`public/stream-state.js` → `toolPillView`),
+  com motivo por código de erro, estilo `tool-fail` próprio e contador
+  "N ferramentas com falha nesta resposta".
+- **Ferramentas de frontend (AG-UI) não executavam** com o Gateway real pelo
+  mesmo motivo: o mapa era indexado pelo nome declarado. Agora aceita
+  `gateway.<nome>` e emite o nome que o navegador conhece.
+- **`POST /api/agui` respondia 404.** O transporte AG-UI documentado
+  (`npm run build:widget -- --agui`) nunca esteve montado no servidor. Agora está,
+  isolado por caminho exato, e o evento `RUN_STARTED` — que saía **sem o campo
+  `type`**, porque `AGUI.RUN_STARTED` não existia no mapa de constantes — passou a
+  ser emitido corretamente, junto de `RUN_FINISHED` no fechamento do run.
+- **Prompt**: a Kirana passa a declarar que **não tem internet nem busca web** e
+  a diferenciar falha de ferramenta de falha de transporte.
+
+### Adicionado
+- **`scripts/preflight-gateway.mjs`** + `verificar-gateway.bat` — 7 sondas contra
+  o Gateway **real** (`/health`, `/auth/status`, `/v1/models`, `/v1/capabilities`,
+  rigor de payload, streaming com ferramenta e round-trip de `role:"tool"`).
+  Read-only por padrão; `--live` gasta 2 chamadas de modelo. Grava relatório
+  **sem chave e sem token**.
+- **`scripts/homologar-conversa.mjs`** + `homologar.bat` — homologação de ponta a
+  ponta no Windows: doctor, preflight real, suíte, contrato de payload e uma
+  conversa real de 4 turnos que reprova `unknown_tool`, "ok" sem dado, falha sem
+  código de erro, resposta vazia e promessa de pesquisa web.
+- **`POST /api/agui`** (ver acima).
+- **`KIRANA_AGENT_RATE_MAX`** (padrão `0` = desligado) — balde de limite para o
+  transporte público `/api/copilot` e `/api/agui`, que até então não tinham
+  limite nenhum. Desligado por padrão para não alterar comportamento.
+- **`deploy/`** — `Dockerfile`, `docker-compose.yml` (Kirana + Caddy, porta da
+  Kirana não publicada), `Caddyfile` (SSE sem bufferização) e
+  `.env.production.example`.
+- **Docs novos**: `docs/INTEGRACAO-GATEWAY-REAL.md`, `docs/PRODUCAO.md`,
+  `docs/HOMOLOGACAO-WINDOWS.md`, `docs/AUDITORIA-GATEWAY-v0.5.1.md`.
+- **Testes novos**: `test/gateway-namespace.test.js` (8), `test/tool-pill.test.js`
+  (5), `test/copilot-routes.test.js` (7). Total **442 → 449** (medido: `# tests 449 / # pass 449 / # fail 0`).
+
+### Investigado e mantido (com prova)
+- **`GET /api/copilot/info` responde 405 e isso está CORRETO.** Cheguei a montar a
+  rota devolvendo metadados; o teste de navegador reprovou (6/8) e a investigação
+  mostrou por quê: o cliente v2, em `transport: "auto"`, faz `GET <runtimeUrl>/info`
+  e — **se essa chamada responder 2xx** — passa a assumir o transporte **REST**,
+  mandando requisições que um runtime *single-route* não serve (HTTP 400
+  "Missing method field", painel preso em "conectando…"). O runtime info real é
+  servido por `POST /api/copilot {"method":"info"}` → `{version, agents:{kirana},
+  singleRoute}`. O 405 mantém o cliente no caminho certo. Há teste cobrindo os
+  dois lados (`test/copilot-routes.test.js`), e a decisão está comentada em
+  `src/server.js`.
+- **`src/copilot/http.js` deixou de ser código morto** apenas na parte do
+  adaptador AG-UI (`/api/agui`); o trecho que monta o runtime continua sem uso.
+
+### Alterado
+- `scripts/mock-gateway.js` ganhou `--namespaced` (imita o Gateway real),
+  `--unknown-tool=<nome>`, `/auth/status`, `/v1/capabilities` e
+  `authenticated` no `/health`.
+- `test/helpers.js`: `startFakeGateway({ namespaced })`.
+- `test/browser/site-v2.mjs`: porta padrão corrigida (1456 = gateway → 1455 = Kirana).
+
+### Não alterado (de propósito)
+- Gateway ChatGPT, modelos, credenciais, `.env`, `data/`, `sites/`, o site
+  público, as 24 ferramentas e o fluxo da Fase 5.
+
 ## 0.5.1 — 26/10/2026 (Fase 5: a Kirana executa solicitações de serviço)
 
 A Kirana deixa de só explicar: ela **conduz uma solicitação de serviço dentro do

@@ -2,7 +2,7 @@
 /**
  * Teste REAL de navegador (Playwright/Chromium) — widget CopilotKit v2.
  *
- * Espera a Kirana rodando em KIRANA_BASE_URL (padrão http://127.0.0.1:1456) com
+ * Espera a Kirana rodando em KIRANA_BASE_URL (padrão http://127.0.0.1:1455) com
  * o gateway SIMULADO. O que este teste valida de verdade:
  *   - o bundle v2 (`public/widget/kirana-v2.js`) monta numa página real;
  *   - o cliente v2 conecta ao runtime `/api/copilot` (agente `kirana`);
@@ -15,7 +15,9 @@
  */
 import { chromium } from 'playwright';
 
-const BASE = process.env.KIRANA_BASE_URL || 'http://127.0.0.1:1456';
+// O padrão é a Kirana (1455), como nas outras suítes. Antes apontava para 1456,
+// que é o GATEWAY SIMULADO — a suíte falhava ao rodar sem variável de ambiente.
+const BASE = process.env.KIRANA_BASE_URL || 'http://127.0.0.1:1455';
 const results = [];
 let failures = 0;
 

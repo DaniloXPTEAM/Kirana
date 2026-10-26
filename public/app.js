@@ -5,7 +5,7 @@
  * gateway existe no navegador; só um token opcional de acesso local.
  */
 
-import { createStreamState, applyEvent, finalize, composerView } from './stream-state.js';
+import { createStreamState, applyEvent, finalize, composerView, toolPillView } from './stream-state.js';
 import { createVoiceController } from './voice.js';
 
 /**
@@ -354,11 +354,13 @@ function formatMs(ms) {
   return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
 }
 
-function addToolPill(meta, { name, title, ok, pending }) {
-  const label = (title || name).replace(/^Consultar /i, '').replace(/^Registrar /i, 'Registrar ');
-  const cls = pending ? 'pill tool-warn' : ok === false ? 'pill tool-warn' : 'pill tool-ok';
-  meta.appendChild(el('span', { class: cls, text: pending ? `${label} · aguardando` : `${label} · ok` }));
+function addToolPill(meta, { name, title, ok, pending, errorCode }) {
+  // A pílula mostra o RESULTADO da ferramenta. Antes ela imprimia "· ok" mesmo
+  // quando `ok === false` — a interface dizia sucesso para uma falha real.
+  const view = toolPillView({ name, title, ok, pending, errorCode });
+  meta.appendChild(el('span', { class: `pill tool-${view.tone}`, text: view.label }));
   scrollToBottom();
+  return view;
 }
 
 function renderConfirmation(action, { resolved = false, outcome = '' } = {}) {
@@ -670,6 +672,7 @@ async function sendMessage(text) {
   let gotFirstDelta = false;
   let aborted = false;
   let hadError = false;
+  let toolFailures = 0;
   let pendingActionFromTurn = null;
 
   const paint = () => {
@@ -718,10 +721,15 @@ async function sendMessage(text) {
           paint();
           voiceBridge.delta?.(event.text);
           break;
-        case 'tool_result':
+        case 'tool_result': {
           shell.bubble.classList.remove('cursor');
-          addToolPill(shell.meta, { name: event.name, title: event.title, ok: event.ok, pending: event.errorCode === 'confirmation_required' });
+          const pendente = event.errorCode === 'confirmation_required';
+          addToolPill(shell.meta, { name: event.name, title: event.title, ok: event.ok, pending: pendente, errorCode: event.errorCode });
+          // Falha de FERRAMENTA é diferente de falha de TRANSPORTE: o stream
+          // pode terminar bem e a ferramenta ter falhado.
+          if (event.ok === false && !pendente) toolFailures += 1;
           break;
+        }
         case 'confirmation':
           pendingActionFromTurn = event.action;
           break;
@@ -764,6 +772,14 @@ async function sendMessage(text) {
           break;
         }
         case 'done':
+          if (toolFailures > 0) {
+            shell.meta.appendChild(
+              el('span', {
+                class: 'pill tool-fail',
+                text: toolFailures === 1 ? '1 ferramenta com falha nesta resposta' : `${toolFailures} ferramentas com falha nesta resposta`,
+              }),
+            );
+          }
           if (event.ttftMs) shell.meta.appendChild(el('span', { class: 'pill', text: `${formatMs(event.ttftMs)} até 1º token` }));
           if (event.totalMs) shell.meta.appendChild(el('span', { class: 'pill', text: `${formatMs(event.totalMs)} total` }));
           if (event.model) {
@@ -877,7 +893,7 @@ async function confirmAction(action, approve, card) {
         buffer += event.text;
         paint();
       } else if (event.type === 'tool_result') {
-        addToolPill(shell.meta, { name: event.name, title: event.title, ok: event.ok });
+        addToolPill(shell.meta, { name: event.name, title: event.title, ok: event.ok, errorCode: event.errorCode });
       } else if (event.type === 'done') {
         if (event.totalMs) shell.meta.appendChild(el('span', { class: 'pill', text: `${formatMs(event.totalMs)} total` }));
         markCardResolved(card, approve ? 'Ação executada com confirmação.' : 'Ação cancelada por você.');

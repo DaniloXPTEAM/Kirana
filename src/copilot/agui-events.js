@@ -9,6 +9,13 @@
  */
 
 export const AGUI = {
+  // Ciclo de vida do run. Fazem parte do protocolo AG-UI e são emitidos pelo
+  // ADAPTADOR (`/api/agui`); no caminho do runtime oficial quem os emite é o
+  // BuiltInAgent do CopilotKit — por isso não são produzidos pelo tradutor.
+  RUN_STARTED: 'RUN_STARTED',
+  RUN_FINISHED: 'RUN_FINISHED',
+  STEP_STARTED: 'STEP_STARTED',
+  STEP_FINISHED: 'STEP_FINISHED',
   TEXT_MESSAGE_START: 'TEXT_MESSAGE_START',
   TEXT_MESSAGE_CONTENT: 'TEXT_MESSAGE_CONTENT',
   TEXT_MESSAGE_END: 'TEXT_MESSAGE_END',

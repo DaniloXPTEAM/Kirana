@@ -9,6 +9,7 @@
  * - timeout por ferramenta e resultados sempre estruturados.
  */
 import { validateJsonSchema } from '../validation.js';
+import { canonicalToolName } from './names.js';
 
 export class ToolError extends Error {
   constructor(message, code = 'tool_error') {
@@ -38,6 +39,23 @@ export function createToolRegistry({ tools = [], logger } = {}) {
     list,
     has: (name) => byName.has(name),
     get: (name) => byName.get(name) ?? null,
+
+    /**
+     * Traduz o nome devolvido pelo modelo para o nome registrado.
+     *
+     * O Gateway v0.4.x devolve `gateway.<nome>`; o registro usa `<nome>`. A
+     * conversão só aceita o resultado quando ele existe de fato — nome
+     * desconhecido continua desconhecido (nunca "chuta" outra ferramenta).
+     */
+    resolveName(raw) {
+      const name = typeof raw === 'string' ? raw : '';
+      if (byName.has(name)) return name;
+      const canonical = canonicalToolName(name);
+      return byName.has(canonical) ? canonical : name;
+    },
+
+    /** Nomes registrados — usado para explicar `unknown_tool` ao modelo. */
+    names: () => [...byName.keys()],
     readTools: () => list().filter((t) => t.kind === 'read'),
     writeTools: () => list().filter((t) => t.kind === 'write'),
 

@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!deploy/.env.production.example
 
 # dados locais (sessões, memória, interesses comerciais)
 data/
@@ -18,3 +19,6 @@ coverage/
 # Python
 __pycache__/
 *.pyc
+
+# Relatórios gerados por homologar.bat / preflight (não versionar)
+homologacao/

@@ -21,8 +21,15 @@ export const silentLogger = (() => {
  *   { toolCalls: [{ name, args, id }] } -> chamada de ferramenta
  *   { status: 500, error: '...' }       -> erro HTTP
  *   { hang: true }                      -> não responde (para testar timeout)
+ *
+ * `namespaced: true` reproduz o comportamento do Gateway REAL v0.4.x: ele
+ * envolve as ferramentas do cliente em um namespace (`gateway`) e devolve os
+ * nomes como `gateway.<nome>` (ver `integrations/Kirana-ChatGPT-Gateway-*.zip`,
+ * `src/responses.js` → `displayToolName`/`toNamespacedTools`). Sem essa opção o
+ * mock devolve o nome cru — e é justamente essa diferença que escondeu o defeito
+ * da v0.5.1.
  */
-export async function startFakeGateway({ script, apiKey = 'test-key' } = {}) {
+export async function startFakeGateway({ script, apiKey = 'test-key', namespaced = false } = {}) {
   const requests = [];
   let callIndex = 0;
 
@@ -71,7 +78,10 @@ export async function startFakeGateway({ script, apiKey = 'test-key' } = {}) {
           index,
           id: call.id || `call_${callIndex}_${index}`,
           type: 'function',
-          function: { name: call.name, arguments: JSON.stringify(call.args ?? {}) },
+          function: {
+            name: namespaced ? `gateway.${call.name}` : call.name,
+            arguments: JSON.stringify(call.args ?? {}),
+          },
         }));
         // Envia em pedaços para exercitar o parser de SSE.
         res.write(`data: ${JSON.stringify({ id, choices: [{ index: 0, delta: { tool_calls: toolCalls.slice(0, 1) } }] })}\n\n`);

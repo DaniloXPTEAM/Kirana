@@ -117,6 +117,12 @@ export async function* runKiranaTurn({ agent, sessions, siteKit, logger, input, 
     for (const event of translator.fail(error?.message || 'Erro interno no adaptador.', error?.code || 'adapter_error')) {
       yield event;
     }
+  } finally {
+    // Fecha o run SEMPRE (sucesso, abort ou erro). `AGUI.RUN_FINISHED` existia
+    // como constante, mas não estava no mapa: o `RUN_STARTED` saía sem `type`
+    // (`type: undefined` é removido pelo JSON) e um cliente AG-UI de verdade
+    // nunca reconheceria o início do run.
+    yield { type: AGUI.RUN_FINISHED, threadId, runId };
   }
 }
 
