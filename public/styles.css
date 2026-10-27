@@ -293,6 +293,11 @@ ul { margin: 0; padding: 0; list-style: none; }
 /* Falha de ferramenta (não é falha de transporte do stream). */
 .msg-meta .pill.tool-fail { color: #b42318; border-color: #f3c7c3; background: #fff5f4; }
 
+/* Modo embed (/?embed=1): painel do site, sem barra lateral do operador. */
+body.kirana-embed .app { grid-template-columns: 1fr; }
+body.kirana-embed .sidebar,
+body.kirana-embed #sidebar-open { display: none !important; }
+
 .cursor::after {
   content: ""; display: inline-block; width: 7px; height: 1.05em;
   margin-left: 2px; vertical-align: -0.18em; border-radius: 2px;

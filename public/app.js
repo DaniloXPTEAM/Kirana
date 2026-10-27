@@ -9,6 +9,19 @@ import { createStreamState, applyEvent, finalize, composerView, toolPillView } f
 import { createVoiceController } from './voice.js';
 
 /**
+ * Modo embed (`/?embed=1`) — usado quando a interface é aberta dentro do iframe
+ * do site (ver `public/widget/kirana-embed.js`).
+ *
+ * O painel embutido não precisa da barra lateral (conversas, ferramentas,
+ * status): ela existe para o operador local. Esconder por CSS evita mudar
+ * qualquer lógica e mantém a interface completa quando aberta direto.
+ */
+if (new URLSearchParams(location.search).get('embed') === '1') {
+  document.documentElement.dataset.kiranaEmbed = '1';
+  document.addEventListener('DOMContentLoaded', () => document.body.classList.add('kirana-embed'));
+}
+
+/**
  * Fase 4: contexto do site e execução de ações autorizadas.
  *
  * A Kirana só sabe onde o visitante está se o navegador contar. A página é

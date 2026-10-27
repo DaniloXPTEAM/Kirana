@@ -50,7 +50,9 @@ publicação. Relatório completo em `docs/AUDITORIA-GATEWAY-v0.5.1.md`,
 - **Docs novos**: `docs/INTEGRACAO-GATEWAY-REAL.md`, `docs/PRODUCAO.md`,
   `docs/HOMOLOGACAO-WINDOWS.md`, `docs/AUDITORIA-GATEWAY-v0.5.1.md`.
 - **Testes novos**: `test/gateway-namespace.test.js` (8), `test/tool-pill.test.js`
-  (5), `test/copilot-routes.test.js` (7). Total **442 → 449** (medido: `# tests 449 / # pass 449 / # fail 0`).
+  (5), `test/copilot-routes.test.js` (7), `test/production-config.test.js` (15).
+  Total **442 → 464** (medido: `# tests 464 / # pass 464 / # fail 0`) e navegador
+  **79/79** (15 + 18 + 8 + 26 + 12) nas duas configurações de gateway.
 
 ### Investigado e mantido (com prova)
 - **`GET /api/copilot/info` responde 405 e isso está CORRETO.** Cheguei a montar a
@@ -65,6 +67,37 @@ publicação. Relatório completo em `docs/AUDITORIA-GATEWAY-v0.5.1.md`,
   `src/server.js`.
 - **`src/copilot/http.js` deixou de ser código morto** apenas na parte do
   adaptador AG-UI (`/api/agui`); o trecho que monta o runtime continua sem uso.
+
+### Produção (preparação para hospedagem)
+- **CORS com lista fechada** (`src/cors.js`): o preflight `OPTIONS` não devolvia
+  `Access-Control-Allow-Origin`, então o widget no site (outra origem) nunca
+  conseguiria conversar. Agora a origem é liberada pelo `site.json` +
+  `KIRANA_ALLOWED_ORIGINS`, nunca `*`. O runtime do CopilotKit responde `*` por
+  padrão e foi contido por `enforceCors` (sem tocar no runtime).
+- **`KIRANA_TRUST_PROXY`**: atrás de proxy, `remoteAddress` é o proxy — todos os
+  visitantes caíam no mesmo balde e o limite por IP virava limite **global**.
+  Com a flag, o IP vem de `X-Forwarded-For` (só quando habilitada; o cabeçalho é
+  forjável quando exposto direto).
+- **`KIRANA_ENV=production`**: passa a exigir `KIRANA_ACCESS_TOKEN` para subir, e
+  as rotas privadas (`GET /api/sessions`, `GET /api/session/:id`, `GET
+  /api/memory`) passam a exigir autenticação — antes listavam **todas** as
+  conversas e a memória para qualquer um. Em `development` nada muda.
+- **`KIRANA_EMBED_ORIGINS`**: `frame-ancestors` por lista de domínios (o
+  `KIRANA_ALLOW_EMBED` existente liberava `*`, ou seja, qualquer site).
+- **`validateProductionConfig`** + `doctor`: as travas viram verificação no
+  START, não texto de documentação.
+
+### Integração com o site
+- **`public/widget/kirana-embed.js`** — kit de incorporação em um único
+  `<script>`: botão flutuante + painel em iframe da própria Kirana (chamadas
+  same-origin; nenhuma credencial no site). Modo alternativo `mode="script"`
+  monta o widget v2 direto na página.
+- **`/?embed=1`** — modo do painel embutido (esconde a barra lateral do
+  operador), sem mudar a interface normal.
+- **`test/browser/site-embed.mjs`** — teste de navegador com **duas origens
+  reais**: página estática num servidor separado inclui só o script, o iframe
+  abre (frame-ancestors autorizou), o visitante conversa, a ferramenta executa e
+  o conteúdo do site permanece intacto. 12/12.
 
 ### Alterado
 - `scripts/mock-gateway.js` ganhou `--namespaced` (imita o Gateway real),

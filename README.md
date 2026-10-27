@@ -151,6 +151,10 @@ Todas as variáveis são opcionais, exceto a chave do gateway. Valores padrão e
 | `KIRANA_ACCESS_TOKEN` | Token opcional entre navegador e backend (vazio) |
 | `KIRANA_RATE_LIMIT_MAX` / `_WINDOW_MS` | Limite por IP (`20` / `60000`) |
 | `KIRANA_AGENT_RATE_MAX` | Limite de `/api/copilot` e `/api/agui` por IP (`0` = desligado; use ~60 em produção) |
+| `KIRANA_ENV` | `development` (padrão) ou `production` (exige token e fecha as rotas privadas) |
+| `KIRANA_TRUST_PROXY` | Confia em `X-Forwarded-For` do proxy (`false`; **ligue** atrás de Caddy/Nginx) |
+| `KIRANA_ALLOWED_ORIGINS` | Origens extras autorizadas a chamar a Kirana (CORS), além do `site.json` |
+| `KIRANA_EMBED_ORIGINS` | Origens autorizadas a embutir a interface em iframe (`frame-ancestors`) |
 | `KIRANA_FIRST_TOKEN_TIMEOUT_MS` | Tempo máximo para o 1º token (`20000`) |
 | `KIRANA_REQUEST_TIMEOUT_MS` | Tempo máximo da requisição (`120000`) |
 | `KIRANA_MAX_TOOL_ROUNDS` | Rodadas de ferramenta por mensagem (`4`) |
@@ -383,6 +387,8 @@ Nenhuma dependência de terceiros: só a biblioteca padrão do Node.
 | [`docs/PRODUCAO.md`](docs/PRODUCAO.md) | arquitetura online, as três opções (com o que cada uma custa e arrisca), segredos, ordem de publicação e rollback |
 | [`docs/AUDITORIA-GATEWAY-v0.5.1.md`](docs/AUDITORIA-GATEWAY-v0.5.1.md) | diagnóstico do defeito do namespace, correções e evidências |
 | [`deploy/`](deploy/README.md) | `Dockerfile`, compose com Caddy, Caddyfile e `.env.production.example` |
+| [`docs/GATEWAY-MUDANCAS-PARA-PRODUCAO.md`](docs/GATEWAY-MUDANCAS-PARA-PRODUCAO.md) | item por item, o que o projeto **separado** do Gateway precisa mudar para operar online (nada é alterado aqui) |
+| [`docs/INTEGRACAO-SITE.md`](docs/INTEGRACAO-SITE.md) | como incluir a Kirana no site com um único `<script>` (kit `kirana-embed.js`) |
 
 > **Por que `GET /api/copilot/info` responde 405:** o runtime é *single-route*. O
 > cliente v2 tenta `GET <runtimeUrl>/info` primeiro e, se receber 2xx, assume o

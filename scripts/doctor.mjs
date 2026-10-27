@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 
-import { loadConfig, loadEnvFile, PROJECT_ROOT } from '../src/config.js';
+import { loadConfig, loadEnvFile, validateProductionConfig, PROJECT_ROOT } from '../src/config.js';
 import { createGatewayClient } from '../src/gateway.js';
 import { createLogger } from '../src/logger.js';
 import { createVoiceService } from '../src/voice/tts.js';
@@ -31,6 +31,21 @@ const logger = createLogger({ level: 'error', secrets: [config.gateway.apiKey] }
 const major = Number(process.versions.node.split('.')[0]);
 const minor = Number(process.versions.node.split('.')[1]);
 record('Node.js', major > 20 || (major === 20 && minor >= 6) ? 'ok' : 'fail', `v${process.versions.node} (necessário >= 20.6)`);
+
+// Perfil de execução e travas de produção (mesmas regras do start).
+{
+  const { fatal, avisos } = validateProductionConfig(config);
+  record(
+    'Perfil',
+    config.env === 'production' ? 'ok' : 'warn',
+    config.env === 'production'
+      ? 'production (rotas privadas exigem token)'
+      : 'development (uso local) — em produção defina KIRANA_ENV=production',
+  );
+  for (const problema of fatal) record('Produção (bloqueia)', 'fail', problema);
+  for (const aviso of avisos) record('Produção (aviso)', 'warn', aviso);
+  if (config.env === 'production' && fatal.length === 0) record('Produção', 'ok', 'configuração mínima atendida');
+}
 
 record(
   'Chave do gateway',

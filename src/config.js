@@ -83,6 +83,28 @@ export function loadConfig(env = process.env) {
     },
     maxBodyBytes: toInt(env.KIRANA_MAX_BODY_BYTES, 32 * 1024),
     /**
+     * Perfil de execução.
+     *
+     * `production` liga as travas que não podem existir só na documentação:
+     *   - rotas privadas (listar TODAS as sessões, memória, conteúdo de conversa
+     *     alheia) passam a exigir autenticação;
+     *   - exige `KIRANA_ACCESS_TOKEN` (senão o servidor não sobe);
+     *   - exige pelo menos uma origem permitida e limite do transporte > 0.
+     * Em `development` (padrão) nada disso muda, e as suítes seguem iguais.
+     */
+    env: String(env.KIRANA_ENV || 'development').trim().toLowerCase() === 'production' ? 'production' : 'development',
+    /**
+     * Confia em `X-Forwarded-For`/`X-Forwarded-Proto` do proxy (Caddy/Nginx).
+     * SEM isso, todo visitante aparece com o IP do proxy: o limite por IP passa
+     * a ser um limite GLOBAL e o primeiro visitante derruba o site inteiro.
+     */
+    trustProxy: toBool(env.KIRANA_TRUST_PROXY, false),
+    /** Origens extras autorizadas a chamar a Kirana (além do `site.json`). */
+    allowedOrigins: String(env.KIRANA_ALLOWED_ORIGINS || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean),
+    /**
      * Limite próprio do transporte do agente no navegador (`/api/copilot` e
      * `/api/agui`).
      *
@@ -109,6 +131,16 @@ export function loadConfig(env = process.env) {
     },
     // Apenas para prévias em sandbox/iframe de outra origem. Não usar em produção.
     allowEmbed: toBool(env.KIRANA_ALLOW_EMBED, false),
+    /**
+     * Origens que podem embutir a interface em iframe (modo de integração com o
+     * site). Preferível a `allowEmbed`: em vez de liberar TODO mundo
+     * (`frame-ancestors *`), libera só os domínios listados.
+     * Ex.: KIRANA_EMBED_ORIGINS=https://opportunity.ia.br
+     */
+    embedOrigins: String(env.KIRANA_EMBED_ORIGINS || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean),
     gateway: {
       url: (env.KIRANA_GATEWAY_URL || 'http://127.0.0.1:1455').replace(/\/+$/, ''),
       apiKey: gatewayApiKey,
@@ -171,4 +203,39 @@ export function publicApiConfig(config, extras = {}) {
     limits: config.rateLimit,
     timeouts: { firstTokenMs: config.gateway.firstTokenTimeoutMs },
   };
+}
+
+/**
+ * Travas de produção — avaliadas no start e no `doctor`.
+ *
+ * A ideia é simples: o que impede um backend público de vazar dado ou de abrir
+ * a conta do Gateway não pode morar só na documentação. Estas verificações
+ * rodam quando `KIRANA_ENV=production`; em desenvolvimento não mudam nada.
+ *
+ * @returns {{fatal:string[], avisos:string[]}}
+ */
+export function validateProductionConfig(config) {
+  const fatal = [];
+  const avisos = [];
+  if (config.env !== 'production') return { fatal, avisos };
+
+  if (!config.accessToken) {
+    fatal.push('KIRANA_ACCESS_TOKEN vazio: as rotas privadas (sessões, memória, conteúdo de conversa) ficariam abertas.');
+  }
+  if (!config.trustProxy) {
+    avisos.push('KIRANA_TRUST_PROXY=false: atrás de proxy, todos os visitantes compartilham o mesmo IP e o limite por IP vira limite global.');
+  }
+  if (!(config.agentTransportRateLimit?.max > 0)) {
+    avisos.push('KIRANA_AGENT_RATE_MAX=0: /api/copilot e /api/agui ficam sem limite. Cada chamada consome o plano do Gateway.');
+  }
+  if (config.allowedOrigins.length === 0) {
+    avisos.push('KIRANA_ALLOWED_ORIGINS vazio: só as origens do site.json poderão chamar a Kirana. Confirme que o domínio publicado está lá.');
+  }
+  if (/^http:\/\//.test(config.gateway.url)) {
+    avisos.push('KIRANA_GATEWAY_URL em HTTP sem TLS: aceitável só se for loopback/ túnel privado no mesmo host.');
+  }
+  if (config.allowEmbed) {
+    avisos.push('KIRANA_ALLOW_EMBED=true: qualquer site poderá embutir a interface.');
+  }
+  return { fatal, avisos };
 }

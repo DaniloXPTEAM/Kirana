@@ -166,11 +166,15 @@ export function serveStatic(publicDir, urlPath, res) {
  * desenvolvimento que exibem a interface dentro de um iframe de outra origem.
  * Em uso normal (padrão) a interface só pode ser enquadrada pela própria origem.
  */
-export function securityHeaders({ allowEmbed = false } = {}) {
+export function securityHeaders({ allowEmbed = false, embedOrigins = [] } = {}) {
+  // Lista explícita tem prioridade: libera o iframe só para os domínios do site.
+  // Nesse caso `X-Frame-Options` é omitido (ele não aceita lista; quem decide é
+  // o `frame-ancestors` do CSP, que os navegadores atuais respeitam).
+  const lista = (embedOrigins ?? []).map((item) => String(item).trim()).filter(Boolean);
   return {
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'no-referrer',
-    'X-Frame-Options': allowEmbed ? 'ALLOWALL' : 'SAMEORIGIN',
+    ...(lista.length ? {} : { 'X-Frame-Options': allowEmbed ? 'ALLOWALL' : 'SAMEORIGIN' }),
     'Content-Security-Policy': [
       "default-src 'self'",
       "img-src 'self' data:",
@@ -182,7 +186,7 @@ export function securityHeaders({ allowEmbed = false } = {}) {
       "media-src 'self' blob:",
       "base-uri 'none'",
       "form-action 'none'",
-      `frame-ancestors ${allowEmbed ? '*' : "'self'"}`,
+      `frame-ancestors ${lista.length ? lista.join(' ') : allowEmbed ? '*' : "'self'"}`,
     ].join('; '),
     // `microphone=(self)` libera o microfone apenas para esta origem (o botão
     // de voz usa SpeechRecognition). Câmera e geolocalização seguem bloqueadas.

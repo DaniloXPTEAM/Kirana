@@ -10,7 +10,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { loadConfig, loadEnvFile, publicApiConfig, PROJECT_ROOT } from './config.js';
+import { loadConfig, loadEnvFile, publicApiConfig, validateProductionConfig, PROJECT_ROOT } from './config.js';
 import { createLogger } from './logger.js';
 import { createGatewayClient } from './gateway.js';
 import { createSessionStore } from './sessions.js';
@@ -29,6 +29,7 @@ import { createAgent, mapError } from './agent.js';
 import { createSiteKit } from './copilot/site-kit.js';
 import { createCopilotHandler } from './copilot/runtime.js';
 import { createCopilotIntegration } from './copilot/http.js';
+import { corsFor, enforceCors } from './cors.js';
 import { createDemoContact } from './demo-contact.js';
 import { createRateLimiter } from './ratelimit.js';
 import { createVoiceService } from './voice/tts.js';
@@ -48,6 +49,19 @@ export function createKiranaServer(overrides = {}) {
   const envFileLoaded = loadEnvFile(path.join(PROJECT_ROOT, '.env'));
   const config = overrides.config ?? loadConfig(process.env);
   const logger = overrides.logger ?? createLogger({ level: config.logLevel, secrets: [config.gateway.apiKey, config.accessToken] });
+
+  /**
+   * Travas de produção: falham no START, não em produção. Um backend público
+   * com `KIRANA_ENV=production` e sem `KIRANA_ACCESS_TOKEN` exporia as conversas
+   * de todos os visitantes — melhor não subir.
+   */
+  const producao = validateProductionConfig(config);
+  for (const aviso of producao.avisos) logger.warn(`Produção: ${aviso}`);
+  if (producao.fatal.length) {
+    const detalhe = producao.fatal.join(' | ');
+    logger.error(`Configuração de produção inválida: ${detalhe}`);
+    if (!overrides.allowUnsafeProduction) throw new Error(`Configuração de produção inválida: ${detalhe}`);
+  }
   const catalog = overrides.catalog ?? loadCatalog({ logger });
   const sessions = overrides.sessions ?? createSessionStore({ dataDir: config.dataDir, logger });
   const memory = overrides.memory ?? createMemoryStore({ dataDir: config.dataDir, limits: config.agent, logger });
@@ -175,7 +189,26 @@ export function createKiranaServer(overrides = {}) {
 
   /* ------------------------------ utilidades ----------------------------- */
 
-  const clientIp = (req) => req.socket?.remoteAddress || 'local';
+  /**
+   * IP do cliente.
+   *
+   * Atrás de proxy (Caddy/Nginx) o socket é SEMPRE o proxy. Com
+   * `KIRANA_TRUST_PROXY=true` usamos o primeiro IP de `X-Forwarded-For`, que é o
+   * do visitante. Sem isso, todos os visitantes compartilham um único balde e o
+   * limite de uso vira um limite global (o primeiro visitante derruba o site).
+   *
+   * A confiança é explícita: nunca lemos o cabeçalho por padrão, porque ele é
+   * forjável quando o servidor está exposto direto.
+   */
+  const clientIp = (req) => {
+    if (config.trustProxy) {
+      const forwarded = String(req.headers['x-forwarded-for'] || '')
+        .split(',')[0]
+        .trim();
+      if (forwarded) return forwarded;
+    }
+    return req.socket?.remoteAddress || 'local';
+  };
 
   function assertAuth(req) {
     if (!config.accessToken) return;
@@ -187,20 +220,32 @@ export function createKiranaServer(overrides = {}) {
     }
   }
 
-  /** Bloqueia chamadas vindas de outra origem (proteção básica contra CSRF). */
+  /**
+   * Bloqueia chamadas de origem não autorizada (proteção básica contra CSRF).
+   *
+   * Usa a MESMA política do CORS (`src/cors.js`): mesma origem **ou** origem
+   * listada em `site.json` / `KIRANA_ALLOWED_ORIGINS`. Antes exigia Host
+   * idêntico, o que impedia o site público (outra origem) de chamar a Kirana —
+   * exatamente o cenário de produção.
+   */
   function assertSameOrigin(req) {
-    const origin = req.headers.origin;
-    if (!origin) return;
-    const host = req.headers.host;
-    try {
-      const parsed = new URL(origin);
-      if (host && parsed.host !== host) {
-        throw new HttpError(403, 'forbidden_origin', 'Origem não permitida.');
-      }
-    } catch (error) {
-      if (error instanceof HttpError) throw error;
-      throw new HttpError(403, 'forbidden_origin', 'Origem inválida.');
-    }
+    if (!req.headers.origin) return; // cliente que não é navegador
+    if (req.kiranaCors?.allowed) return;
+    throw new HttpError(403, 'forbidden_origin', 'Origem não permitida.');
+  }
+
+  /**
+   * Rotas privadas: em produção exigem autenticação.
+   *
+   * Por que existe: `GET /api/sessions` devolve TODAS as conversas (os títulos
+   * são mensagens do visitante) e `GET /api/memory` devolve a memória do
+   * assistente. Em localhost isso é conveniência de desenvolvimento; num backend
+   * público é vazamento de dado de terceiros. Em `development` (padrão) nada
+   * muda em relação às versões anteriores.
+   */
+  function assertPrivate(req) {
+    if (config.env !== 'production') return;
+    assertAuth(req);
   }
 
   function checkVoiceRate(req) {
@@ -310,10 +355,21 @@ export function createKiranaServer(overrides = {}) {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const method = req.method || 'GET';
 
-    for (const [key, value] of Object.entries(securityHeaders({ allowEmbed: config.allowEmbed }))) res.setHeader(key, value);
+    for (const [key, value] of Object.entries(securityHeaders({ allowEmbed: config.allowEmbed, embedOrigins: config.embedOrigins }))) res.setHeader(key, value);
+
+    // CORS: o site público (outra origem) precisa poder chamar a Kirana.
+    // Lista fechada — nunca `*` — vinda do site.json + KIRANA_ALLOWED_ORIGINS.
+    const cors = corsFor(req, { siteKit, extraOrigins: config.allowedOrigins });
+    req.kiranaCors = cors;
+    for (const [key, value] of Object.entries(cors.headers)) res.setHeader(key, value);
+    if (req.headers.origin && !cors.allowed) {
+      logger.warn('Origem não autorizada', { origin: cors.origin });
+    }
 
     try {
       if (method === 'OPTIONS') {
+        // Preflight do navegador: responde só com os cabeçalhos já definidos.
+        // Origem fora da lista recebe 204 SEM CORS e o navegador bloqueia.
         res.writeHead(204, { Allow: 'GET,POST,DELETE,OPTIONS' });
         res.end();
         return;
@@ -383,6 +439,9 @@ export function createKiranaServer(overrides = {}) {
       if (url.pathname.startsWith('/api/copilot')) {
         if (!copilot) return sendError(res, 503, 'copilot_unavailable', 'CopilotKit não disponível neste ambiente.');
         checkAgentRate(req);
+        // O runtime responde `Access-Control-Allow-Origin: *` por padrão: aqui a
+        // lista fechada da Kirana prevalece (ver src/cors.js → enforceCors).
+        enforceCors(res, cors);
         await copilot.handler(req, res);
         return;
       }
@@ -399,6 +458,7 @@ export function createKiranaServer(overrides = {}) {
       if (url.pathname === '/api/agui' || url.pathname === '/api/agui/') {
         if (!agui) return sendError(res, 503, 'agui_unavailable', 'AG-UI não disponível neste ambiente.');
         checkAgentRate(req);
+        enforceCors(res, cors);
         await agui.handle(req, res, url);
         return;
       }
@@ -629,6 +689,7 @@ export function createKiranaServer(overrides = {}) {
     }
 
     if (route === '/api/sessions' && method === 'GET') {
+      assertPrivate(req);
       sendJson(res, 200, { sessions: sessions.list() });
       return;
     }
@@ -649,6 +710,7 @@ export function createKiranaServer(overrides = {}) {
         return;
       }
       if (method === 'GET') {
+        assertPrivate(req);
         sendJson(res, 200, publicSession(session));
         return;
       }
@@ -663,6 +725,7 @@ export function createKiranaServer(overrides = {}) {
 
     /* ----------------------------- memória -------------------------- */
     if (route === '/api/memory' && method === 'GET') {
+      assertPrivate(req);
       sendJson(res, 200, { items: memory.list() });
       return;
     }

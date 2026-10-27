@@ -1,86 +1,92 @@
-> **Fase 4 (v0.5.0):** este documento descreve a integração da v0.3.x (widget
-> CopilotKit v1 + ações de demonstração). Para o agente residente no site
-> Opportunity AI — conhecimento real, contexto de página, allowlist de rotas,
-> ferramentas de site e widget v2 — leia **`docs/FASE4-AUDITORIA.md`**. O que está
-> aqui continua válido para os sites de demonstração.
+# Incorporar a Kirana no site Opportunity AI
 
-# Integração com o site (Fase F — ainda não executada)
+Um `<script>`, zero credencial. O site continua sendo o site: a Kirana conversa
+com o backend dela por dentro de um iframe/painel. Nenhuma chave, token ou
+endereço de Gateway fica no HTML público.
 
-Este documento **não autoriza publicação**. Ele registra o caminho técnico previsto para
-incorporar a Kirana em `https://opportunity.ia.br` quando a Fase 1 estiver validada e aprovada.
+> Status: **pronto e testado em mock** (`test/browser/site-embed.mjs`, 12/12, com
+> duas origens reais). **Não publicado.** A publicação depende de a Kirana estar
+> hospedada (ver `docs/GATEWAY-MUDANCAS-PARA-PRODUCAO.md` para o lado do Gateway e
+> `deploy/` para o lado da Kirana).
 
-## 1. Situação atual
-
-- A Kirana roda **apenas localmente** (`127.0.0.1:3000`).
-- O gateway roda em `127.0.0.1:1455` e **não pode** ser exposto à internet.
-- A autorização *Sign in with ChatGPT* é pessoal: não é base para servir inferência irrestrita a
-  visitantes de um site público. Ver `docs/SEGURANCA-PRIVACIDADE.md`, seção 4.
-
-## 2. Topologia recomendada
-
-```text
-visitante → HTTPS site → /kirana-api (proxy reverso) → backend Kirana (container)
-                                                          ↓ rede privada
-                                                   gateway autorizado
-```
-
-Regras:
-
-1. Somente o **backend** da Kirana fica exposto, atrás de HTTPS e proxy reverso.
-2. O gateway continua em rede privada (`127.0.0.1`), nunca publicado.
-3. A chave do gateway continua só no backend, em variável de ambiente/secret.
-4. Nada de chave ou token no bundle JavaScript.
-
-## 3. Componente incorporável (previsto)
-
-Sem iframe inicialmente; o mais simples é um *bundle* próprio:
+## 1. O que colocar na página
 
 ```html
-<!-- futuro, não publicar ainda -->
-<script src="https://opportunity.ia.br/kirana/kirana-widget.js" defer></script>
-<kirana-chat
-  api-base="https://opportunity.ia.br/kirana-api"
-  greeting="Oi! Eu sou a Kirana, assistente da Opportunity AI."
-></kirana-chat>
+<script src="https://kirana.SEUDOMINIO/widget/kirana-embed.js"
+        data-kirana-url="https://kirana.SEUDOMINIO"
+        data-kirana-site="opportunity-ai"
+        defer></script>
 ```
 
-Alternativas e quando usar:
+Atributos:
 
-| Abordagem | Prós | Contras |
+| Atributo | Obrigatório | Para que serve |
 |---|---|---|
-| Web component + fetch | Estilo consistente, sem iframe, acessível | Precisa de CORS e CSP do site |
-| iframe same-origin (`/kirana/`) | Isolamento de CSS/JS, simples de versionar | Altura dinâmica, foco e SEO pioram |
-| Página dedicada (`/kirana`) | Zero integração | Não aparece no site |
+| `data-kirana-url` | sim | endereço público da Kirana (sem barra no fim) |
+| `data-kirana-site` | não | identifica o site nas métricas/sessões |
+| `data-kirana-mode` | não | `iframe` (padrão) ou `script` (widget v2 direto na página) |
+| `data-kirana-label` | não | texto do botão flutuante (padrão: "Falar com a Kirana") |
+| `data-kirana-open` | não | `1` abre o painel já na carga |
 
-Recomendação: **web component** em `kirana-widget.js`, reutilizando `public/app.js` como base,
-com CSS escopado (`:host`/shadow DOM) para não colidir com o tema do site.
+Modo `script` monta o widget v2 dentro da própria página (sem iframe). Ele exige
+que a origem do site esteja em `KIRANA_ALLOWED_ORIGINS` — é mais integrado, mas
+mistura estilos; o modo `iframe` é o recomendado e o testado.
 
-## 4. Ajustes necessários no backend antes de publicar
+## 2. O que precisa estar configurado na Kirana (servidor)
 
-1. **Autenticação real por usuário/sessão** (o `KIRANA_ACCESS_TOKEN` atual é local).
-2. **CORS explícito** para `https://opportunity.ia.br` (hoje só mesma origem).
-3. **Cotas por visitante** além do rate limit por IP (ex.: 10 mensagens/hora).
-4. **Armazenamento durável** (banco) com retenção definida e expurgo automático.
-5. **Fila/limite de concorrência** para não saturar o gateway.
-6. **Métricas** de TTFT, tempo total, erros e uso de ferramentas sem PII.
-7. **Consentimento e aviso de privacidade** no primeiro uso do widget.
-8. **Isolamento de sessão** por visitante (hoje, uma instalação = um conjunto de dados).
+```bash
+KIRANA_ENV=production
+KIRANA_ACCESS_TOKEN=<token forte>            # sem isto o servidor não sobe
+KIRANA_TRUST_PROXY=true                      # atrás de Caddy/Nginx
+KIRANA_ALLOWED_ORIGINS=https://opportunity.ia.br,https://www.opportunity.ia.br
+KIRANA_EMBED_ORIGINS=https://opportunity.ia.br,https://www.opportunity.ia.br
+KIRANA_AGENT_RATE_MAX=60
+KIRANA_GATEWAY_URL=<Gateway de produção>
+KIRANA_GATEWAY_API_KEY=<chave do Gateway de produção>
+```
 
-## 5. Checklist de publicação
+`KIRANA_EMBED_ORIGINS` é o que autoriza o iframe (`frame-ancestors`). Sem ela, o
+navegador bloqueia o painel embutido — de propósito: lista fechada, nunca `*`.
 
-- [ ] Fase 1 validada contra o gateway real (relatório atualizado)
-- [ ] Comparação Luna x Sol concluída com dados reais
-- [ ] Meta de 2 s avaliada e decisão registrada (manter ou revisar a meta)
-- [ ] Revisão dos termos de uso aplicáveis à conta usada no gateway
-- [ ] Arquitetura multiusuário + autenticação + cotas
-- [ ] Revisão de privacidade (LGPD) e texto de consentimento
-- [ ] Teste de carga e de abuso (prompt injection, spam, custo)
-- [ ] Aprovação explícita da Opportunity AI
-- [ ] Publicação em ambiente separado (staging) antes de produção
+## 3. Verificação antes de publicar o site
 
-## 6. O que não fazer
+```bash
+# 1) a Kirana sobe com a config de produção?
+node scripts/doctor.mjs            # mostra "Perfil: production" e as travas
 
-- Não publicar `127.0.0.1:1455` em nenhum cenário.
-- Não colocar a `GATEWAY_API_KEY` no frontend "só para testar".
-- Não usar a conta pessoal do ChatGPT como backend de um site público sem revisar os termos.
-- Não reaproveitar o gateway como API pública de terceiros.
+# 2) o iframe é permitido só pela origem do site?
+curl -sI https://kirana.SEUDOMINIO/ | grep -i "content-security-policy"
+#    frame-ancestors https://opportunity.ia.br https://www.opportunity.ia.br
+
+# 3) o preflight responde à origem do site e recusa outra?
+curl -si -X OPTIONS https://kirana.SEUDOMINIO/api/chat \
+  -H "Origin: https://opportunity.ia.br" -H "Access-Control-Request-Method: POST" \
+  | grep -i "access-control-allow-origin"
+curl -si -X OPTIONS https://kirana.SEUDOMINIO/api/chat \
+  -H "Origin: https://sitedeoutrapessoa.com" -H "Access-Control-Request-Method: POST" \
+  | grep -i "access-control-allow-origin"     # deve vir vazio
+
+# 4) conversa real, pelo endereço público
+curl -s https://kirana.SEUDOMINIO/api/status | head -5
+```
+
+## 4. Ensaio local do painel embutido (o que o teste automatiza)
+
+```bash
+# terminal 1 — Kirana autorizando o site de teste a embutir
+KIRANA_EMBED_ORIGINS=http://127.0.0.1:3010 node src/server.js
+
+# terminal 2 — página estática (servidor separado, outra origem) e o teste
+node test/browser/site-embed.mjs
+```
+
+O teste cria uma página em `127.0.0.1:3010` que contém **apenas** o `<script>`,
+abre a Kirana em `:3000` (ou na porta configurada) e verifica 12 pontos: script
+carrega, botão aparece, iframe abre, `frame-ancestors` autorizou, o visitante
+conversa, a ferramenta roda (`Listar soluções · ok`), não há `gateway.` nem
+segredo no DOM, e o conteúdo/textos do site continuam intactos.
+
+## 5. Reversão
+
+Remover a linha do `<script>` devolve o site ao estado anterior. Nada no site
+guarda estado da Kirana.
