@@ -217,6 +217,40 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // Gatilho genérico de teste: força UMA chamada a uma ferramenta nomeada.
+    // Uso: MOCK_FORCE_TOOL=navigate_to_page. Serve para exercitar as diretivas
+    // de site (site_action) sem depender de um modelo real.
+    const FORCE_TOOL = process.env.MOCK_FORCE_TOOL || '';
+    if (FORCE_TOOL && !alreadyCalledTool && tools.includes(FORCE_TOOL)) {
+      const forced = {
+        index: 0,
+        id: `call_${Date.now()}`,
+        type: 'function',
+        function: {
+          name: toolName(FORCE_TOOL),
+          arguments: JSON.stringify(
+            FORCE_TOOL === 'navigate_to_page'
+              ? { path: /contato/i.test(userText) ? '/contato' : '/solucoes/' }
+              : FORCE_TOOL === 'explain_current_page'
+                ? {}
+                : {},
+          ),
+        },
+      };
+      sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: { role: 'assistant', content: '' } }] });
+      sse(res, {
+        id,
+        object: 'chat.completion.chunk',
+        model: body.model,
+        choices: [{ index: 0, delta: { tool_calls: [forced] } }],
+      });
+      sse(res, { id, object: 'chat.completion.chunk', model: body.model, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] });
+      sse(res, '[DONE]');
+      res.end();
+      console.log(`[mock-gateway] ferramenta forçada pelo teste: ${FORCE_TOOL}`);
+      return;
+    }
+
     if (!alreadyCalledTool && (frontend.navigate || frontend.fill || frontend.submit)) {
       const call = frontend.navigate
         ? { name: 'navigateToPage', args: { page: /contato/i.test(userText) ? 'contato' : 'solucoes' } }
