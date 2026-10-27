@@ -1,5 +1,50 @@
 # Changelog — Kirana
 
+## 0.5.3 (correção 1) — 27/10/2026 (continuação com várias ferramentas: fim do HTTP 400)
+
+Correção de um defeito de **contexto**, encontrado com o Gateway ChatGPT v0.4.0
+em execução: quando o modelo pedia duas ou mais ferramentas **no mesmo turno**,
+as ferramentas executavam e a interface mostrava `ok`, mas a continuação morria
+com `HTTP 400 invalid_request_error` ("Responses API rejected the request").
+Auditoria completa em `entregas/AUDITORIA-400-CONTINUACAO.md`.
+
+### Corrigido
+- **Resultados de chamadas paralelas eram descartados no contexto**
+  (`src/sessions.js`, `buildContextMessages`). A regra exigia que a mensagem
+  imediatamente anterior a um `tool` fosse o `assistant` dono da chamada — o que
+  só vale com uma ferramenta por turno. Com N chamadas no mesmo turno, do
+  segundo resultado em diante era descartado enquanto o `assistant` continuava
+  anunciando todas as chamadas. O Gateway traduz cada `assistant.tool_calls` em
+  `function_call` e cada `tool` em `function_call_output`; sem o output
+  correspondente, a Responses API responde 400. Agora o dono do grupo é o
+  `assistant` mais recente que declara aquela chamada, e todos os resultados
+  legítimos são preservados com o `toolCallId` original. Resultados duplicados
+  são enviados uma única vez; resultado com id de outro turno continua sendo
+  descartado; grupo incompleto continua saindo inteiro do contexto.
+- **Versão do log divergia do pacote** (`src/config.js`). `version` era o
+  literal `'0.5.0'`: o log dizia "Kirana v0.5.0" rodando o build v0.5.3. Agora
+  vem do `package.json` (`APP_VERSION`), fonte única.
+
+### Adicionado
+- **Barreira de contrato para emparelhamento de ferramentas**
+  (`src/contract.js`, `validateToolCallPairing`). Detecta `tool_calls` sem
+  resultado, resultado órfão e resultado duplicado **antes** de enviar a
+  continuação, com erro local claro em vez de 400 da rede. É opt-in
+  (`checkToolPairing`) e ligada em `src/agent.js`; chamadas ainda em execução
+  podem ser isentadas via `pendingToolCallIds` (ação pendente de confirmação já
+  é isenta automaticamente).
+- **`test/tool-pairing.test.js`** — 15 testes de regressão: uma, duas e três
+  ferramentas no mesmo turno; turnos distintos; id incorreto; resultado
+  duplicado; histórico incompleto; resposta final do modelo depois das
+  ferramentas; barreira de contrato; versão em fonte única.
+
+### Notas
+- Protocolo do Gateway **não** mudou; chamadas paralelas continuam habilitadas.
+- Nenhuma mudança em autenticação, ferramentas, RAG, memória, voz, site ou
+  dados persistidos. Nada a alterar do lado do Gateway.
+- Homologação com o Gateway real em execução segue pendente de teste no
+  ambiente Windows (os testes desta correção usam upstream simulado).
+
 ## 0.5.2 — 26/10/2026 (integração com o Gateway real, rotas e produção)
 
 Versão de **correção e preparação**: conserta o defeito que só aparecia com o

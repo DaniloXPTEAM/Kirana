@@ -11,6 +11,23 @@ import { fileURLToPath } from 'node:url';
 
 export const PROJECT_ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 
+/**
+ * Versão da aplicação — fonte única é o `package.json`.
+ *
+ * Antes era uma string literal aqui ('0.5.0') e ficou defasada em relação ao
+ * pacote: o log dizia "Kirana v0.5.0" rodando o build v0.5.3, o que atrapalha
+ * auditoria e suporte. Lido uma vez, no carregamento do módulo; se o arquivo
+ * estiver ilegível a Kirana não sobe com uma versão inventada.
+ */
+function readPackageVersion() {
+  const raw = fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf8');
+  const version = JSON.parse(raw).version;
+  if (typeof version !== 'string' || !version.trim()) throw new Error('package.json sem campo "version" válido');
+  return version.trim();
+}
+
+export const APP_VERSION = readPackageVersion();
+
 function parseEnvFile(text) {
   const out = {};
   for (const rawLine of text.split(/\r?\n/)) {
@@ -70,7 +87,7 @@ export function loadConfig(env = process.env) {
 
   const config = {
     appName: 'Kirana',
-    version: '0.5.0',
+    version: APP_VERSION,
     env: env.KIRANA_ENV || 'local',
     host: env.KIRANA_HOST || '127.0.0.1',
     port: toInt(env.KIRANA_PORT, 3000),

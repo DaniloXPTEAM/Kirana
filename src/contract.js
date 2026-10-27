@@ -33,16 +33,107 @@ export const MESSAGE_KEYS = Object.freeze({
 const TOOL_FUNCTION_KEYS = ['name', 'description', 'parameters', 'strict'];
 
 /**
+ * Emparelhamento entre chamadas e resultados de ferramenta.
+ *
+ * O Gateway v0.4.0 converte `assistant.tool_calls` em itens `function_call` e
+ * mensagens `tool` em `function_call_output` (Responses API), que exige o
+ * `call_id` de cada output casando com um `function_call` anterior. Um
+ * `function_call` sem output faz a Responses API responder
+ * `400 invalid_request_error` — foi a causa do defeito de 27/10/2026
+ * (resultados de chamadas paralelas descartados em buildContextMessages).
+ *
+ * Esta checagem é a barreira do lado da Kirana: roda sobre as mensagens que
+ * serão ENVIADAS (já reparadas por buildContextMessages), então detecta
+ * regressão antes da rede, com erro local claro.
+ *
+ * Estados intermediários legítimos: uma chamada ainda em execução é declarada
+ * em `pendingToolCallIds` e não é cobrada — é o caso de ferramenta de frontend
+ * entregue ao navegador ou de turno interrompido no meio do grupo de
+ * ferramentas. A chamada continua sendo exigida em qualquer outro caso.
+ *
+ * @param {Array<object>} messages mensagens já no formato do Gateway
+ * @param {{ pendingToolCallIds?: string[] }} [options]
+ * @returns {Array<{path: string, message: string}>}
+ */
+export function validateToolCallPairing(messages, { pendingToolCallIds = [] } = {}) {
+  const errors = [];
+  if (!Array.isArray(messages)) return errors;
+
+  const pending = new Set(
+    (Array.isArray(pendingToolCallIds) ? pendingToolCallIds : []).filter((id) => typeof id === 'string' && id),
+  );
+
+  // Dono de cada índice: `tool` cujo id não pertence ao `assistant` mais
+  // recente é resultado órfão (id errado, duplicado fora de ordem ou colado
+  // depois de outro turno).
+  const owners = new Map(); // tool_call_id -> índice do assistant dono (o último que declarou)
+  const results = new Map(); // tool_call_id -> índices das mensagens tool
+
+  messages.forEach((message, index) => {
+    if (message?.role === 'assistant' && Array.isArray(message.tool_calls)) {
+      for (const call of message.tool_calls) {
+        if (typeof call?.id === 'string' && call.id) owners.set(call.id, index);
+      }
+      return;
+    }
+    if (message?.role !== 'tool') return;
+    const id = message.tool_call_id;
+    if (typeof id !== 'string' || !id) return; // já reportado pela validação de forma
+    const list = results.get(id) || [];
+    list.push(index);
+    results.set(id, list);
+  });
+
+  messages.forEach((message, index) => {
+    if (message?.role === 'assistant' && Array.isArray(message.tool_calls)) {
+      for (const call of message.tool_calls) {
+        const id = typeof call?.id === 'string' ? call.id : '';
+        if (!id || pending.has(id)) continue;
+        const at = results.get(id) || [];
+        if (!at.some((resultIndex) => resultIndex > index)) {
+          errors.push({
+            path: `messages[${index}]`,
+            message: `chamada de ferramenta sem resultado correspondente: "${id}"`,
+          });
+        }
+      }
+      return;
+    }
+    if (message?.role !== 'tool') return;
+    const id = message.tool_call_id;
+    if (typeof id !== 'string' || !id) return;
+    const at = results.get(id) || [];
+    if (at.length > 1 && at[0] !== index) {
+      errors.push({ path: `messages[${index}]`, message: `resultado duplicado para a chamada "${id}"` });
+      return;
+    }
+    const ownerIndex = owners.get(id);
+    if (ownerIndex === undefined || ownerIndex > index) {
+      errors.push({ path: `messages[${index}]`, message: `resultado sem chamada correspondente antes dele: "${id}"` });
+    }
+  });
+
+  return errors;
+}
+
+/**
  * @param {object} payload
- * @param {{ allowOptInFields?: boolean, requireSystemPrompt?: boolean }} [options]
+ * @param {{ allowOptInFields?: boolean, requireSystemPrompt?: boolean, checkToolPairing?: boolean, pendingToolCallIds?: string[] }} [options]
  *   allowOptInFields=false (padrão) trata temperature/max_tokens/tool_choice
  *   como violação — é a configuração esperada com o Gateway v0.2.0.
  *   requireSystemPrompt=true exige a mensagem de sistema inicial — é uma
  *   invariante do AGENTE, verificada em src/agent.js, não uma exigência do
  *   gateway (que aceita conversas sem system).
+ *   checkToolPairing=true liga a checagem de emparelhamento
+ *   `assistant.tool_calls` ↔ `tool.tool_call_id` (validateToolCallPairing).
+ *   Fica desligada por padrão para não mudar o contrato de FORMATO; a
+ *   continuação do agente liga explicitamente em src/agent.js.
  * @returns {Array<{path: string, message: string}>}
  */
-export function validateGatewayPayload(payload, { allowOptInFields = false, requireSystemPrompt = false } = {}) {
+export function validateGatewayPayload(
+  payload,
+  { allowOptInFields = false, requireSystemPrompt = false, checkToolPairing = false, pendingToolCallIds = [] } = {},
+) {
   const errors = [];
   const push = (path, message) => errors.push({ path, message });
 
@@ -140,6 +231,13 @@ export function validateGatewayPayload(payload, { allowOptInFields = false, requ
       if (!fn.parameters || typeof fn.parameters !== 'object') push(where, 'function.parameters deve ser objeto');
       else if (fn.parameters.type !== 'object') push(where, 'function.parameters.type deve ser "object"');
     });
+  }
+
+  // Barreira adicional: chamada de ferramenta sem resultado faz a Responses API
+  // responder 400 na continuação. Ligada explicitamente por quem monta a
+  // continuação (src/agent.js).
+  if (checkToolPairing) {
+    errors.push(...validateToolCallPairing(payload.messages, { pendingToolCallIds }));
   }
 
   return errors;

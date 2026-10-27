@@ -150,9 +150,14 @@ export function createAgent({ config, gateway, registry, sessions, memory, logge
     const messages = [{ role: 'system', content: system }, ...history.map(toApiMessage)];
 
     // Invariante do agente: conversa sempre começa pela identidade da Kirana.
+    // checkToolPairing: barreira adicional contra continuação com `tool_calls`
+    // sem resultado — a Responses API recusa com 400 (defeito de 27/10/2026).
+    // Uma ação pendente de confirmação é estado intermediário legítimo e fica
+    // isenta, assim como qualquer chamada declarada em `pendingToolCallIds`.
+    const pendingToolCallIds = session.pendingAction?.toolCallId ? [session.pendingAction.toolCallId] : [];
     const problems = validateGatewayPayload(
       { model: 'validacao-interna', messages, stream: true },
-      { allowOptInFields: true, requireSystemPrompt: true },
+      { allowOptInFields: true, requireSystemPrompt: true, checkToolPairing: true, pendingToolCallIds },
     );
     if (problems.length) {
       throw Object.assign(new Error(`Contexto inválido para o gateway: ${problems.map((p) => `${p.path}: ${p.message}`).join(' | ')}`), {

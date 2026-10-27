@@ -154,34 +154,68 @@ export function createSessionStore({ dataDir, logger }) {
 /**
  * Prepara o histórico para envio ao modelo:
  * - mantém apenas as últimas N mensagens;
- * - remove mensagens `tool` órfãs e chamadas de ferramenta sem resultado;
+ * - remove mensagens `tool` órfãs, resultados duplicados e chamadas de
+ *   ferramenta sem resultado;
+ * - preserva TODOS os resultados de um turno com várias ferramentas;
  * - garante que o contexto comece com uma mensagem de usuário.
+ *
+ * Regra do grupo de ferramentas (correção de 27/10/2026)
+ * ------------------------------------------------------
+ * O Gateway v0.4.0 traduz cada mensagem para o formato da Responses API, onde
+ * todo `function_call` PRECISA de um `function_call_output` com o mesmo
+ * `call_id`. A versão anterior exigia que a mensagem imediatamente anterior a
+ * uma mensagem `tool` fosse o `assistant` dono da chamada — regra que só vale
+ * quando o modelo pede UMA ferramenta por turno. Com duas ou mais chamadas
+ * paralelas, o segundo resultado em diante era descartado enquanto o
+ * `assistant` continuava anunciando todas as chamadas; a continuação chegava
+ * ao Gateway com um `function_call` sem output e a Responses API respondia
+ * `400 invalid_request_error`.
+ *
+ * Agora o dono do grupo é o `assistant` mais recente que declara aquela
+ * chamada, e cada resultado é aceito se o `toolCallId` pertence a ele — não
+ * importa quantos resultados venham em sequência.
  */
 export function buildContextMessages(messages, limit = 24) {
   const visible = (Array.isArray(messages) ? messages : []).filter((m) => !m.hidden);
   const slice = visible.slice(-Math.max(2, limit));
 
-  // Índices das chamadas de ferramenta que possuem resultado correspondente.
-  const answeredIds = new Set(slice.filter((m) => m.role === 'tool' && m.toolCallId).map((m) => m.toolCallId));
+  // O contexto precisa começar com usuário (depois da mensagem de sistema).
+  // Feito no início para que nada anterior ao primeiro `user` sobreviva e
+  // deixe um `tool` sem dono na cabeça do recorte.
+  let start = 0;
+  while (start < slice.length && slice[start].role !== 'user') start += 1;
 
   const repaired = [];
-  for (let i = 0; i < slice.length; i += 1) {
+  let owner = null; // assistant dono do grupo de ferramentas em curso
+  const keptToolIds = new Set(); // evita enviar o mesmo resultado duas vezes
+
+  // Um resultado só conta para a chamada se vier DEPOIS dela.
+  const hasResultAfter = (id, from) =>
+    slice.some((m, j) => j > from && m.role === 'tool' && m.toolCallId === id);
+
+  for (let i = start; i < slice.length; i += 1) {
     const msg = slice[i];
     if (msg.role === 'tool') {
-      if (!msg.toolCallId || !answeredIds.has(msg.toolCallId)) continue;
-      const previous = repaired[repaired.length - 1];
-      if (!previous || previous.role !== 'assistant' || !previous.toolCalls?.length) continue;
+      if (!msg.toolCallId || !owner) continue; // sem dono: órfão
+      if (!owner.toolCalls?.some((call) => call.id === msg.toolCallId)) continue; // id não pertence ao grupo
+      if (keptToolIds.has(msg.toolCallId)) continue; // duplicado
+      keptToolIds.add(msg.toolCallId);
       repaired.push(msg);
       continue;
     }
     if (msg.role === 'assistant' && msg.toolCalls?.length) {
-      const allAnswered = msg.toolCalls.every((call) => answeredIds.has(call.id));
-      if (!allAnswered) continue; // chamada pendente/sem resultado: fora do contexto
+      const allAnswered = msg.toolCalls.every((call) => hasResultAfter(call.id, i));
+      if (!allAnswered) {
+        owner = null; // chamada pendente/sem resultado: o grupo inteiro sai
+        continue;
+      }
+      owner = msg;
+      repaired.push(msg);
+      continue;
     }
+    owner = null; // qualquer outra mensagem encerra o grupo
     repaired.push(msg);
   }
 
-  // O contexto precisa começar com usuário (depois da mensagem de sistema).
-  while (repaired.length && repaired[0].role !== 'user') repaired.shift();
   return repaired;
 }

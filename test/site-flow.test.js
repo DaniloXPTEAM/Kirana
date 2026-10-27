@@ -11,10 +11,14 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import path from 'node:path';
 
 import { startFakeGateway, startKirana, postSse, getJson, textFrom } from './helpers.js';
 import { createSiteBridge, safePath } from '../public/site-agent.js';
+
+/** Versão do pacote — fonte única de versão da aplicação (src/config.js). */
+const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 async function newSession(base) {
   const response = await fetch(`${base}/api/session`, {
@@ -235,7 +239,8 @@ test('voz e demais rotas da v0.4.4 continuam respondendo com o site ligado', asy
     const config = await getJson(kirana.base, '/api/config');
     assert.equal(config.status, 200);
     assert.equal(config.body.site.id, 'opportunity-ai');
-    assert.equal(config.body.version, '0.5.0');
+    // Versão vem do package.json (fonte única) — não fixar o literal aqui.
+    assert.equal(config.body.version, pkg.version);
     assert.ok(config.body.models?.primary, 'modelos preservados');
     assert.ok(config.body.features, 'flags preservadas');
 
