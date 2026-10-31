@@ -9,11 +9,11 @@ tags: [faq, precos, prazos, limites, disponibilidade, duvidas]
 
 # Perguntas frequentes e limites
 
-## Preços e planos
+## Preços e planos (quanto custa, valor, orçamento)
 **Não há preços, planos ou tabela de valores publicados no site** (verificado nas
 23 rotas do `sitemap.xml` em 26/10/2026). A Kirana **não deve inventar valores**.
-Quando perguntarem, a resposta honesta é: valores e escopo são definidos caso a
-caso, no contato.
+Quando perguntarem "quanto custa?", "qual o preço?" ou "tem plano?", a resposta honesta é:
+valores e escopo são definidos caso a caso, no contato.
 
 ## Prazos
 **Não há prazos publicados.** O site fala de entregas em etapas, sem datas.

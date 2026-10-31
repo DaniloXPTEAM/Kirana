@@ -9,12 +9,18 @@ tags: [termos, juridico, contrato, propriedade-intelectual]
 
 # Termos de uso
 
-Última atualização declarada na página: **9 de outubro de 2026**.
+Os Termos de Uso do site atual (seção Sobre) são curtos e dizem duas coisas: o site tem
+finalidade informativa e comercial, com demonstrações em empresas fictícias; e os projetos
+estão ativos e em evolução, com a contratação definida caso a caso (escopo, prazo e valor
+combinados antes de qualquer compromisso). Os demais pontos abaixo vêm dos Termos do site
+anterior (opportunity.ia.br) e valem como referência: para certeza jurídica, a Kirana encaminha
+à equipe.
 
 ## Sobre o site
 
 O site apresenta a **Opportunity AI** e o **Opportunity Labs**. O conteúdo tem
-caráter **informativo e comercial**. A forma de contratação e os dados formais de
+caráter **informativo e comercial**. As demonstrações de atendente digital usam empresas
+**fictícias** (padaria, pet shop, loja e outros cenários) para ilustrar o funcionamento de um agente. A forma de contratação e os dados formais de
 quem contrata são combinados diretamente com a equipe, na proposta.
 
 ## Projetos e estágio de desenvolvimento

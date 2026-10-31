@@ -32,7 +32,7 @@ publicidade. Na versão de avaliação do site, o envio **abre o WhatsApp** com 
 preenchida.
 
 ## Contato direto
-WhatsApp: **(85) 99946-2763** — alternativa a preencher o formulário.
+WhatsApp: **(85) 99946-2763** (conversa direta com quem desenvolve o projeto) e e-mail **rafael@opportunity.ia.br** (propostas e parcerias). Alternativas a preencher o formulário.
 
 ## Privacidade (https://opportunity.ia.br/privacidade)
 
@@ -42,9 +42,9 @@ WhatsApp: **(85) 99946-2763** — alternativa a preencher o formulário.
 - Finalidade: responder ao contato e apresentar informações sobre as soluções; a
   base legal é o **consentimento** (caixa do formulário).
 - Compartilhamento: os dados não são vendidos; podem ser tratados por provedores
-  de infraestrutura que hospedam o site e processam o formulário (ex.: Cloudflare).
+  de infraestrutura que hospedam o site e processam o formulário, em nome da Opportunity AI.
 - Cookies e métricas: o site **não usa cookies de publicidade nem ferramentas de
   medição de audiência**.
 - Direitos do titular: confirmação, acesso, correção, anonimização, eliminação,
   portabilidade e revogação do consentimento, pelo e-mail de contato.
-- Última atualização da política no site: **9 de outubro de 2026**.
+- Última atualização da política no site: **31 de outubro de 2026**. Pedidos de direitos do titular: rafael@opportunity.ia.br.

@@ -1,5 +1,32 @@
 # Changelog — Kirana
 
+## Dossiê completo da Opportunity AI para a Kirana do site — 31/10/2026
+
+A Kirana local passa a conhecer, de ponta a ponta, o que o site novo publica, para atuar como atendente e
+vitrine do site (explica, localiza a seção certa, prepara o contato e encaminha à equipe).
+
+### Novo
+- **5 documentos** em `sites/opportunity-ai/knowledge`: `perfil.md` (dossiê da empresa e **resumo fixo do prompt**),
+  `projetos-detalhes.md` (os 9 projetos do Labs, um a um), `como-trabalhamos.md` (4 passos, parte técnica e
+  dúvidas comuns), `demonstracao.md` (Agente Adaptativo e os 6 cenários fictícios) e `guia-de-atendimento.md`
+  (tom, descoberta, para onde levar o visitante, objeções, contato e passagem para uma pessoa). Base: 22 documentos.
+- **Resumo fixo no prompt:** `buildKnowledgePrompt` inclui a seção "Resumo fixo do prompt" do `perfil.md`
+  (marcas, frentes, projetos, contato e limites) em todo turno; o resto continua pelas ferramentas.
+- **Catálogo** (`products.json`): cada projeto ganha `funcionalidades`; MordenRPG e Armada Nexus ganham
+  `acesso_publico` e o aviso de projeto de fãs.
+
+### Corrigido
+- **Rota do CopilotKit v2 (`/api/copilot`) não enviava o bloco do site ao modelo:** a sessão era criada sem `siteId`,
+  então o bloco "Site em que você está atendendo" (conhecimento, perfil, regras de conduta e página atual) nunca entrava
+  no prompt nesse caminho; só as ferramentas funcionavam. Agora a sessão guarda o site e a página (validada) vindos do
+  estado compartilhado. Teste novo em `copilot-agui-endpoint.test.js`.
+- **Busca:** seção longa não é mais cortada em 1200 caracteres; vira vários trechos (antes, o fim de listas longas,
+  como os últimos projetos de `labs.md`, não era buscável). Stopwords: "pelo/pela/pelos/pelas/num/numa/tem/têm/ter".
+- **Conhecimento desatualizado:** `tecnologia-e-processo.md` dizia "seis frentes"; `privacidade.md`,
+  `contato-e-privacidade.md` e `termos.md` agora seguem o texto do site novo (política de 31/10/2026, sem citar o
+  provedor do site antigo; os Termos do site novo são curtos e os demais pontos ficam como referência do site anterior).
+- Testes: 22 documentos e novos casos de recuperação (projetos, processo, demonstração, perfil, guia).
+
 ## Conhecimento do site atualizado — 31/10/2026 (site novo: projetos ativos, 7 frentes)
 
 O site da Opportunity AI foi atualizado (repositório `opportunity-site`) e a base de conhecimento da Kirana

@@ -52,7 +52,7 @@ test('get_site_context devolve identidade, página atual e o que não está disp
   assert.equal(result.servicoEmFoco.serviceId, 'voz');
   assert.equal(result.paginaConhecida, true);
   assert.ok(result.rotasPermitidas >= 20);
-  assert.equal(result.conhecimento.documentos, 17);
+  assert.equal(result.conhecimento.documentos, 22);
   // Fase 5: upload existe com política declarada (e nunca executa arquivo).
   assert.equal(result.uploads.disponivel, true);
   assert.equal(result.uploads.maxMb, 5);

@@ -26,9 +26,9 @@ const site = {
   pages: [],
 };
 
-test('a base do site existe, tem os 17 documentos e todos citam fonte e data', () => {
+test('a base do site existe, tem os 22 documentos e todos citam fonte e data', () => {
   const knowledge = loadKnowledge({ dir: KNOWLEDGE_DIR });
-  assert.equal(knowledge.docs.length, 17, 'documentos esperados: 17 (11 iniciais + soluções, privacidade, termos, sites e sistemas, estrutura do site e conceitos)');
+  assert.equal(knowledge.docs.length, 22, 'documentos esperados: 22 (17 anteriores + perfil, detalhes dos projetos, como trabalhamos, demonstração e guia de atendimento)');
   assert.ok(knowledge.chunks.length >= 20, 'chunks suficientes para recuperação');
 
   for (const doc of knowledge.docs) {
@@ -79,6 +79,15 @@ test('a recuperação acha o trecho certo para perguntas reais de visitante', ()
     ['os projetos do labs estão ativos?', 'labs'],
     ['quais são as seções do site', 'estrutura-do-site'],
     ['mensagem pelo formulário vira contrato?', 'termos'],
+    // Dossiê completo (perfil, projetos em detalhe, processo, demonstração, guia).
+    ['quais funcionalidades tem o opportunity crm', 'projetos-detalhes'],
+    ['o que a gabi faz no android', 'projetos-detalhes'],
+    ['o armada nexus funciona sem o mordenrpg', 'projetos-detalhes'],
+    ['quais são as etapas de como vocês trabalham', 'como-trabalhamos'],
+    ['preciso trocar meus sistemas atuais', 'como-trabalhamos'],
+    ['a demonstração do agente adaptativo é de verdade', 'demonstracao'],
+    ['quem é o fundador e quais são as três marcas', 'perfil'],
+    ['como responder quando perguntam o preço e o prazo', 'guia-atendimento'],
   ];
   for (const [query, expected] of cases) {
     const hits = knowledge.search(query, { limit: 3 });
@@ -99,7 +108,7 @@ test('as páginas institucionais têm documento próprio e explicam sem inventar
   // Fatos que a Kirana pode afirmar, porque estão publicados.
   assert.doesNotMatch(knowledge.doc('termos').body, /possui CNPJ/, 'não afirma situação formal que o site não publica');
   assert.match(knowledge.doc('termos').body, /não criam contrato/);
-  assert.match(knowledge.doc('privacidade').body, /Cloudflare/);
+  assert.match(knowledge.doc('privacidade').body, /provedores de\s+infraestrutura/i);
   assert.match(knowledge.doc('privacidade').body, /não usa cookies/);
   assert.match(knowledge.doc('solucoes').body, /pesquisa e prototipagem/i);
 });
@@ -130,6 +139,11 @@ test('o prompt do conhecimento carrega identidade, serviços e regras de honesti
   assert.match(prompt, /nunca invente|não invente/i);
   assert.match(prompt, /sem pre[çc]os publicados/i);
   assert.match(prompt, /Limites conhecidos/);
+  // Resumo fixo do perfil: marcas, frentes, projetos e contato em todo turno.
+  assert.match(prompt, /Perfil da empresa/);
+  assert.match(prompt, /Opportunity Labs/);
+  assert.match(prompt, /Armada Nexus RPG/);
+  assert.match(prompt, /\(85\) 99946-2763/);
   assert.ok(prompt.length < 6000, `prompt do sistema precisa continuar enxuto (${prompt.length} B)`);
 });
 
@@ -148,6 +162,12 @@ test('tokenize, radical e front-matter são previsíveis (base da recuperação)
   assert.equal(parsed.body.trim(), 'Corpo do texto.');
   const chunks = chunkBody('## Um\n\ntexto a\n\n## Dois\n\ntexto b', { maxChars: 1200 });
   assert.deepEqual(chunks.map((chunk) => chunk.heading), ['Um', 'Dois']);
+  // Seção longa não é cortada: vira vários trechos com o mesmo título e o texto todo continua buscável.
+  const longa = Array.from({ length: 12 }, (_, i) => `- item ${i + 1} com um texto razoavelmente comprido para ocupar espaço`).join('\n');
+  const partes = chunkBody(`## Lista\n\n${longa}`, { maxChars: 300 });
+  assert.ok(partes.length > 1, 'seção longa divide em mais de um trecho');
+  assert.ok(partes.every((parte) => parte.heading === 'Lista' && parte.text.length <= 300));
+  assert.match(partes.map((parte) => parte.text).join('\n'), /item 12/, 'o fim da seção não some');
 });
 
 test('o conhecimento é recarregado quando o arquivo muda (atualização automática)', async () => {
