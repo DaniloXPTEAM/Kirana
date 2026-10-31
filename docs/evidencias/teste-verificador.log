@@ -1,0 +1,80 @@
+TAP version 13
+# Subtest: A1 · o verificador não envia max_tokens em nenhum corpo
+ok 1 - A1 · o verificador não envia max_tokens em nenhum corpo
+  ---
+  duration_ms: 1.742763
+  ...
+# Subtest: A2 · o contrato documenta que max_tokens é rejeitado (e não enviado)
+ok 2 - A2 · o contrato documenta que max_tokens é rejeitado (e não enviado)
+  ---
+  duration_ms: 0.310178
+  ...
+# Subtest: A3 · o .cmd não promete limite de 16 tokens
+ok 3 - A3 · o .cmd não promete limite de 16 tokens
+  ---
+  duration_ms: 0.40585
+  ...
+# Subtest: A4 · nenhuma ferramenta monta corpo com campo fora do contrato
+ok 4 - A4 · nenhuma ferramenta monta corpo com campo fora do contrato
+  ---
+  duration_ms: 0.636679
+  ...
+# Subtest: B1 · inferência sem streaming usa só campos aceitos
+ok 5 - B1 · inferência sem streaming usa só campos aceitos
+  ---
+  duration_ms: 0.785384
+  ...
+# Subtest: B2 · streaming usa só campos aceitos e pede usage por stream_options
+ok 6 - B2 · streaming usa só campos aceitos e pede usage por stream_options
+  ---
+  duration_ms: 0.181376
+  ...
+# Subtest: B3 · cancelamento usa o mesmo contrato (sem campo extra)
+ok 7 - B3 · cancelamento usa o mesmo contrato (sem campo extra)
+  ---
+  duration_ms: 0.251195
+  ...
+# Subtest: B4 · garantirContrato bloqueia campo extra em vez de enviar
+ok 8 - B4 · garantirContrato bloqueia campo extra em vez de enviar
+  ---
+  duration_ms: 0.452103
+  ...
+# Subtest: B5 · limites efetivos são declarados e separados
+ok 9 - B5 · limites efetivos são declarados e separados
+  ---
+  duration_ms: 0.216084
+  ...
+# Subtest: C1 · verificador contra dublê estrito: 2 chamadas, sem falha
+ok 10 - C1 · verificador contra dublê estrito: 2 chamadas, sem falha
+  ---
+  duration_ms: 532.524085
+  ...
+# Subtest: C2 · --com-cancelamento acrescenta exatamente 1 chamada (3 no total)
+ok 11 - C2 · --com-cancelamento acrescenta exatamente 1 chamada (3 no total)
+  ---
+  duration_ms: 615.400097
+  ...
+# Subtest: C3 · --catalogo não gasta chamada de geração
+ok 12 - C3 · --catalogo não gasta chamada de geração
+  ---
+  duration_ms: 767.187805
+  ...
+# Subtest: D1 · 400 unsupported_parameter NÃO reprova o modelo
+ok 13 - D1 · 400 unsupported_parameter NÃO reprova o modelo
+  ---
+  duration_ms: 0.656242
+  ...
+# Subtest: D2 · identidade só é aprovada com identityVerified=true
+ok 14 - D2 · identidade só é aprovada com identityVerified=true
+  ---
+  duration_ms: 0.446167
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1934.892767

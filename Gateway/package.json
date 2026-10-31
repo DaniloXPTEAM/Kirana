@@ -1,0 +1,23 @@
+{
+  "name": "kirana-chatgpt-gateway",
+  "version": "0.4.1",
+  "private": true,
+  "type": "module",
+  "description": "Private localhost ChatGPT gateway with modular capability discovery and temporary document-file delivery.",
+  "engines": {
+    "node": ">=20.20"
+  },
+  "scripts": {
+    "start": "node src/main.js",
+    "voice": "node examples/voice-client/server.mjs",
+    "keygen": "node src/keygen.js",
+    "test": "node --test",
+    "check": "node --check src/main.js && node --check src/gateway.js && node --check src/auth.js && node --check src/responses.js && node --check src/engine.js && node --check src/capabilities.js && node --check src/files.js && node --check src/zip.js && node --check src/jobs.js && node --check src/providers/command.js && node --check src/providers/whisper-cpp.js && node --check src/providers/piper.js && node --check src/providers/comfyui.js && node --check src/providers/video-analysis.js && node --check src/providers/index.js && node --check src/keygen.js && node --check test/engine.test.js && node --check test/engine-gateway.test.js && node --check tools/quality-suite.mjs && node --check test/jobs.test.js && node --check test/media-gateway.test.js && node --check test/multimodal.test.js && node --check test/voice-client.test.js && node --check examples/api-client/client.mjs && node --check examples/benchmark.mjs && node --check examples/tool-smoke.mjs && node --check examples/voice-client/server.mjs && node --check examples/voice-client/providers.js && node --check examples/voice-client/app.js && node --check examples/voice-client/edge-tts-adapter.js && node --check examples/voice-client/edge-tts-runner.mjs && node --check examples/voice-client/tts-routing.js",
+    "test:engine": "node --test test/engine.test.js test/engine-gateway.test.js",
+    "quality": "node tools/quality-suite.mjs",
+    "quality:mock": "node tools/quality-suite.mjs --mock --out resultados-qualidade-mock.json"
+  },
+  "dependencies": {
+    "jose": "^6.1.0"
+  }
+}

@@ -1,0 +1,105 @@
+KIRANA / GATEWAY — IDENTIDADE DESTA DISTRIBUICAO
+================================================
+Versao da distribuicao : v0.5.5  (REV4.2 + correcoes de voz)
+Data                   : 30/10/2026
+Kirana                 : 0.5.5
+Gateway                : 0.4.1
+
+Rastreabilidade
+---------------
+Base direta : Kirana-v0.5.4-REV4.2-com-Gateway-v0.4.1-Windows.zip (substituido por esta versao)
+              SHA-256 66ff74b18d2cf1ee837bf011f92a9d18634b1fa5fafca89d66da1b38f7f1d878
+Base anterior: Kirana-v0.5.4-REV4.1-com-Gateway-v0.4.1-Windows.zip
+              SHA-256 f83834b9f3538bbec81dff5c1a1394f3a1268cca58141aca675e4122da399536
+Base anterior: Kirana-v0.5.4-REV4-com-Gateway-v0.4.1-Windows.zip
+              SHA-256 30b7e8817c892b6f8a1e9fd8d9b3710a70af3ad7c3ea6bc50263f189371abffa
+Base anterior: Kirana-v0.5.4-REV3-com-Gateway-v0.4.1-Windows.zip
+              SHA-256 3081caf4a5c1c86c1743240f8159a1eeb2b34b19fe1837a24d72041b43d97882
+Historico   : REV2 (da6d721af8f0899190c32b691e738319cd68fabb505d5fc081e0a39c0870023f)
+              REV1 / v0.5.4 original
+
+O que a v0.5.5 corrige (sobre a REV4.2)  -- encontrado no Windows real
+-----------------------------------------------------------------------
+- A Kirana respondia a si mesma por voz. Causa: em modo continuo o SpeechRecognition
+  devolve em event.results TODOS os resultados desde que a sessao abriu, e voice.js lia
+  desde o indice 0. Falas antigas do usuario e ecos antigos voltavam colados numa so
+  mensagem ("pergunta antiga + resposta da Kirana"), que a guarda de eco nao reconhecia.
+  Agora le so a partir de event.resultIndex. Teste: Kirana/test/voice-recognition-cumulative.test.js
+  (reconhecedor falso cumulativo, como o do navegador; reproduzia o defeito antes do conserto).
+- Falar por cima da Kirana agora interrompe e escuta (antes so "Kirana, pare" interrompia).
+  Criterio conservador (isUserSpeechOverSpeech): >=4 palavras, >=3 novas e >=60% novas em
+  relacao ao que ela esta dizendo; eco, mesmo com erros de reconhecimento, nao interrompe.
+  Desligavel: speechBargeIn=false em Kirana/public/voice.js (volta ao comportamento antigo).
+  O teste 11 de voice-bargein.test.js, que fixava o comportamento antigo, foi trocado por 11 e 11b.
+- Testes de voz rodam no Node >= 21: globalThis.navigator passou a ser somente leitura, e os
+  dubles agora usam Object.defineProperty. Antes, 77 testes de voz falhavam so por isso.
+- INSTALAR-WINDOWS.cmd NAO gera mais a senha de acesso da tela (KIRANA_ACCESS_TOKEN fica vazio,
+  uso local em 127.0.0.1). Com ela, a interface so pedia o token por window.prompt, que o navegador
+  podia bloquear em silencio: POST /api/chat dava 401 e o chat e a voz paravam. Quem precisar de
+  token (ponte do celular / acesso fora do loopback) o define a mao no Kirana/.env.
+- INICIAR-TUDO.cmd reaproveita um Gateway JA ATIVO iniciado por OUTRA pasta quando ele aceita a chave
+  desta instalacao (/auth/status = 200) e a versao confere: nao o encerra nem reinicia (o login SIWC
+  vive so na memoria dele) e inicia so o que falta. Sem essa prova de chave, continua parando sem
+  encerrar nada. So vale para o Gateway; Kirana de outra pasta nunca e reaproveitada.
+  Validado de ponta a ponta no Windows real (copia limpa + Gateway real ativo): instalou adotando a
+  chave, iniciou a Kirana, o Gateway ficou intacto (mesmo PID, SIWC ativo).
+- Versao do produto: Kirana 0.5.5 (package.json e as conferencias de versao dos scripts).
+- Aviso: o interruptor por fala foi testado so com dubles; microfone e alto-falante reais
+  precisam de validacao do proprietario.
+
+O que a REV4.2 corrige (sobre a REV4.1)  -- encontrado no Windows real
+-----------------------------------------------------------------------
+- Instalar em pasta nova com um Gateway JA ATIVO (SIWC em memoria) gerava uma
+  GATEWAY_API_KEY aleatoria que ele nunca aceitaria: HTTP 401 permanente.
+  Novo tools/detectar-instalacao.mjs (passo 4b do instalador), antes de gerar chave:
+    * Gateway ativo + chave de pasta vizinha que ELE aceita (/auth/status 200)
+      -> reaproveita essa chave (nao gera outra, nao toca no Gateway);
+    * Gateway ativo + nenhuma chave aceita -> CONFLITO: para antes de gravar chave;
+    * sem Gateway ativo -> fluxo normal (gera chave);
+    * .env proprio ja com chave -> preserva; avisa se o Gateway ativo a recusa.
+  Nunca encerra processo, nunca imprime chave (so fingerprint).
+- VALIDAR-MODELOS-REAIS.cmd era LF-only com acento em UTF-8 e sem chcp: o cmd.exe
+  imprimia "'cho' nao e reconhecido". Agora CRLF, ASCII e chcp 65001, como os demais.
+- INICIAR-TUDO: a mensagem de porta ocupada agora avisa que encerrar um Gateway com
+  SIWC ativo apaga a sessao (antes sugeria Stop-Process sem aviso).
+- DIAGNOSTICO: /api/gateway/ping 404 vira AVISO (ponte desligada), e 401 em
+  /auth/status passa a ser descrito como conflito de instalacao.
+- tools/teste-instalacao-existente.mjs: regressao do cenario (Gateway ativo +
+  chaves divergentes + pasta nova) e verificacao CRLF/ASCII dos .cmd.
+
+O que a REV4.1 corrigiu (sobre a REV4)
+------------------------------------
+- O verificador nao envia mais `max_tokens`: o Gateway REJEITA esse campo com
+  400 unsupported_parameter, antes de chegar ao modelo. Corpo montado por
+  tools/contrato-chat.mjs, so com os 7 campos aceitos.
+- .cmd nao promete mais "16 tokens" (nao existe limite de tokens configuravel).
+- Cancelamento so roda com --com-cancelamento (padrao = exatamente 2 chamadas).
+- 400 por campo invalido e classificado como INCOMPATIBILIDADE_DO_VERIFICADOR,
+  nunca como reprovacao do modelo.
+- 14 testes novos (tools/teste-verificador.mjs) impedem a regressao.
+
+O que a REV4 acrescenta sobre a REV3
+------------------------------------
++ Validacao de modelos reais incorporada (tools/validar-modelos-reais.mjs)
++ Atalho Windows VALIDAR-MODELOS-REAIS.cmd
++ Dublê de gateway autorizado para testar o verificador (tools/)
++ docs/validacao/ (saida dos relatorios) e docs/TAMA_T03_B0_BLOQUEIO_SIWC.md
++ docs/REVISAO-4.md (relatorio de alteracoes) e este arquivo de identidade
++ tools/verificar-pacote.mjs passa a exigir os arquivos acima
+
+O que NAO mudou
+---------------
+- Codigo do produto (Kirana/src, Gateway/src) e os testes existentes
+- Versoes 0.5.4 / 0.4.1
+- Instalador, inicializador, chave local automatica, backups, protecao de PID
+- Ponte /api/gateway/*, autenticacao SIWC, streaming SSE, Tailscale privado
+- Nenhum segredo embutido: .env e gerado na instalacao
+
+Instalacao (dois comandos)
+--------------------------
+  INSTALAR-WINDOWS.cmd
+  INICIAR-TUDO.cmd
+
+Validar modelos (depois de autorizar a conta em http://127.0.0.1:1455/auth/start)
+--------------------------------------------------------------------------------
+  VALIDAR-MODELOS-REAIS.cmd
