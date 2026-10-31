@@ -112,6 +112,54 @@ export function parseFrontMatter(raw) {
   return { meta, body: text.slice(match[0].length) };
 }
 
+/**
+ * Junta quebras de linha "moles" (texto Markdown quebrado em ~80 colunas) em uma linha por parágrafo ou item.
+ *
+ * Por quê: o chat da Kirana (`public/markdown.js`) transforma quebra de linha dentro do parágrafo em `<br />`.
+ * Se o modelo recebe o texto com a quebra no meio da frase e o repete, a resposta aparece cortada. Aqui o
+ * conhecimento sempre chega inteiro, qualquer que seja a largura em que o arquivo foi escrito.
+ * Não mexe em títulos, tabelas, citações, linhas em branco nem blocos de código.
+ */
+export function unwrapSoftBreaks(text) {
+  const out = [];
+  let inCode = false;
+  let kind = 'other'; // 'para' | 'list' | 'other' (tipo da última linha emitida)
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    const t = line.trim();
+    if (/^```/.test(t)) {
+      inCode = !inCode;
+      out.push(line);
+      kind = 'other';
+      continue;
+    }
+    if (inCode) {
+      out.push(line);
+      continue;
+    }
+    const isList = /^([-*+]|\d+[.)])\s/.test(t);
+    const isBlock = !t || /^#{1,6}\s/.test(t) || t.startsWith('|') || t.startsWith('>') || /^(-{3,}|\*{3,})$/.test(t);
+    if (isBlock) {
+      out.push(line);
+      kind = 'other';
+      continue;
+    }
+    if (isList) {
+      out.push(line);
+      kind = 'list';
+      continue;
+    }
+    const indented = /^\s/.test(line);
+    const continua = (kind === 'para' && out.length) || (kind === 'list' && indented && out.length);
+    if (continua) {
+      out[out.length - 1] = `${out[out.length - 1].replace(/\s+$/, '')} ${t}`;
+    } else {
+      out.push(line);
+      kind = 'para';
+    }
+  }
+  return out.join('\n');
+}
+
 /** Quebra o corpo em trechos por cabeçalho (o que a busca devolve). */
 export function chunkBody(body, { maxChars = 1200 } = {}) {
   const blocks = [];
@@ -197,7 +245,9 @@ export function loadKnowledge({ dir, logger } = {}) {
       const file = path.join(dir, entry.name);
       try {
         const stat = fs.statSync(file);
-        const { meta, body } = parseFrontMatter(fs.readFileSync(file, 'utf8'));
+        const parsed = parseFrontMatter(fs.readFileSync(file, 'utf8'));
+        const meta = parsed.meta;
+        const body = unwrapSoftBreaks(parsed.body);
         const id = meta.id || entry.name.replace(/\.md$/, '');
         const title = meta.title || id;
         const chunks = chunkBody(body).map((chunk, position) => ({

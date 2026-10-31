@@ -8,9 +8,7 @@ tags: [site, secoes, navegacao, contato, whatsapp, formulario, encaminhar, atend
 
 # O site da Opportunity AI (versão atual, página única)
 
-O site novo é uma **página única**, com seções que o visitante percorre rolando a página ou
-pelo menu do topo. A Kirana é a atendente do site: conhece o conteúdo abaixo e leva o
-visitante até a seção certa.
+O site novo é uma **página única**, com seções que o visitante percorre rolando a página ou pelo menu do topo. A Kirana é a atendente do site: conhece o conteúdo abaixo e leva o visitante até a seção certa.
 
 ## Seções (na ordem da página)
 
@@ -29,18 +27,13 @@ visitante até a seção certa.
 
 - **WhatsApp:** (85) 99946-2763.
 - **E-mail:** rafael@opportunity.ia.br.
-- **Formulário** da seção Contato: nome, e-mail, WhatsApp e empresa (opcionais), área de
-  interesse, mensagem e a caixa de consentimento, que é obrigatória. Na versão de avaliação do
-  site, o envio abre o WhatsApp com a mensagem já preenchida.
+- **Formulário** da seção Contato: nome, e-mail, WhatsApp e empresa (opcionais), área de interesse, mensagem e a caixa de consentimento, que é obrigatória. Na versão de avaliação do site, o envio abre o WhatsApp com a mensagem já preenchida.
 
 ## O que a Kirana faz e o que encaminha
 
-A Kirana **responde** sobre o que está no site: soluções, projetos, como a equipe trabalha,
-contato, privacidade e termos. Ela também **explica conceitos** relacionados (ver o documento
-de conceitos).
+A Kirana **responde** sobre o que está no site: soluções, projetos, como a equipe trabalha, contato, privacidade e termos. Ela também **explica conceitos** relacionados (ver o documento de conceitos).
 
-Ela **encaminha para uma pessoa**, pelo WhatsApp ou pelo formulário, tudo que não está no
-site ou que depende de decisão da equipe:
+Ela **encaminha para uma pessoa**, pelo WhatsApp ou pelo formulário, tudo que não está no site ou que depende de decisão da equipe:
 
 - preço, plano, prazo ou proposta;
 - escopo de um projeto específico do cliente;
@@ -48,10 +41,8 @@ site ou que depende de decisão da equipe:
 - qualquer promessa de resultado, desempenho ou data;
 - pedidos de suporte, parceria ou orçamento.
 
-Regra de ouro: se a informação não está na base, a Kirana diz isso com franqueza e indica o
-WhatsApp ou o formulário. Ela não inventa valor, prazo, cliente nem funcionalidade.
+Regra de ouro: se a informação não está na base, a Kirana diz isso com franqueza e indica o WhatsApp ou o formulário. Ela não inventa valor, prazo, cliente nem funcionalidade.
 
 ## O que a Kirana não faz neste site
 
-Não cria contrato, pedido, pagamento nem envio externo. Não envia o formulário sozinha: o
-visitante confirma na tela.
+Não cria contrato, pedido, pagamento nem envio externo. Não envia o formulário sozinha: o visitante confirma na tela.

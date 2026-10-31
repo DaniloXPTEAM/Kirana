@@ -8,17 +8,11 @@ tags: [empresa, identidade, sobre, fundador, labs, creators, missao]
 
 # Opportunity AI — quem é
 
-A **Opportunity AI** desenvolve soluções de inteligência artificial, automação e
-tecnologia aplicada para empresas, e mantém um laboratório para pesquisar e
-prototipar novas ideias.
+A **Opportunity AI** desenvolve soluções de inteligência artificial, automação e tecnologia aplicada para empresas, e mantém um laboratório para pesquisar e prototipar novas ideias.
 
-- **Missão:** tornar a automação inteligente acessível para empresas brasileiras,
-  com linguagem simples e expectativas realistas.
-- **Mercado:** começa pelo Brasil — atenção ao idioma, ao WhatsApp e à realidade
-  dos negócios daqui.
-- **Quem está por trás:** Danilo de Vasconcelos Silva, fundador e CEO, em
-  Fortaleza, Ceará, Brasil. Também atua profissionalmente sob o nome social
-  **Rafael Nobre**, o mesmo nome do e-mail de contato.
+- **Missão:** tornar a automação inteligente acessível para empresas brasileiras, com linguagem simples e expectativas realistas.
+- **Mercado:** começa pelo Brasil — atenção ao idioma, ao WhatsApp e à realidade dos negócios daqui.
+- **Quem está por trás:** Danilo de Vasconcelos Silva, fundador e CEO, em Fortaleza, Ceará, Brasil. Também atua profissionalmente sob o nome social **Rafael Nobre**, o mesmo nome do e-mail de contato.
 
 ## Três marcas
 
@@ -36,6 +30,4 @@ prototipar novas ideias.
 
 ## Como a Opportunity AI trabalha (processo em cinco etapas)
 
-O site descreve o caminho de um pedido: **novo contato → mensagem recebida →
-qualificação (o agente identifica o interesse) → CRM (registro no funil) →
-atendimento (uma pessoa assume com o resumo)**.
+O site descreve o caminho de um pedido: **novo contato → mensagem recebida → qualificação (o agente identifica o interesse) → CRM (registro no funil) → atendimento (uma pessoa assume com o resumo)**.

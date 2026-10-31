@@ -8,8 +8,7 @@ tags: [processo, etapas, como-trabalhamos, tecnologia, faq, duvidas, supervisao-
 
 # Como a Opportunity AI trabalha
 
-Seção "Como trabalhamos" do site: sem projeto gigante de uma vez. A equipe começa pelo que mais
-incomoda hoje e evolui a partir do que funcionar. Nenhuma etapa tem prazo publicado.
+Seção "Como trabalhamos" do site: sem projeto gigante de uma vez. A equipe começa pelo que mais incomoda hoje e evolui a partir do que funcionar. Nenhuma etapa tem prazo publicado.
 
 ## Os quatro passos
 
@@ -18,9 +17,7 @@ incomoda hoje e evolui a partir do que funcionar. Nenhuma etapa tem prazo public
 3. **Desenvolvemos e testamos.** Construção da solução e validação com o cliente, em situações reais do negócio, antes de colocar em uso.
 4. **Entregamos e orientamos.** Explicação de como usar no dia a dia, do que ficou pronto e de quais etapas futuras podem ser necessárias.
 
-O caminho de um pedido de atendimento, como o site ilustra: novo contato, mensagem recebida,
-qualificação (o agente identifica o interesse), registro no funil (CRM) e atendimento, em que uma
-pessoa assume com o resumo.
+O caminho de um pedido de atendimento, como o site ilustra: novo contato, mensagem recebida, qualificação (o agente identifica o interesse), registro no funil (CRM) e atendimento, em que uma pessoa assume com o resumo.
 
 ## Como a solução é construída por dentro (parte técnica)
 

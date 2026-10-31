@@ -15,7 +15,16 @@ vitrine do site (explica, localiza a seção certa, prepara o contato e encaminh
 - **Catálogo** (`products.json`): cada projeto ganha `funcionalidades`; MordenRPG e Armada Nexus ganham
   `acesso_publico` e o aviso de projeto de fãs.
 
+### Personalidade
+- `src/prompts.js`: nova seção "Personalidade e tom": atenciosa, curiosa e tranquila; respeitosa e próxima, **nunca informal
+  e nunca formal demais** (sem gíria nem "prezado"); retoma o que a pessoa disse; uma pergunta por vez; sem "Claro!" e
+  "Posso ajudar em algo mais?" repetidos; sem emoji; honestidade acolhedora quando não sabe. O `guia-de-atendimento.md`
+  ganha o mesmo tom, com exemplos.
+
 ### Corrigido
+- **Frases cortadas no chat:** os documentos estavam quebrados em ~80 colunas e o chat da Kirana transforma quebra de linha em
+  `<br />`; se o modelo repetisse o trecho, a frase aparecia cortada. Os 22 documentos foram reescritos com uma linha por
+  parágrafo/item e o carregador (`unwrapSoftBreaks`) passa a juntar essas quebras sempre, mesmo em arquivos futuros. Testes novos.
 - **Rota do CopilotKit v2 (`/api/copilot`) não enviava o bloco do site ao modelo:** a sessão era criada sem `siteId`,
   então o bloco "Site em que você está atendendo" (conhecimento, perfil, regras de conduta e página atual) nunca entrava
   no prompt nesse caminho; só as ferramentas funcionavam. Agora a sessão guarda o site e a página (validada) vindos do

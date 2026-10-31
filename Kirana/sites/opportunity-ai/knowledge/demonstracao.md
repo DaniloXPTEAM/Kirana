@@ -8,18 +8,11 @@ tags: [demonstracao, agente-adaptativo, simulacao, cenarios, padaria, petshop, l
 
 # Demonstração do Agente Adaptativo
 
-A seção **Agente Adaptativo** do site mostra, em empresas **fictícias**, como um atendente digital
-muda de identidade, de conversa e de conhecimento conforme o negócio. É uma **simulação**: as
-respostas são preparadas, não há modelo de linguagem por trás nem dado real, e nada do que é digitado
-é enviado a um servidor. A Kirana deve deixar isso claro sempre que citar a demonstração.
+A seção **Agente Adaptativo** do site mostra, em empresas **fictícias**, como um atendente digital muda de identidade, de conversa e de conhecimento conforme o negócio. É uma **simulação**: as respostas são preparadas, não há modelo de linguagem por trás nem dado real, e nada do que é digitado é enviado a um servidor. A Kirana deve deixar isso claro sempre que citar a demonstração.
 
 ## Como o visitante usa
 
-Escolhe um cenário na faixa de abas (ela rola na horizontal quando não cabe na tela), vê a tela
-simulada do negócio e conversa com o atendente: pode clicar nas perguntas sugeridas ou digitar. Há
-botão para reiniciar a conversa. Se a pergunta digitada não for reconhecida, o atendente da
-simulação responde com uma mensagem padrão e indica o caminho humano. Para ver uma solução
-parecida no negócio dele, o visitante usa o formulário de contato ou o WhatsApp.
+Escolhe um cenário na faixa de abas (ela rola na horizontal quando não cabe na tela), vê a tela simulada do negócio e conversa com o atendente: pode clicar nas perguntas sugeridas ou digitar. Há botão para reiniciar a conversa. Se a pergunta digitada não for reconhecida, o atendente da simulação responde com uma mensagem padrão e indica o caminho humano. Para ver uma solução parecida no negócio dele, o visitante usa o formulário de contato ou o WhatsApp.
 
 ## Os seis cenários
 
@@ -34,17 +27,11 @@ parecida no negócio dele, o visitante usa o formulário de contato ou o WhatsAp
 
 ## Atenção: números e valores da demonstração são ilustrativos
 
-Valores, horários, tempos de resposta e condições que aparecem nos cenários (cardápios, preços de
-produtos, taxas, "tempo médio") são **ilustrativos**. Não são oferta, preço nem promessa da
-Opportunity AI. A Kirana nunca deve citá-los como valores reais da empresa nem usá-los para
-estimar o custo ou o prazo de um projeto.
+Valores, horários, tempos de resposta e condições que aparecem nos cenários (cardápios, preços de produtos, taxas, "tempo médio") são **ilustrativos**. Não são oferta, preço nem promessa da Opportunity AI. A Kirana nunca deve citá-los como valores reais da empresa nem usá-los para estimar o custo ou o prazo de um projeto.
 
 ## O que a demonstração quer provar
 
-Que um agente pode: responder com as informações cadastradas do negócio; mudar de tom e de
-identidade visual conforme o segmento; qualificar o interessado; e passar a conversa a uma pessoa
-quando o assunto pede decisão humana. Em uma solução real, o conteúdo é cadastrado e atualizado junto
-com o cliente e a integração com o WhatsApp usa a API oficial, quando configurada e aprovada.
+Que um agente pode: responder com as informações cadastradas do negócio; mudar de tom e de identidade visual conforme o segmento; qualificar o interessado; e passar a conversa a uma pessoa quando o assunto pede decisão humana. Em uma solução real, o conteúdo é cadastrado e atualizado junto com o cliente e a integração com o WhatsApp usa a API oficial, quando configurada e aprovada.
 
 ## Perguntas que a Kirana pode ouvir sobre a demonstração
 

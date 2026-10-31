@@ -8,10 +8,7 @@ tags: [perfil, dossie, empresa, quem-somos, marcas, frentes, projetos, contato, 
 
 # Opportunity AI — perfil completo
 
-Documento-base da Kirana sobre a empresa. Reúne, em um lugar, o que o site publica. Os detalhes
-de cada tema estão nos outros documentos (soluções, projetos, como trabalhamos, contato,
-privacidade, termos, limites). Em caso de dúvida entre este resumo e uma página específica, vale
-a página específica.
+Documento-base da Kirana sobre a empresa. Reúne, em um lugar, o que o site publica. Os detalhes de cada tema estão nos outros documentos (soluções, projetos, como trabalhamos, contato, privacidade, termos, limites). Em caso de dúvida entre este resumo e uma página específica, vale a página específica.
 
 ## Resumo fixo do prompt
 
@@ -32,29 +29,15 @@ a página específica.
 
 ## Propósito e posicionamento
 
-A Opportunity AI quer tornar a automação e a inteligência artificial compreensíveis e úteis para
-quem toca um negócio pequeno, com linguagem simples e expectativa realista. O site apresenta o
-trabalho em dois eixos: as **soluções comerciais** (o que a empresa contrata) e o **Opportunity
-Labs** (onde testam formatos que ainda não têm lugar óbvio no mercado: plataformas para
-comunidades, ferramentas de criação e jogos; "é onde a curiosidade vira protótipo").
+A Opportunity AI quer tornar a automação e a inteligência artificial compreensíveis e úteis para quem toca um negócio pequeno, com linguagem simples e expectativa realista. O site apresenta o trabalho em dois eixos: as **soluções comerciais** (o que a empresa contrata) e o **Opportunity Labs** (onde testam formatos que ainda não têm lugar óbvio no mercado: plataformas para comunidades, ferramentas de criação e jogos; "é onde a curiosidade vira protótipo").
 
 ## Para quem é
 
-Pequenos negócios e equipes comerciais com tarefa repetitiva, atendimento que acumula (por
-exemplo, mensagens de WhatsApp), informação espalhada em planilhas e conversas, ou necessidade de
-uma ferramenta que não existe pronta. Não é preciso entender de inteligência artificial para
-conversar: o visitante explica o problema com as palavras do dia a dia. Quando a empresa é muito
-pequena e o volume baixo, a equipe diz com franqueza quando não vale o investimento.
+Pequenos negócios e equipes comerciais com tarefa repetitiva, atendimento que acumula (por exemplo, mensagens de WhatsApp), informação espalhada em planilhas e conversas, ou necessidade de uma ferramenta que não existe pronta. Não é preciso entender de inteligência artificial para conversar: o visitante explica o problema com as palavras do dia a dia. Quando a empresa é muito pequena e o volume baixo, a equipe diz com franqueza quando não vale o investimento.
 
 ## A mensagem principal do site
 
-Título da página inicial: **"Sua empresa tem um problema? A tecnologia pode ajudar a resolver."**
-Texto de apoio: criamos soluções digitais e de inteligência artificial para simplificar tarefas,
-organizar atendimentos, melhorar processos e ajudar pequenos negócios a crescer; o visitante
-explica o que precisa e a equipe estuda a melhor maneira de resolver. Os dois convites principais
-são **contar o desafio da empresa** (seção Contato) e **falar no WhatsApp**; há ainda o convite
-para conhecer os projetos do laboratório. A página mostra três números: sete frentes de solução,
-nove projetos ativos e "uma conversa para começar".
+Título da página inicial: **"Sua empresa tem um problema? A tecnologia pode ajudar a resolver."** Texto de apoio: criamos soluções digitais e de inteligência artificial para simplificar tarefas, organizar atendimentos, melhorar processos e ajudar pequenos negócios a crescer; o visitante explica o que precisa e a equipe estuda a melhor maneira de resolver. Os dois convites principais são **contar o desafio da empresa** (seção Contato) e **falar no WhatsApp**; há ainda o convite para conhecer os projetos do laboratório. A página mostra três números: sete frentes de solução, nove projetos ativos e "uma conversa para começar".
 
 ## Princípios que a empresa declara
 
@@ -65,20 +48,12 @@ nove projetos ativos e "uma conversa para começar".
 
 ## O que diferencia, nas palavras do site
 
-Soluções **sob medida** e em etapas, linguagem sem jargão, integração com o que a empresa já usa
-(sem trocar tudo de uma vez), arquitetura em peças que dá para trocar, registro das ações do
-agente e supervisão humana. A Kirana nunca deve afirmar superioridade sobre concorrentes, nem
-usar números de desempenho: o site não publica métricas de resultado.
+Soluções **sob medida** e em etapas, linguagem sem jargão, integração com o que a empresa já usa (sem trocar tudo de uma vez), arquitetura em peças que dá para trocar, registro das ações do agente e supervisão humana. A Kirana nunca deve afirmar superioridade sobre concorrentes, nem usar números de desempenho: o site não publica métricas de resultado.
 
 ## Presença e canais
 
-Atendimento remoto, a partir de Fortaleza, Ceará, para todo o Brasil. Canais publicados:
-WhatsApp comercial, e-mail e formulário do site. A conversa por WhatsApp é direta com quem
-desenvolve o projeto. LinkedIn do fundador: https://www.linkedin.com/in/danilo-de-vasconcelos-silva-b4296552
+Atendimento remoto, a partir de Fortaleza, Ceará, para todo o Brasil. Canais publicados: WhatsApp comercial, e-mail e formulário do site. A conversa por WhatsApp é direta com quem desenvolve o projeto. LinkedIn do fundador: https://www.linkedin.com/in/danilo-de-vasconcelos-silva-b4296552
 
 ## Onde cada assunto está
 
-Soluções e suas frentes: documento de soluções e um documento por frente. Projetos: documentos
-do Labs e de detalhes dos projetos. Processo, parte técnica e dúvidas comuns: documento Como
-trabalhamos. Demonstração do atendente: documento da demonstração. Contato, privacidade e termos:
-documentos próprios. O que não está publicado: documento de limites e perguntas frequentes.
+Soluções e suas frentes: documento de soluções e um documento por frente. Projetos: documentos do Labs e de detalhes dos projetos. Processo, parte técnica e dúvidas comuns: documento Como trabalhamos. Demonstração do atendente: documento da demonstração. Contato, privacidade e termos: documentos próprios. O que não está publicado: documento de limites e perguntas frequentes.

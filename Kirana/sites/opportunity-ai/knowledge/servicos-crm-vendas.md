@@ -12,19 +12,14 @@ tags: [crm, vendas, funil, followup, opportunity-crm, servico]
 
 Contatos, funil, follow-up, histórico, oportunidades e relatórios.
 
-- **Situação comum:** a equipe não sabe ao certo quem precisa de retorno hoje nem
-  em que etapa cada negócio está.
-- **Proposta de solução:** um funil organizado por etapas, com histórico de cada
-  contato e automações simples de follow-up.
-- **Exemplo de uso:** cada novo contato entra como lead, é classificado e aparece
-  na coluna certa, com lembrete para o próximo passo.
+- **Situação comum:** a equipe não sabe ao certo quem precisa de retorno hoje nem em que etapa cada negócio está.
+- **Proposta de solução:** um funil organizado por etapas, com histórico de cada contato e automações simples de follow-up.
+- **Exemplo de uso:** cada novo contato entra como lead, é classificado e aparece na coluna certa, com lembrete para o próximo passo.
 
 ## Entregáveis possíveis
-Desenho do funil · organização dos contatos · automações de lembrete · relatórios
-do funil.
+Desenho do funil · organização dos contatos · automações de lembrete · relatórios do funil.
 
 ## Limitações declaradas
-- O **Opportunity CRM** é um projeto em fase de **conceito** (Labs); a implantação
-  em sistemas existentes é um serviço separado.
+- O **Opportunity CRM** é um projeto em fase de **conceito** (Labs); a implantação em sistemas existentes é um serviço separado.
 
 Página: https://opportunity.ia.br/solucoes/crm-vendas

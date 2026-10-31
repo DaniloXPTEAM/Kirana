@@ -13,10 +13,8 @@ tags: [automacao, workflows, dados, arquivos, integracao, servico]
 Processos de navegador, dados, arquivos e integração entre sistemas, com logs.
 
 - **Situação comum:** alguém copia dados de um sistema para outro todos os dias.
-- **Proposta de solução:** automatizar o processo em etapas, com registro do que
-  foi feito e tratamento de erros.
-- **Exemplo de uso:** dados de uma planilha são conferidos, organizados e enviados
-  ao sistema de destino, com relatório do que foi processado.
+- **Proposta de solução:** automatizar o processo em etapas, com registro do que foi feito e tratamento de erros.
+- **Exemplo de uso:** dados de uma planilha são conferidos, organizados e enviados ao sistema de destino, com relatório do que foi processado.
 
 ## Entregáveis possíveis
 Mapeamento do processo · automação com logs · tratamento de erros e avisos.

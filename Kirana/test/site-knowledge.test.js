@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { loadKnowledge, tokenize, stem, parseFrontMatter, chunkBody, buildKnowledgePrompt } from '../src/knowledge/index.js';
+import { loadKnowledge, tokenize, stem, parseFrontMatter, chunkBody, buildKnowledgePrompt, unwrapSoftBreaks } from '../src/knowledge/index.js';
 
 const KNOWLEDGE_DIR = path.join('sites', 'opportunity-ai', 'knowledge');
 const site = {
@@ -187,5 +187,42 @@ test('o conhecimento é recarregado quando o arquivo muda (atualização automá
     assert.ok(second.chunks[0].mtimeMs > first.chunks[0].mtimeMs);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('texto quebrado em ~80 colunas chega inteiro: uma linha por parágrafo e por item', () => {
+  const entrada = [
+    '# Título',
+    '',
+    'Um parágrafo que foi',
+    'quebrado no meio da frase.',
+    '',
+    '- item um que continua',
+    '  na linha de baixo',
+    '- item dois',
+    '',
+    '| a | b |',
+    '| - | - |',
+    '',
+    '```',
+    'linha 1',
+    'linha 2',
+    '```',
+  ].join('\n');
+  const saida = unwrapSoftBreaks(entrada).split('\n');
+  assert.ok(saida.includes('Um parágrafo que foi quebrado no meio da frase.'));
+  assert.ok(saida.includes('- item um que continua na linha de baixo'));
+  assert.ok(saida.includes('- item dois'));
+  assert.ok(saida.includes('| a | b |') && saida.includes('| - | - |'), 'tabelas ficam intactas');
+  assert.ok(saida.includes('linha 1') && saida.includes('linha 2'), 'código fica intacto');
+});
+
+test('nenhum documento do conhecimento do site tem frase cortada no meio da linha', () => {
+  const knowledge = loadKnowledge({ dir: KNOWLEDGE_DIR });
+  for (const doc of knowledge.docs) {
+    const bruto = fs.readFileSync(path.join(KNOWLEDGE_DIR, doc.file), 'utf8').replace(/^---[\s\S]*?\n---\n?/, '');
+    // continuação indentada de item ou linha de texto emendada em outra de texto = quebra mole no arquivo
+    const moles = bruto.split('\n').filter((linha, i, todas) => /^ {2,}\S/.test(linha) && i > 0 && todas[i - 1].trim() && !/^\s*```/.test(linha));
+    assert.deepEqual(moles, [], `${doc.id}: há quebras de linha no meio de frase (o chat as mostra como <br>)`);
   }
 });
