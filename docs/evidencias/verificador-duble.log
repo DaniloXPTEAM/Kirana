@@ -1,0 +1,23 @@
+Gateway em http://127.0.0.1:1470
+contrato: model, messages, stream, tools, tool_choice, parallel_tool_calls, stream_options
+chamadas de geração previstas: 2
+
+PASS                   0.1  Gateway responde em /health — HTTP 200 · 53ms
+PASS                   0.2  estado do motor (/v1/engine) — version=0.4.1 · authenticated=true · catálogo=2 · routing=false · primário=modelo-falso-a
+PASS                   0.3  conta autorizada (SIWC) — authenticated=true
+PASS                   0.4  /auth/status — authenticated=true · armazenamento=memory-only · escopos=chat
+PASS                   0.5  /v1/capabilities — 2 declarada(s) · prontas: text.chat,files.create · não prontas: (nenhuma)
+PASS                   1.1  catálogo real obtido — 2 modelo(s): modelo-falso-a, modelo-falso-b
+   · chamada de geração #1 (inferência stream:false)
+PASS                   2.1  inferência real (modelo-falso-a) — HTTP 200 · 12ms · finish=stop · tokens=12/1/13 · resposta="ok"
+PASS                   2.2  identidade do modelo (/v1/runs) — pedido=modelo-falso-a · reportado=modelo-falso-a · identityVerified=true · upstreamId=presente
+PASS                   2.3  registro auditável da execução — id=run_000001 · totalMs=350 · 1º útil=110ms · toolCalls=0 · usage=12/1/13
+   · chamada de geração #2 (streaming stream:true)
+PASS                   3.1  streaming SSE real — ct=text/event-stream; charset=utf-8 · 1º byte 125ms · último 366ms · 3 leituras · 2 deltas · [DONE]=true · finish=stop · usage="usage":{"prompt_tokens":12,"completion_tokens":1,"total_tokens":13}
+NAO_EXECUTADO          4.1  cancelamento — fora do fluxo padrão (evita chamada extra de geração); use --com-cancelamento
+PASS                   5.1  erros diferenciados (não um 500 genérico) — modelo inexistente=400/model_not_available · JSON inválido=400/invalid_json · rota inexistente=404/not_found · run inexistente=404/run_not_found
+PASS                   6.1  nenhum segredo nos logs — 0 arquivo(s) · 0 ocorrência(s)
+chamadas de geração nesta execução: 2 (previstas: 2)
+RESULTADO: 12 PASS · 0 FALHA · 0 bloqueado(auth) · 0 inconclusivo · 1 não executado
+Veredito do modelo: APROVADO
+Relatórios em ./saida-simulada

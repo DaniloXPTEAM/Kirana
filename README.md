@@ -1,422 +1,204 @@
-# Kirana — agente conversacional da Opportunity AI
+# Kirana v0.5.5 + Gateway v0.4.1 — distribuição Windows
 
-**Versão:** 0.5.2 (integração com o Gateway real, rotas de contrato e produção — `CHANGELOG.md`)
-**Organização:** Opportunity AI
-**Gateway utilizado:** `Kirana-ChatGPT-Gateway v0.4.x` (não modificado; contrato em
-[`docs/INTEGRACAO-GATEWAY-REAL.md`](docs/INTEGRACAO-GATEWAY-REAL.md))
-**Data desta entrega:** 26/10/2026
-
-A Kirana é um agente conversacional com identidade própria, sessões, streaming, ferramentas
-com permissões separadas e confirmação obrigatória para ações de escrita. Ela conversa com o
-gateway ChatGPT já existente por HTTP, **sempre pelo backend** — a chave do gateway nunca chega
-ao navegador.
-
-> **Leia antes de usar:** a validação contra o gateway real precisa ser feita na sua máquina
-> Windows (o gateway roda em `http://127.0.0.1:1455`). O que foi validado aqui está descrito em
-> [`docs/RELATORIO-VALIDACAO.md`](docs/RELATORIO-VALIDACAO.md), sem confundir teste simulado com
-> validação real.
+> **Correções desta entrega** (detalhe em `docs/CHANGELOG-CORRECAO.md`):
+> 1. o instalador **não se bloqueia mais** na segunda execução na mesma pasta;
+> 2. a **chave local é gerada, alinhada e conferida automaticamente** — nenhuma etapa manual
+>    de transporte de chave entre os dois `.env`;
+> 3. a Kirana **descobre o modelo no catálogo real** do seu plano em vez de insistir num slug
+>    do `.env.example`;
+> 4. o parser SSE do Gateway não perde o frame final nem corrompe acento;
+> 5. **revisão 2**: instalador compatível com Windows PowerShell 5.1 (RNG e conversão de
+>    parâmetros); o inicializador **só reaproveita** processo com dono comprovado; o
+>    `PARAR-TUDO` **não encerra nada** sem identidade confirmada; o código do erro de
+>    streaming chega até a tela; a escolha de modelo não promete capacidade não verificada.
+>    Detalhe em `docs/REVISAO-2.md`;
+> 6. **revisão 3**: um stream cortado **nunca** é entregue como resposta concluída
+>    (`[DONE]` passa a ser exigido); 401/403 são separados em chave local × SIWC ×
+>    não conclusivo pelo `error.code`; a falha de descoberta de modelos **não** fica 5 minutos
+>    no cache — autorizou, a próxima mensagem já consulta de novo. Detalhe em
+>    `docs/REVISAO-3.md`;
+> 7. **revisão 4**: consolidação — a validação de modelos reais passou a fazer parte **desta**
+>    distribuição (`tools/validar-modelos-reais.mjs` + `VALIDAR-MODELOS-REAIS.cmd`), sem precisar
+>    aplicar um segundo ZIP. Nesta revisão foram corrigidas duas divergências do verificador:
+>    ele prometia limitar custo por `max_tokens` (que o Gateway **não repassa**) e tratava o campo
+>    `model` da resposta como prova de identidade (é só o nome pedido — a prova está em
+>    `/v1/runs`, campo `identityVerified`). Detalhe em `docs/REVISAO-4.md`;
+> 8. **revisão 4.1**: o verificador enviava `max_tokens` e o Gateway **rejeita** esse campo com
+>    `400 unsupported_parameter` — o teste morria antes do modelo e parecia "modelo ruim".
+>    Agora o corpo é montado por `tools/contrato-chat.mjs`, só com os 7 campos aceitos; o
+>    cancelamento virou opt-in; e `tools/teste-verificador.mjs` (14 testes) impede o retorno
+>    do campo. Detalhe em `docs/REVISAO-4.1.md`.
 >
-> **Homologação em 3 comandos (Windows, com o Gateway ligado):**
-> `verificar-gateway.bat` → contrato do Gateway real (read-only) ·
-> `homologar.bat --full` → homologação completa, grava tudo em `homologacao/` ·
-> [`docs/HOMOLOGACAO-WINDOWS.md`](docs/HOMOLOGACAO-WINDOWS.md) → roteiro e critérios.
+> E da montagem anterior, mantida: o Gateway 0.4.1 recusava subir na segunda vez (o
+> `registration.json` criado antes do consentimento SIWC era considerado inválido). Corrigido em
+> `Gateway/src/auth.js` — uma linha — sem mudar a versão nem a API. Detalhes em
+> `docs/CAUSA-RAIZ-E-CORRECAO.md`, seção 6. **Não apague `Gateway/.local-state`**: é lá que está o
+> `hostId` do seu consentimento.
 
----
+Este pacote contém **um** executável de cada componente. Não há ZIP do Gateway escondido em
+`integrations/`: a pasta `Gateway/` **é** a v0.4.1 (com `src/engine.js`, `/v1/engine` e `/v1/runs`).
 
-## 1. O que está pronto
+```
+Kirana-v0.5.5-com-Gateway-v0.4.1-Windows/
+├── Kirana/                  versão 0.5.5 (agente, interface, ponte /api/gateway/*)
+├── Gateway/                 versão 0.4.1 (motor, identidade de modelo, /v1/engine, /v1/runs)
+├── INSTALAR-WINDOWS.cmd     UM comando: instala, repara, alinha a chave e faz pré-voo
+├── INICIAR-TUDO.cmd         UM comando: sobe Gateway :1455 + Kirana :3000 e abre a interface
+├── PARAR-TUDO.cmd           encerra só o que esta distribuição iniciou
+├── DIAGNOSTICO.cmd          versões, portas, processos, .env, SIWC, ponte
+├── MIGRAR-ENV.cmd           traz configurações das instalações antigas (plano por padrão)
+├── BACKUP-ANTES-DE-LIMPAR.cmd  copia .env e estado antes de qualquer remoção
+├── scripts/                 os .ps1 usados pelos .cmd
+├── tools/                   verificadores e utilitários (rodam com Node, sem Windows)
+│   ├── configurar.mjs       gera/preserva a chave e alinha nos dois .env
+│   ├── checar-config.mjs    pré-voo antes de iniciar qualquer serviço
+│   ├── verificar-pacote.mjs --release (ZIP) | --instalacao (pasta em uso)
+│   ├── diagnosticar-modelos.mjs  catálogo real + qual modelo seria usado (sem mostrar chave)
+│   ├── teste-revisao3.mjs   41 testes da revisão 3 (stream cortado, 401 por código, cache)
+│   ├── teste-revisao2.mjs   42 testes da revisão 2 (PS 5.1, dono de processo, SSE, modelos)
+│   ├── teste-correcoes.mjs  18 testes da revisão 1
+│   ├── validar-modelos-reais.mjs  V00 + catálogo + inferência + identidade + SSE (roda no Windows)
+│   ├── contrato-chat.mjs          os 7 campos aceitos + montagem única do corpo
+│   ├── teste-verificador.mjs      14 testes: barra max_tokens e valida os limites
+│   └── duble-gateway-autorizado.mjs  dublê de contrato ESTRITO, para testar sem SIWC
+└── docs/
+    ├── CAUSA-RAIZ-E-CORRECAO.md   por que o pacote anterior tinha Gateway 0.4.0
+    ├── MIGRACAO-ENV-E-SIWC.md     .env, estado e por que o SIWC "não pegava"
+    ├── INSTALACAO-LIMPA.md        procedimento seguro para reinstalar do zero
+    ├── TESTES-EXECUTADOS.md       o que foi testado, com quais resultados
+    ├── CHANGELOG-CORRECAO.md      causa-raiz de cada correção, antes × depois
+    ├── TESTES-E-EVIDENCIAS.md     o que passou, o que falhou e o que não deu para testar
+    ├── REVISAO-2.md               os 9 defeitos da revisão 2, um por um
+    ├── REVISAO-3.md               stream cortado, 401 por código e cache de falha
+    ├── REVISAO-4.md               consolidação + divergências de max_tokens e identidade
+    ├── REVISAO-4.1.md             correção do verificador (400 unsupported_parameter)
+    ├── TAMA_T03_B0_BLOQUEIO_SIWC.md   o que fazer no Windows para liberar os modelos
+    ├── GATEWAY_REV3_ACESSO_PRIVADO_STATUS.md  Tailscale: estado e rollback do Serve
+    ├── validacao/                 onde VALIDAR-MODELOS-REAIS.cmd grava os relatórios
+    └── MIGRACAO-E-ROLLBACK.md     reinstalar, repetir o instalador e voltar atrás
+```
 
-| Área | Estado |
-|---|---|
-| Interface de chat própria (desktop + mobile) | ✅ implementada |
-| Streaming SSE ponta a ponta (gateway → backend → navegador) | ✅ implementado e testado |
-| Sessões persistentes + histórico + retomada de conversa | ✅ implementado e testado |
-| Prompt de identidade Kirana (seção 4 da especificação) | ✅ implementado |
-| Ferramentas: 4 de leitura + 3 de escrita com confirmação | ✅ implementado e testado |
-| Confirmação obrigatória antes de gravar/enviar | ✅ implementado e testado |
-| Memória persistente opcional, com consulta/correção/exclusão | ✅ implementado e testado |
-| Fallback de modelo (primário → alternativo) sem duplicar ações | ✅ implementado e testado |
-| Rate limiting, validação de entrada, CORS/origem, CSP | ✅ implementado e testado |
-| CopilotKit + AG-UI + sites por cliente (Marco 2) | ✅ implementado e testado |
-| **Voz conversacional: ouvir, falar, interromper (Marco 3)** | ✅ implementado e testado em Chromium real |
-| **Solicitações de serviço: rascunho, coleta, arquivo, formulário, validação, confirmação e cancelamento (Fase 5)** | ✅ implementado e testado (envio real depende de endpoint autorizado) |
-| Testes automatizados | ✅ 429 testes, 0 falhas (+ 67 verificações de navegador) |
-| Validação com o gateway ChatGPT real | ⏳ pendente — depende da sua máquina |
-| Meta de 2 s para a primeira resposta útil | ⏳ não medida em condição real |
+## Requisitos
 
----
+- Windows 11
+- Node.js **20.20 ou superior** (o Gateway exige `>=20.20`)
+- PowerShell 5.1 (já vem no Windows)
 
-## 2. Requisitos
+## Instalação em dois comandos
 
-- **Node.js 20.6 ou superior** (testado com 20.20 aqui e 24.15 no Windows).
-- **Instalação de dependências obrigatória com `pnpm`** desde a v0.4.0 (o projeto usa
-  `pnpm-lock.yaml` como fonte da verdade). O orquestrador usa `@langchain/langgraph@1.5.2` e
-  `@langchain/core@1.3.0` (versões exatas). Até a v0.1.2 o projeto era zero-dependência.
-- A versão do gerenciador está fixada em `package.json` (`packageManager: pnpm@9.15.9`), então o
-  `corepack` — que já vem com o Node 20 — usa exatamente essa versão, sem instalação global.
-- Windows 10/11 (as instruções usam `.bat`), macOS ou Linux.
-- O `Kirana-ChatGPT-Gateway v0.2.0` rodando em `http://127.0.0.1:1455` com a `GATEWAY_API_KEY` em mãos.
+```powershell
+# extraia o ZIP em uma pasta nova, por exemplo:
+#    C:\Kirana-sistema\Kirana-v0.5.5-com-Gateway-v0.4.1-Windows
 
----
+.\INSTALAR-WINDOWS.cmd     # instala/repara, cria .env, gera e alinha a chave, faz pré-voo
+.\INICIAR-TUDO.cmd         # sobe Gateway 1455 + Kirana 3000 e ABRE a interface
+```
 
-## 3. Instalação no Windows
+A interface abre sozinha em `http://127.0.0.1:3000`. O `DIAGNOSTICO.cmd` é para conferência
+quando algo não funcionar — não é etapa obrigatória do uso normal.
 
-1. Copie a pasta `kirana` para o computador (por exemplo `C:\CRiando coisa nova\kirana`).
-2. Confirme que o Node está instalado:
-   ```bat
-   node --version
-   ```
-   Se não estiver, instale o Node 20 LTS em <https://nodejs.org>.
-3. Instale as dependências (uma única vez, dentro da pasta da Kirana):
-   ```bat
-   corepack pnpm install --frozen-lockfile
-   ```
-   O `--frozen-lockfile` garante que a instalação use exatamente o `pnpm-lock.yaml` versionado:
-   se o `package.json` e o lockfile divergirem, a instalação falha em vez de gerar uma árvore
-   diferente da testada. Não use `npm install` nesta versão: o `package-lock.json` do npm foi
-   removido justamente porque era da v0.2.0 e estava incompatível.
-4. **Ligue o gateway** (o projeto que já funciona). No diretório dele:
-   ```bat
-   cd "C:\CRiando coisa nova\Kirana-ChatGPT-Gateway-v0.2.0"
-   ```
-   Suba o gateway como você já faz hoje e confirme:
-   ```bat
-   curl http://127.0.0.1:1455/health
-   ```
-5. **Configure a Kirana.** Na pasta `kirana`, copie o exemplo e preencha a chave:
-   ```bat
-   copy .env.example .env
-   notepad .env
-   ```
-   Ajuste pelo menos:
-   ```env
-   KIRANA_GATEWAY_URL=http://127.0.0.1:1455
-   KIRANA_GATEWAY_API_KEY=cole_aqui_a_chave_do_gateway
-   ```
-   A chave é a mesma `GATEWAY_API_KEY` do `.env` do gateway. **Não** use a chave da conta ChatGPT.
-6. **Confira o ambiente:**
-   ```bat
-   diagnostico.bat
-   ```
-   O diagnóstico mostra: versão do Node, `.env`, alcance do `/health`, modelos listados, se o
-   modelo primário existe e se a voz (Thalita) está disponível.
-7. **Inicie a Kirana:**
-   ```bat
-   iniciar.bat
-   ```
-   A interface abre em <http://127.0.0.1:3000>.
+Depois de subir, autorize o SIWC **uma vez por execução**:
 
-### Modo demonstração (sem gateway real)
+```
+http://127.0.0.1:1455/auth/start
+```
 
-Se quiser conhecer a interface sem tocar na conta ChatGPT:
+> **Os tokens do SIWC ficam em memória.** Ao reiniciar o Gateway, autorize de novo. Isso é decisão
+> de segurança do próprio Gateway (`src/auth.js:25`), não um defeito desta distribuição.
+
+## Vindo de uma instalação antiga
+
+Não copie pastas da instalação antiga para dentro desta. A ordem segura é:
+
+```powershell
+.\BACKUP-ANTES-DE-LIMPAR.cmd -RaizAntiga "C:\CRiando coisa nova\Kirana" -IncluirEstado
+.\INSTALAR-WINDOWS.cmd
+.\MIGRAR-ENV.cmd -RaizAntiga "C:\CRiando coisa nova\Kirana"     # mostra o plano, não grava
+.\MIGRAR-ENV.cmd -RaizAntiga "C:\CRiando coisa nova\Kirana" -Aplicar
+.\INICIAR-TUDO.cmd
+.\DIAGNOSTICO.cmd
+```
+
+A migração copia **variáveis compatíveis**, renomeia as que mudaram de nome e **recusa** copiar
+coisas como `OPENAI_API_KEY`. Ela nunca imprime valores — só presença e comprimento. Detalhes em
+`docs/MIGRACAO-ENV-E-SIWC.md`.
+
+A remoção das pastas antigas **não é feita por script**. O procedimento está em
+`docs/INSTALACAO-LIMPA.md`, e vem depois da validação.
+
+## Projetos que este pacote não toca
+
+- `Kirana-Arena-Bridge` (0.3.2) — projeto independente, ignorado por todos os scripts.
+- `opportunity-site-pronto` (site Opportunity AI) — idem.
+- Nenhum repositório Git é alterado ou publicado.
+
+## Acesso remoto pelo celular (opcional)
+
+O Gateway continua restrito a `127.0.0.1:1455`. Para o Tama IA no Android alcançar a Kirana pelo
+Tailscale (Serve, não Funnel), a ponte `/api/gateway/*` já vem implementada nesta versão. Configure
+no `Kirana/.env`:
+
+```
+KIRANA_BRIDGE=on
+KIRANA_BRIDGE_TOKEN=<32+ caracteres>
+KIRANA_BRIDGE_REQUIRE_HTTPS=on
+KIRANA_BRIDGE_TRUST_PROXY=on
+KIRANA_ACCESS_TOKEN=<32+ caracteres>
+```
+
+O servidor **não sobe** em combinações perigosas (ponte sem token, HTTPS obrigatório sem proxy
+confiável, proxy confiável sem token da Kirana). Guia do aparelho, do Serve e do diagnóstico de
+camadas: `Kirana/docs/ACESSO-REMOTO-TAILSCALE.md`.
+
+## Se o diagnóstico reprovar
+
+| Veredito | Significado | O que fazer |
+|---|---|---|
+| `Gateway/package.json` FALHA | pacote errado (não é este) | baixe o ZIP desta entrega |
+| `servico ativo e v0.x, pasta declara v0.4.1` | processo antigo ocupando a porta | feche-o; o pacote não mata processo alheio |
+| `.env` FALHA | arquivo ausente | `.\INSTALAR-WINDOWS.cmd` |
+| `SIWC inativa` (aviso) | tokens em memória expiraram com o restart | autorize em `/auth/start` |
+| `GET /v1/models recusado (401)` | autorização não ativa | autorize; se persistir, veja `grantedScopes` em `docs/MIGRACAO-ENV-E-SIWC.md` §4 |
+| `porta ocupada por processo sem /health` | sobra de instalação antiga | encerre manualmente após confirmar o caminho |
+
+## Verificação independente
+
+```powershell
+node tools\verificar-pacote.mjs            # estrutura + versões + marcadores de código
+node tools\verificar-pacote.mjs --testes   # + executa as duas suítes (76 e 531 testes)
+node tools\teste-scripts.mjs               # sintaxe dos .ps1 + migração sem vazar segredo
+```
+
+## Validar os modelos reais (depois de autorizar a conta)
+
+O Gateway só mostra catálogo e responde com modelo quando a conta está autorizada (SIWC).
+Depois de abrir `http://127.0.0.1:1455/auth/start` e concluir o login:
 
 ```bat
-iniciar-demo.bat
+VALIDAR-MODELOS-REAIS.cmd
 ```
 
-Isso sobe um **gateway simulado** (`scripts/mock-gateway.js`) e a Kirana apontando para ele.
-As respostas são geradas por script — serve para ver streaming, ferramentas e confirmação.
-Nesse modo não há modelo real: as respostas são obviamente sintéticas.
+Ele faz, em ordem, e para no primeiro bloqueio:
 
-### Prévia no navegador (somente demonstração)
-
-Este pacote inclui `docs/preview-interface.html`, uma **prévia estática** (HTML autocontido) da
-interface, para revisar o design sem subir nada. Se a Kirana estiver rodando em um ambiente que
-exibe a página dentro de um iframe de outra origem (sandbox/IDE online), use
-`KIRANA_ALLOW_EMBED=true` — em uso normal mantenha `false`, que a interface só pode ser enquadrada
-pela própria origem.
-
-### Linux / macOS
-
-```bash
-cp .env.example .env       # preencha KIRANA_GATEWAY_API_KEY
-node scripts/doctor.mjs
-node src/server.js
-```
-
----
-
-## 4. Configuração (`.env`)
-
-Todas as variáveis são opcionais, exceto a chave do gateway. Valores padrão entre parênteses.
-
-| Variável | Função |
+| # | O que verifica |
 |---|---|
-| `KIRANA_GATEWAY_URL` | Endereço do gateway (`http://127.0.0.1:1455`) |
-| `KIRANA_GATEWAY_API_KEY` | Chave do gateway. **Só no backend** |
-| `KIRANA_PRIMARY_MODEL` | Modelo preferencial (`gpt-6-luna`) |
-| `KIRANA_FALLBACK_MODEL` | Modelo alternativo (`gpt-6.1-sol`) |
-| `KIRANA_ALLOW_FALLBACK` | Permite fallback (`true`) |
-| `KIRANA_MODEL_PROBE` | Confere `/v1/models` antes de usar o primário (`true`) |
-| `KIRANA_HOST` / `KIRANA_PORT` | Onde a Kirana escuta (`127.0.0.1` / `3000`) |
-| `KIRANA_ACCESS_TOKEN` | Token opcional entre navegador e backend (vazio) |
-| `KIRANA_RATE_LIMIT_MAX` / `_WINDOW_MS` | Limite por IP (`20` / `60000`) |
-| `KIRANA_AGENT_RATE_MAX` | Limite de `/api/copilot` e `/api/agui` por IP (`0` = desligado; use ~60 em produção) |
-| `KIRANA_ENV` | `development` (padrão) ou `production` (exige token e fecha as rotas privadas) |
-| `KIRANA_TRUST_PROXY` | Confia em `X-Forwarded-For` do proxy (`false`; **ligue** atrás de Caddy/Nginx) |
-| `KIRANA_ALLOWED_ORIGINS` | Origens extras autorizadas a chamar a Kirana (CORS), além do `site.json` |
-| `KIRANA_EMBED_ORIGINS` | Origens autorizadas a embutir a interface em iframe (`frame-ancestors`) |
-| `KIRANA_FIRST_TOKEN_TIMEOUT_MS` | Tempo máximo para o 1º token (`20000`) |
-| `KIRANA_REQUEST_TIMEOUT_MS` | Tempo máximo da requisição (`120000`) |
-| `KIRANA_MAX_TOOL_ROUNDS` | Rodadas de ferramenta por mensagem (`4`) |
-| `KIRANA_HISTORY_LIMIT` | Mensagens de histórico enviadas ao modelo (`24`) |
-| `KIRANA_ORCHESTRATOR` | `langgraph` (padrão) ou `legacy` (rollback para o loop da Fase 1) |
-| `KIRANA_SEND_TEMPERATURE` | Envia `temperature` ao gateway (`false` — v0.2.0 recusa) |
-| `KIRANA_SEND_MAX_TOKENS` | Envia `max_tokens` ao gateway (`false`) |
-| `KIRANA_SEND_TOOL_CHOICE` | Envia `tool_choice` ao gateway (`false`) |
-| `KIRANA_TEMPERATURE` / `KIRANA_MAX_TOKENS` | Valores usados só se os campos acima forem habilitados |
-| `KIRANA_DATA_DIR` | Onde ficam sessões, memória e interesses (`./data`) |
+| 0 | `/health`, `/v1/engine`, `/auth/status`, `/v1/capabilities` |
+| 1 | catálogo real em `/v1/models` |
+| 2 | inferência real (uma requisição curta) |
+| 2.2 | **identidade do modelo** pelo `/v1/runs` (`identityVerified`) — o `model` da resposta é só o nome pedido |
+| 3 | streaming SSE real com `[DONE]` |
+| 4 | cancelamento não derruba o Gateway |
+| 5 | erros diferenciados (`model_not_available`, `invalid_json`, `not_found`) |
+| 6 | nenhuma chave/token nos logs |
 
----
+Relatórios gerados em `docs\validacao\`.
 
-## 5. Como usar
+Opções: `--catalogo` (só lista, não gera), `--modelo <slug>`, `--com-cancelamento`, `--base <url>`.
+Código de saída: `0` tudo certo · `1` alguma falha · `3` bloqueado por falta de SIWC.
 
-- **Conversar:** escreva e pressione `Enter` (`Shift+Enter` quebra linha).
-- **Interromper:** botão *Interromper* durante a geração — o backend cancela a requisição no gateway.
-- **Nova conversa / histórico:** barra lateral; conversas antigas podem ser reabertas.
-- **Ferramentas:** as de leitura rodam sozinhas; as de escrita **sempre** pedem confirmação em
-  um cartão na conversa. Se você clicar *Não* ou simplesmente continuar a conversa, nada é gravado.
-- **Memória:** botão *Memória* mostra o que está guardado; você pode adicionar (com caixa de
-  consentimento obrigatória), corrigir e apagar.
+> **Sobre limites:** o Gateway 0.4.1 **rejeita `max_tokens`** (`400 unsupported_parameter`) —
+> não existe teto de tokens configurável nesta versão. Os limites reais são 180 s e 4 MiB por
+> requisição (lado Gateway); este verificador usa 60 s e 200 kB.
+> Chamadas de geração: **2** no fluxo padrão (inferência + streaming), **3** com
+> `--com-cancelamento`, **0** com `--catalogo`. Prompt curto reduz consumo, mas não é garantia de custo.
 
-### Ferramentas da Fase 5 (solicitações)
-
-| Ferramenta | Tipo | O que faz |
-|---|---|---|
-| `get_service_requirements` | leitura | Requisitos do serviço; **diz** quando o site não publica requisitos |
-| `start_service_request` | leitura (estado local) | Cria ou **retoma** o rascunho da solicitação na sessão |
-| `fill_site_form` | navegação | Preenche o formulário real com os dados coletados — **nunca envia** |
-| `request_file_upload` | navegação | Pede o arquivo; o servidor valida tipo, tamanho e assinatura |
-| `validate_service_request` | leitura | Válidos, ausentes, erros, próxima ação e próximo campo |
-| `submit_service_request` | **escrita (confirmação)** | Só envia com dados válidos, aprovação e endpoint autorizado |
-| `get_request_status` | leitura | Estado real e histórico — sem prazo estimado |
-| `cancel_service_request` | **escrita (confirmação)** | Cancela e descarta dados e arquivos |
-
-Sem `endpoints.submitRequest` configurado — o caso de hoje — a Kirana **não
-envia**: mantém o rascunho e informa o canal oficial. Inventário completo das 24
-ferramentas em [`docs/FASE5-AUDITORIA-FERRAMENTAS.md`](docs/FASE5-AUDITORIA-FERRAMENTAS.md).
-
-### Ferramentas da Fase 1
-
-| Ferramenta | Tipo | O que faz |
-|---|---|---|
-| `consultar_servicos` | leitura | Catálogo dos 6 serviços publicados no site |
-| `consultar_produtos` | leitura | Projetos do Opportunity Labs com o estágio publicado |
-| `consultar_status_projeto` | leitura | Andamento de projeto — **dados simulados** (`PRJ-001` a `PRJ-003`) |
-| `consultar_memoria` | leitura | Informações que você autorizou guardar |
-| `registrar_interesse_comercial` | escrita | Grava a solicitação **localmente**; não envia e-mail/CRM |
-| `salvar_memoria` | escrita | Guarda uma informação que você pediu para lembrar |
-| `apagar_memoria` | escrita | Remove uma informação guardada |
-
-Nada é executado por comando arbitrário: os argumentos são validados contra JSON Schema no
-servidor, ferramentas de escrita só rodam após confirmação, e o modelo não tem acesso a shell,
-arquivos ou rede.
-
----
-
-## 5.1 Compatibilidade de payload com o Gateway v0.2.0
-
-O Gateway v0.2.0 aceita apenas campos *ChatGPT-plan-compatible* e responde **HTTP 400
-`unsupported_parameter`** para os demais (caso real: `temperature`). Por isso:
-
-- a requisição envia somente `model`, `messages`, `stream` e, quando há ferramentas, `tools`;
-- `temperature`, `max_tokens` e `tool_choice` ficam desligados por padrão (`KIRANA_SEND_*`);
-- `parallel_tool_calls`, penalidades e afins **nunca** são enviados;
-- se o gateway rejeitar um campo assim mesmo, a Kirana **remove o campo e repete uma vez**,
-  antes de qualquer token (sem duplicar texto ou ações);
-- o payload é montado em um único lugar, `src/payload.js`, com allowlist e teste dedicado.
-
-Detalhes e relatório: [`docs/CORRECAO-GATEWAY-V0.2.0.md`](docs/CORRECAO-GATEWAY-V0.2.0.md).
-
-### Auditoria do payload
-
-```bash
-npm run audit        # sonda de contrato ponta a ponta (0 violações esperadas)
-```
-
-### Se aparecer erro 400
-
-1. A mensagem do cartão de erro indica o campo reclamado.
-2. `diagnostico.bat` mostra Node, `.env`, `/health`, `/v1/models` e modelos disponíveis.
-3. Confira se algum `KIRANA_SEND_*` está `true` no `.env` (o padrão é `false`).
-4. Se persistir, copie a mensagem exata — a recuperação automática já remove um campo por vez.
-
-## 5.2 Encerramento do turno (correção v0.2.1)
-
-Ao terminar uma resposta, o indicador "Kirana está escrevendo…" precisa sumir. Duas causas foram
-corrigidas:
-
-1. **CSS:** `.composer-status { display: flex }` vencia a regra do navegador para `[hidden]`, então
-   `hidden = true` não escondia nada. Adicionada a regra global
-   `[hidden] { display: none !important; }`.
-2. **Estado do cliente:** o compositor agora é dirigido por `public/stream-state.js`, que volta a
-   ocioso em **todos** os desfechos — `done`, erro, cancelamento e encerramento inesperado do
-   stream (sem `done`).
-
-O backend também passou a **cancelar a leitura da resposta do gateway** ao receber `[DONE]`
-(antes o socket ficava aberto: um vazamento por turno).
-
-## 6. Testes
-
-```bash
-npm test          # ou testar.bat — resolve a lista de arquivos, sem glob do shell
-```
-
-Resultado desta entrega: **340 testes, 340 aprovados, 0 falhas** (~3 min),
-mais **15 verificações** de navegador do site de demonstração e **34** da voz
-(`test/browser/voice-flow.mjs`). A voz real também tem medição própria:
-`npm run voice:bench`.
-
-Cobrem, entre outros:
-
-- parser de SSE (fragmentação, CRLF, múltiplos eventos, `[DONE]`);
-- validação de JSON Schema das ferramentas;
-- memória (consentimento obrigatório, bloqueio de dados sensíveis, limite, persistência);
-- sessões (títulos, exclusão, reparo de contexto, métricas);
-- ferramentas (leitura x escrita, argumentos inválidos, ferramenta desconhecida);
-- cliente do gateway (texto, tool calls fragmentadas, 401, 404, 5xx, abort, timeout);
-- payload do gateway (allowlist, ausência de `temperature`, saneamento de mensagens, recuperação
-  de campo rejeitado);
-- contrato completo do payload (`test/contract.test.js`): validação de formato, bloqueio local de
-  payload inválido e fluxos reais (ferramentas, memória, fallback, interrupção) sem nenhuma
-  violação;
-- integração HTTP real: chat com streaming, contexto entre turnos, ciclo completo de ferramenta
-  de leitura, fluxo de confirmação (aprovar/recusar/expirar), fallback de modelo, rate limit,
-  token de acesso, bloqueio de origem, erros de entrada e memória via API.
-
-Os testes usam um **gateway falso local** — não consomem a conta ChatGPT e não precisam do `.env`.
-
----
-
-## 7. Benchmark de modelos
-
-```bash
-node scripts/benchmark.mjs --models gpt-6-luna,gpt-6.1-sol --n 10 --context
-```
-
-Mede tempo até o primeiro token útil, tempo total e taxa de sucesso por modelo e cenário,
-chamando o gateway pelo mesmo caminho usado pela Kirana. Salva JSON em `data/benchmark-*.json`.
-
----
-
-## 8. Segurança — resumo
-
-- `GATEWAY_API_KEY` e tokens OAuth ficam apenas no backend; nunca no HTML/JS/logs (o logger redige segredos).
-- Frontend e backend na mesma origem, com verificação de `Origin`, CSP, `nosniff` e sem `eval`.
-- Rate limiting por IP nas rotas de chat.
-- Validação de entrada (JSON, tamanho, campos) e de saída das ferramentas.
-- Ferramentas de escrita exigem confirmação; leitura e escrita são registros separados.
-- `.env` no `.gitignore`; `data/` (sessões, memória, interesses) fora do versionamento.
-- A porta `1455` não deve ser exposta; a Kirana escuta em `127.0.0.1` por padrão.
-
-Detalhes e checklist de publicação: [`docs/SEGURANCA-PRIVACIDADE.md`](docs/SEGURANCA-PRIVACIDADE.md).
-
-> ⚠️ **Não publique este serviço na internet.** A autorização *Sign in with ChatGPT* é pessoal.
-> Uso multiusuário/comercial exige revisar os termos aplicáveis e uma arquitetura própria
-> (ver documentos citados acima).
-
----
-
-## 9. Estrutura
-
-```text
-kirana/
-├─ iniciar.bat / iniciar-demo.bat / testar.bat / diagnostico.bat
-├─ .env.example                  # sem credenciais
-├─ src/
-│  ├─ server.js                  # HTTP, rotas, SSE, arquivos estáticos
-│  ├─ agent.js                   # orquestração do turno, fallback, ferramentas, confirmação
-│  ├─ gateway.js                 # cliente do gateway (formato OpenAI)
-│  ├─ prompts.js                 # identidade e regras da Kirana
-│  ├─ sessions.js                # sessões, histórico, reparo de contexto
-│  ├─ memory.js                  # memória persistente opcional
-│  ├─ interests.js               # registro local de interesses comerciais
-│  ├─ tools/                     # registry, definições e busca textual
-│  ├─ catalog/                   # catálogos confirmados (serviços, produtos, projetos)
-│  ├─ config.js / logger.js / sse.js / validation.js / ratelimit.js / http-utils.js
-├─ public/                       # interface (HTML/CSS/JS, sem dependências)
-├─ scripts/                      # mock-gateway, doctor, benchmark, build-preview
-├─ src/payload.js                # montagem/allowlist do payload do gateway
-├─ src/contract.js               # contrato do payload (validação local)
-├─ src/graph.js                  # orquestrador LangGraph (prepare→model→tools→finalize)
-├─ scripts/run-tests.mjs         # executor de testes multiplataforma
-├─ public/stream-state.js         # máquina de estados do compositor (cliente)
-├─ test/                         # 124 testes automatizados
-└─ docs/                         # arquitetura, integração, segurança, relatório
-```
-
-Nenhuma dependência de terceiros: só a biblioteca padrão do Node.
-
----
-
-## 10. Limitações conhecidas desta entrega
-
-1. **Não validada contra o gateway real.** O ambiente de desenvolvimento não tinha acesso ao
-   seu gateway (ele roda em `127.0.0.1` na sua máquina). Toda a validação foi feita com gateway
-   simulado e com o contrato HTTP documentado.
-2. **Dados de projeto são simulados** (`PRJ-001…003`) — marcados como tal nas respostas.
-3. **Interesse comercial não é enviado** para e-mail, WhatsApp ou CRM: fica em
-   `data/interests.jsonl` com status `registrado_localmente_pendente_de_envio`.
-4. **Memória é local e sem usuários** — um único conjunto de dados por instalação.
-5. **Benchmark de modelos e meta de 2 s** ainda não medidos em condição real.
-6. **`.bat` do Windows** foram escritos e revisados, mas executados apenas em ambiente Linux
-   (com os comandos equivalentes). Se algo falhar no Windows, o comando direto é
-   `node src\server.js`.
-7. **Sem autenticação multiusuário**: `KIRANA_ACCESS_TOKEN` é um token único opcional para uso
-   local, não um sistema de contas.
-
----
-
-## 11. Próximos passos recomendados
-
-1. Rodar `diagnostico.bat` na sua máquina e validar **uma conversa real** com o gateway.
-2. Executar `node scripts/benchmark.mjs --models gpt-6-luna,gpt-6.1-sol --n 10 --context` e
-   comparar Luna x Sol com dados reais.
-3. Medir a primeira resposta útil e comparar com a meta de 2 s.
-4. Refinar o prompt com base em conversas reais (perguntas frequentes da Opportunity AI).
-5. Só depois: integração de envio real do interesse comercial e preparação do componente
-   incorporável para `https://opportunity.ia.br`.
-
----
-
-## 11.1 Integração com o Gateway real e produção
-
-| Documento | Conteúdo |
-|---|---|
-| [`docs/INTEGRACAO-GATEWAY-REAL.md`](docs/INTEGRACAO-GATEWAY-REAL.md) | nomes reais das variáveis, autenticação, modelos, streaming, o namespace `gateway.` e as 7 sondas do preflight |
-| [`docs/HOMOLOGACAO-WINDOWS.md`](docs/HOMOLOGACAO-WINDOWS.md) | roteiro de homologação no Windows, critérios de aprovação e o que enviar de volta |
-| [`docs/PRODUCAO.md`](docs/PRODUCAO.md) | arquitetura online, as três opções (com o que cada uma custa e arrisca), segredos, ordem de publicação e rollback |
-| [`docs/AUDITORIA-GATEWAY-v0.5.1.md`](docs/AUDITORIA-GATEWAY-v0.5.1.md) | diagnóstico do defeito do namespace, correções e evidências |
-| [`deploy/`](deploy/README.md) | `Dockerfile`, compose com Caddy, Caddyfile e `.env.production.example` |
-| [`docs/GATEWAY-MUDANCAS-PARA-PRODUCAO.md`](docs/GATEWAY-MUDANCAS-PARA-PRODUCAO.md) | item por item, o que o projeto **separado** do Gateway precisa mudar para operar online (nada é alterado aqui) |
-| [`docs/INTEGRACAO-SITE.md`](docs/INTEGRACAO-SITE.md) | como incluir a Kirana no site com um único `<script>` (kit `kirana-embed.js`) |
-
-> **Por que `GET /api/copilot/info` responde 405:** o runtime é *single-route*. O
-> cliente v2 tenta `GET <runtimeUrl>/info` primeiro e, se receber 2xx, assume o
-> transporte REST — que este runtime não serve (HTTP 400 e painel preso em
-> "conectando…"). Com 405 ele usa o envelope `POST /api/copilot
-> {"method":"info"}`, que devolve `{version, agents:{kirana}, singleRoute}`.
-> Coberto por `test/copilot-routes.test.js`.
-
-**Endpoints de contrato** (nenhum deles devolve credencial):
-
-| Rota | Método | Para quê |
-|---|---|---|
-| `/health` | GET | estado do processo (sem chave) |
-| `/api/site/info` | GET | metadados do site (ferramentas, páginas, rotas, limites) |
-| `/api/copilot/info` | GET | **405 de propósito** — ver nota abaixo |
-| `/api/copilot` | POST | envelope do runtime: `{method:"info"}` devolve `{version, agents}` |
-| `/api/agui` | POST | transporte AG-UI puro (SSE), alternativo |
-| `/api/chat` | POST | SSE da interface vanilla |
-
----
-
-## 12. Documentação
-
-- [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) — componentes, fluxo de um turno, protocolo SSE, decisões.
-- [`docs/INTEGRACAO-SITE.md`](docs/INTEGRACAO-SITE.md) — como incorporar no site no futuro.
-- [`docs/SEGURANCA-PRIVACIDADE.md`](docs/SEGURANCA-PRIVACIDADE.md) — modelo de ameaças e checklist.
-- [`docs/RELATORIO-VALIDACAO.md`](docs/RELATORIO-VALIDACAO.md) — o que foi realmente testado.
-- [`docs/preview-interface.html`](docs/preview-interface.html) — prévia estática da interface.
-- [`docs/VOZ.md`](docs/VOZ.md) — voz: instalação no Windows, estados, interrupção, privacidade e medições.
-- [`docs/AUDITORIA-MARCO3.md`](docs/AUDITORIA-MARCO3.md) — auditoria feita antes de implementar a voz.
-- [`docs/RELATORIO-MARCO3.md`](docs/RELATORIO-MARCO3.md) — o que mudou no Marco 3 e comparação com o Marco 2.

@@ -1,0 +1,20 @@
+Gateway em http://127.0.0.1:1455
+contrato: model, messages, stream, tools, tool_choice, parallel_tool_calls, stream_options
+chamadas de geração previstas: 2
+
+PASS                   0.1  Gateway responde em /health — HTTP 200 · 36ms
+PASS                   0.2  estado do motor (/v1/engine) — version=0.4.1 · authenticated=false · catálogo=0 · routing=false · primário=null
+BLOQUEADO_AUTENTICACAO 0.3  conta autorizada (SIWC) — authenticated=false — abra http://127.0.0.1:1455/auth/start
+PASS                   0.4  /auth/status — authenticated=false · armazenamento=memory-only · escopos=(nenhum)
+PASS                   0.5  /v1/capabilities — 11 declarada(s) · prontas: files.create,files.upload,files.download · não prontas: text.chat,images.analyze,images.generate,images.edit,video.analyze,video.generate,audio.transcribe,audio.synthesize
+BLOQUEADO_AUTENTICACAO 1.1  catálogo real obtido — authentication_required — 2ms
+PASS                   6.1  nenhum segredo nos logs — 4 arquivo(s) · 0 ocorrência(s)
+chamadas de geração nesta execução: 0 (previstas: 2)
+RESULTADO: 5 PASS · 0 FALHA · 2 bloqueado(auth) · 0 inconclusivo · 0 não executado
+Veredito do modelo: BLOQUEADO_AUTENTICACAO
+Relatórios em ./docs/validacao
+
+PRÓXIMA AÇÃO (só o proprietário pode fazer):
+  1. abra http://127.0.0.1:1455/auth/start neste computador
+  2. conclua o login do SIWC
+  3. rode este verificador de novo

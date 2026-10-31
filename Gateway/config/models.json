@@ -1,0 +1,32 @@
+{
+  "_leia_isto": [
+    "Catálogo de modelos do Gateway — fonte de verdade para roteamento por CAPACIDADE.",
+    "Regra: só declare o que você sabe. Capacidade declarada NÃO é capacidade testada.",
+    "O campo `tested` só deve ser preenchido depois de um teste real registrado",
+    "(use: node test/quality-suite.mjs --registrar).",
+    "Este arquivo veio VAZIO de propósito: nenhum modelo aqui foi testado neste pacote.",
+    "Modelos fora deste arquivo continuam funcionando para texto (capacidade baseline",
+    "do Gateway); o que falta é a informação declarada sobre capacidades especiais."
+  ],
+  "_exemplo": {
+    "model": "<slug exato de GET /v1/models>",
+    "provider": "siwc-responses",
+    "cost": "plan",
+    "notes": "por que acredita nisso e onde leu",
+    "capabilities": {
+      "text.chat": true,
+      "reasoning": true,
+      "coding": true,
+      "tools": true,
+      "json": true,
+      "images.analyze": false,
+      "audio.transcribe": false,
+      "media.generate": false,
+      "long_context": true
+    },
+    "tested": {
+      "text.chat": { "ok": true, "detail": "quality-suite 2026-10-29", "source": "local" }
+    }
+  },
+  "models": []
+}

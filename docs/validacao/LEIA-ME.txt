@@ -1,0 +1,8 @@
+Esta pasta recebe os relatorios de VALIDAR-MODELOS-REAIS.cmd:
+  GATEWAY_REV3_VALIDACAO_MODELOS_REAIS.md
+  GATEWAY_REV3_MATRIZ_MODELOS_E_STREAMING.md
+
+Os arquivos .md presentes aqui sao da execucao de 30/10/2026 no ambiente de
+desenvolvimento (BLOQUEADO por falta de SIWC). Ao rodar o verificador na sua
+maquina com a conta autorizada, eles sao substituidos pela SUA execucao.
+Versao de referencia do formato: REV4 (Kirana 0.5.4 / Gateway 0.4.1).

@@ -1,0 +1,6 @@
+=== PROVA DO DEFEITO (corpo COM max_tokens, como o verificador da REV4 enviava) ===
+HTTP 400
+{"error":{"message":"Unsupported request field: max_tokens. This gateway only forwards validated ChatGPT-plan-compatible fields.","type":"gateway_error","code":"unsupported_parameter","retryable":false}}
+=== MESMO pedido SEM max_tokens (contrato respeitado) ===
+HTTP 401
+{"error":{"message":"Run the local Sign in with ChatGPT flow first.","type":"authentication_error","code":"authentication_required","retryable":false}}
