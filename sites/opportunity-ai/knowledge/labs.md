@@ -60,11 +60,13 @@ conversar com a equipe.
   clima, avisos e memória; inclui pesquisa de voz natural em português brasileiro.
 - **MordenRPG:** portal e comunidade de RPG de mesa, com recursos para jogadores e
   narradores: compêndio do Tormenta 20 (raças, classes, equipamentos, magias, monstros),
-  Oficina de Heróis, homebrew e mesa online com campanhas e one-shots.
+  Oficina de Heróis, homebrew e mesa online com campanhas e one-shots. Projeto distinto
+  do Armada Nexus RPG.
 - **Armada Nexus RPG:** mesa virtual de RPG completa, com dezenas de funções: mapas de
   batalha, tokens, fog of war (névoa de guerra), rolagem de dados, fichas, modo tático
-  com combate e modo explorador, controle de turnos e automação de regras. A ficha do
-  MordenRPG é ligada diretamente à mesa (importa os mesmos dados) e a mesa cobre uso,
+  com combate e modo explorador, controle de turnos e automação de regras. É um projeto independente: funciona
+  sozinho ou integrado ao portal MordenRPG, com a ficha ligada diretamente à mesa (importa
+  os mesmos dados). A mesa cobre uso,
   customização e arremesso de armas, poderes, magias e bestiário completos do
   Tormenta 20.
 - **AI Image Studio:** geração de imagens por IA (personagens, cenários, concept art
