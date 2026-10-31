@@ -52,7 +52,7 @@ test('get_site_context devolve identidade, página atual e o que não está disp
   assert.equal(result.servicoEmFoco.serviceId, 'voz');
   assert.equal(result.paginaConhecida, true);
   assert.ok(result.rotasPermitidas >= 20);
-  assert.equal(result.conhecimento.documentos, 14);
+  assert.equal(result.conhecimento.documentos, 15);
   // Fase 5: upload existe com política declarada (e nunca executa arquivo).
   assert.equal(result.uploads.disponivel, true);
   assert.equal(result.uploads.maxMb, 5);
@@ -75,12 +75,12 @@ test('list_site_pages só devolve páginas internas autorizadas', () => {
   assert.ok(result.paginas.some((page) => page.caminho === '/contato'));
 });
 
-test('list_services devolve o catálogo real (6), nunca inventado', () => {
+test('list_services devolve o catálogo real (7), nunca inventado', () => {
   const result = call('list_services');
   assert.equal(result.ok, true);
-  assert.equal(result.servicos.length, 6);
+  assert.equal(result.servicos.length, 7);
   const ids = result.servicos.map((service) => service.serviceId).sort();
-  assert.deepEqual(ids, ['agentes-ia', 'atendimento', 'automacao', 'crm-vendas', 'relatorios', 'voz']);
+  assert.deepEqual(ids, ['agentes-ia', 'atendimento', 'automacao', 'crm-vendas', 'relatorios', 'sites-sistemas', 'voz']);
   for (const service of result.servicos) {
     assert.match(service.caminho, /^\/solucoes\//);
     assert.ok(service.nome.length > 3);

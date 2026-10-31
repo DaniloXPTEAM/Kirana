@@ -1,15 +1,15 @@
 ---
 id: solucoes
-title: Soluções (visão geral das seis frentes)
+title: Soluções (visão geral das sete frentes)
 source: https://opportunity.ia.br/solucoes/
-capturedAt: 2026-10-26
+capturedAt: 2026-10-31
 path: /solucoes/
 tags: [solucoes, visao-geral, catalogo, frentes]
 ---
 
 # Soluções
 
-Seis frentes de trabalho. O escopo é definido junto com o cliente, e o site
+Sete frentes de trabalho. O escopo é definido junto com o cliente, e o site
 deixa claro **o que é oferta atual e o que ainda é pesquisa**.
 
 ## Como a página apresenta cada frente
@@ -17,7 +17,7 @@ deixa claro **o que é oferta atual e o que ainda é pesquisa**.
 Para cada solução, a página mostra o **problema** (situação comum) e a
 **aplicação** proposta. O detalhe de cada uma fica em `/solucoes/<id>`.
 
-## As seis frentes (resumo do que está na página)
+## As sete frentes (resumo do que está na página)
 
 - **Agentes de IA personalizados** — tarefas que dependem de interpretar pedidos
   em linguagem natural consomem tempo da equipe; aplicação em triagem de
@@ -28,6 +28,10 @@ Para cada solução, a página mostra o **problema** (situação comum) e a
 - **CRM e automação de vendas** — oportunidades se perdem quando o
   acompanhamento depende de memória, planilhas e conversas soltas; aplicação na
   organização do funil comercial e em lembretes de retorno.
+- **Sites e sistemas personalizados** — o negócio precisa de presença digital, de um
+  catálogo próprio ou de um controle que nenhum sistema de prateleira resolve do jeito
+  que a operação funciona; aplicação em site institucional, catálogo, agendamento e
+  sistemas internos sob medida, começando pelo que resolve o problema mais urgente.
 - **Workflows e automação** — tarefas repetitivas entre sistemas tomam horas e
   favorecem erros; aplicação em coleta e tratamento de dados, organização de
   arquivos e integração de ferramentas.
@@ -35,8 +39,8 @@ Para cada solução, a página mostra o **problema** (situação comum) e a
   aplicação em resumos executivos, análise de indicadores e rascunhos de
   apresentações.
 - **Agentes de voz e Android** — interagir por voz ainda é pouco natural em
-  muitas soluções; aplicação em **pesquisa e prototipagem** de assistentes de
-  voz para Android e web.
+  muitas soluções; aplicação em conversas por voz em português do Brasil, com
+  **pesquisa e prototipagem** de assistentes de voz para Android e web (ligada ao projeto Gabi).
 
 ## Convite da página
 
@@ -46,4 +50,5 @@ WhatsApp publicado.
 
 ## O que não está nesta página
 
-Não há preço, plano, prazo nem case de cliente publicados.
+Não há preço, plano, prazo nem case de cliente publicados. Escopo, prazo e valor são
+combinados na conversa, antes de qualquer compromisso.

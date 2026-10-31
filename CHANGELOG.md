@@ -1,5 +1,31 @@
 # Changelog — Kirana
 
+## Conhecimento do site atualizado — 31/10/2026 (site novo: projetos ativos, 7 frentes)
+
+O site da Opportunity AI foi atualizado (repositório `opportunity-site`) e a base de
+conhecimento da Kirana acompanha, para o agente não contradizer o site. Conferido contra
+as 23 páginas do `sitemap.xml` de opportunity.ia.br lidas em 31/10/2026.
+
+### Alterado
+- **Estado dos projetos:** os 9 projetos do Labs passam a "Ativo" (`knowledge/labs.md`,
+  `knowledge/limites-e-faq.md`, `src/catalog/products.json`). "Ativo" = em andamento e mantido
+  pela equipe; não é preço, plano nem promessa de entrega.
+- **Catálogo de produtos:** de 4 para 9 projetos (Gabi, MordenRPG, Armada Nexus RPG, AI Image
+  Studio e RPG Comic Chronicles), com o endereço público do MordenRPG e do Armada Nexus.
+- **Nova frente "Sites e sistemas personalizados"** (7 frentes): `knowledge/servicos-sites-sistemas.md`,
+  `knowledge/solucoes.md`, `site.json`, `requirements.json` e sinônimos em `request-tools.js`.
+- **Formulário:** `knowledge/contato-e-privacidade.md` com as 9 áreas de interesse e o consentimento
+  obrigatório do site novo.
+- **FAQ:** perguntas sobre projetos ativos e sobre o WhatsApp (API oficial).
+- Testes ajustados (15 documentos, 7 serviços, estágio "Ativo"). Suíte: 410 passam; as 69 falhas são as
+  mesmas de antes (`voice-*`, fora deste escopo).
+
+### Não alterado de propósito (decisão pendente do responsável)
+- `knowledge/empresa.md`, `knowledge/termos.md` e o trecho de "Clientes e cases" de
+  `knowledge/limites-e-faq.md` ainda trazem "pré-seed", "ainda não possui CNPJ" e "produtos por
+  iniciativa própria" (do site antigo). O site novo não publica isso; confirmar se continuam valendo.
+- `site-sync` aponta `/solucoes/sites-sistemas` como rota ainda não publicada: só existirá com o site novo.
+
 ## 0.5.3 (correção 1) — 27/10/2026 (continuação com várias ferramentas: fim do HTTP 400)
 
 Correção de um defeito de **contexto**, encontrado com o Gateway ChatGPT v0.4.0

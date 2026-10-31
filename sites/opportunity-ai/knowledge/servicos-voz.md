@@ -24,7 +24,8 @@ Protótipos de conversa por voz · testes de latência e naturalidade · integra
 aplicativo Android quando combinada.
 
 ## Limitações declaradas
-- **Área em pesquisa e prototipagem**; desempenho depende de dispositivo, rede e
-  serviços de voz usados.
+- Frente ligada ao projeto **Gabi** (ativo no Opportunity Labs), com **pesquisa e
+  prototipagem** de voz natural; desempenho depende de dispositivo, rede e serviços de
+  voz usados.
 
 Página: https://opportunity.ia.br/solucoes/voz

@@ -174,6 +174,6 @@ test('o conhecimento é servido por site e é o mesmo objeto em cache', () => {
   const first = siteContext.knowledgeFor(SITE);
   const second = siteContext.knowledgeFor(SITE);
   assert.equal(first, second, 'cache evita reler 11 arquivos por turno');
-  assert.equal(first.docs.length, 14);
+  assert.equal(first.docs.length, 15);
   assert.equal(siteContext.refreshIfStale(SITE), false, 'nada mudou: não recarrega');
 });

@@ -57,7 +57,7 @@ test('consultar_produtos devolve estágio conforme site', async () => {
   const { registry, ctx } = setup();
   const result = await registry.runRead('consultar_produtos', { produto_id: 'opportunity-crm' }, ctx);
   assert.equal(result.ok, true);
-  assert.equal(result.data.produto.estagio, 'Conceito');
+  assert.equal(result.data.produto.estagio, 'Ativo');
 });
 
 test('consultar_status_projeto marca dados simulados', async () => {
