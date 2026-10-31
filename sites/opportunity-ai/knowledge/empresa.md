@@ -2,7 +2,7 @@
 id: empresa
 title: Identidade da Opportunity AI
 source: https://opportunity.ia.br/sobre
-capturedAt: 2026-10-26
+capturedAt: 2026-10-31
 tags: [empresa, identidade, sobre, fundador, labs, creators, missao]
 ---
 
@@ -16,15 +16,9 @@ prototipar novas ideias.
   com linguagem simples e expectativas realistas.
 - **Mercado:** começa pelo Brasil — atenção ao idioma, ao WhatsApp e à realidade
   dos negócios daqui.
-- **Estágio:** startup em estágio inicial (pré-seed), em fase de construção e
-  validação dos primeiros produtos.
 - **Quem está por trás:** Danilo de Vasconcelos Silva, fundador e CEO, em
   Fortaleza, Ceará, Brasil. Também atua profissionalmente sob o nome social
   **Rafael Nobre**, o mesmo nome do e-mail de contato.
-- **Situação formal (informação pública do site):** a empresa ainda **não tem
-  CNPJ**. O fundador já prestou serviços como pessoa física em dois contratos e
-  desenvolveu os produtos por iniciativa própria. Novas contratações, enquanto
-  não houver CNPJ, seguem como contrato de prestação de serviços com o fundador.
 
 ## Três marcas
 

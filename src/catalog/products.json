@@ -85,7 +85,7 @@
       "nome": "MordenRPG",
       "estagio": "Ativo",
       "url": "https://opportunity.ia.br/labs/mordenrpg",
-      "descricao": "Portal de RPG, comunidade e recursos digitais para jogadores e narradores de mesa.",
+      "descricao": "Portal de RPG, comunidade e recursos digitais para jogadores e narradores de mesa: compêndio do Tormenta 20, Oficina de Heróis, homebrew e mesa online. Projeto de fãs, sem fins comerciais.",
       "categoria": "Plataformas digitais e RPG",
       "palavras_chave": [
         "rpg",
@@ -101,15 +101,21 @@
       "nome": "Armada Nexus RPG",
       "estagio": "Ativo",
       "url": "https://opportunity.ia.br/labs/mesa-vtt",
-      "descricao": "Mesa virtual de RPG com mapas, tokens, fichas, rolagens, controle de turnos e combate.",
+      "descricao": "Mesa virtual de RPG completa: mapas, tokens, fog of war, dados, fichas, modo tático com combate, modo explorador, armas, poderes, magias e bestiário do Tormenta 20; a ficha do MordenRPG é ligada à mesa. Projeto de fãs, sem fins comerciais.",
       "categoria": "Games e sistemas interativos",
       "palavras_chave": [
-        "rpg",
-        "mesa virtual",
-        "vtt",
         "armada nexus",
+        "bestiário",
+        "combate",
+        "explorador",
+        "fog of war",
+        "magias",
         "mapas",
-        "tokens"
+        "mesa virtual",
+        "rpg",
+        "tokens",
+        "tormenta",
+        "vtt"
       ],
       "acesso": "https://xpteamrpg.github.io/mesaonline/mesa/"
     },

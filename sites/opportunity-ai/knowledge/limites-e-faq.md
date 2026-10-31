@@ -19,9 +19,7 @@ caso, no contato.
 **Não há prazos publicados.** O site fala de entregas em etapas, sem datas.
 
 ## Clientes, cases e depoimentos
-**Não há casos de clientes nem depoimentos publicados.** O site informa que os
-produtos foram desenvolvidos por iniciativa própria e não encomendados por
-clientes.
+**Não há casos de clientes nem depoimentos publicados.**
 
 ## Disponibilidade e estágio
 Todos os projetos do Opportunity Labs estão **ativos** (em andamento e mantidos pela
@@ -30,8 +28,9 @@ parecida para o seu negócio, escopo, prazo e valor são combinados na conversa,
 qualquer compromisso. As soluções para empresas são feitas **sob medida**.
 
 ## Perguntas comuns
-- **"Vocês têm CNPJ?"** Ainda não; consta no site como startup pré-seed e os
-  contratos, nesse período, são de prestação de serviços com o fundador.
+- **"Vocês têm CNPJ?"** Essa informação não está publicada no site. Dados formais da
+  empresa e da contratação são tratados direto com a equipe, pelo formulário ou pelo
+  WhatsApp (85) 99946-2763.
 - **"Os projetos estão ativos? Posso usar algum?"** Sim, todos estão ativos. Se algum
   combina com o seu negócio, ou se você precisa de algo parecido, o caminho é contar o
   caso: escopo, prazo e valor são combinados na conversa.

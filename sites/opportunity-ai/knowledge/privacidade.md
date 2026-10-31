@@ -13,10 +13,9 @@ tags: [privacidade, lgpd, dados, cookies, cloudflare]
 
 ## Quem é o controlador
 
-O site pertence à **Opportunity AI**, startup em estágio inicial que **ainda não
-possui CNPJ**. O controlador dos dados é o fundador, **Danilo de Vasconcelos
-Silva** (nome social: **Rafael Nobre**), pessoa física, em Fortaleza, Ceará,
-Brasil. O e-mail de privacidade aparece na página protegido contra robôs
+O site pertence à **Opportunity AI**. O controlador dos dados é o fundador,
+**Danilo de Vasconcelos Silva** (nome social: **Rafael Nobre**), em Fortaleza,
+Ceará, Brasil. O e-mail de privacidade aparece na página protegido contra robôs
 (ofuscado) — não é possível citá-lo aqui sem inventar o endereço.
 
 ## Quais dados são coletados

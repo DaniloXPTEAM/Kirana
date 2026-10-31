@@ -72,7 +72,7 @@ test('a recuperação acha o trecho certo para perguntas reais de visitante', ()
     ['como entro em contato', 'contato'],
     ['posso enviar meus arquivos', 'servico-automacao'],
     // Páginas institucionais (adicionadas na verificação final da Fase 4).
-    ['vocês têm CNPJ?', 'termos'],
+    ['vocês têm CNPJ?', 'limites'],
     ['como vocês tratam meus dados', 'privacidade'],
     ['quais são as sete frentes de trabalho', 'solucoes'],
     ['vocês fazem site ou sistema sob medida?', 'servico-sites-sistemas'],
@@ -96,7 +96,7 @@ test('as páginas institucionais têm documento próprio e explicam sem inventar
     assert.ok(doc.body.length > 300, `${id}: conteúdo suficiente`);
   }
   // Fatos que a Kirana pode afirmar, porque estão publicados.
-  assert.match(knowledge.doc('termos').body, /não possui CNPJ/);
+  assert.doesNotMatch(knowledge.doc('termos').body, /possui CNPJ/, 'não afirma situação formal que o site não publica');
   assert.match(knowledge.doc('termos').body, /não criam contrato/);
   assert.match(knowledge.doc('privacidade').body, /Cloudflare/);
   assert.match(knowledge.doc('privacidade').body, /não usa cookies/);

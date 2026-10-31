@@ -20,10 +20,16 @@ as 23 páginas do `sitemap.xml` de opportunity.ia.br lidas em 31/10/2026.
 - Testes ajustados (15 documentos, 7 serviços, estágio "Ativo"). Suíte: 410 passam; as 69 falhas são as
   mesmas de antes (`voice-*`, fora deste escopo).
 
-### Não alterado de propósito (decisão pendente do responsável)
-- `knowledge/empresa.md`, `knowledge/termos.md` e o trecho de "Clientes e cases" de
-  `knowledge/limites-e-faq.md` ainda trazem "pré-seed", "ainda não possui CNPJ" e "produtos por
-  iniciativa própria" (do site antigo). O site novo não publica isso; confirmar se continuam valendo.
+### Situação formal removida (decisão do responsável)
+- `empresa.md`, `termos.md`, `privacidade.md` e `limites-e-faq.md` deixam de afirmar "pré-seed", "ainda não
+  possui CNPJ" e "produtos por iniciativa própria". Perguntada sobre CNPJ, a Kirana diz que a informação não
+  está publicada e encaminha para a equipe. Teste de `termos` ajustado (não pode afirmar situação formal).
+- `privacidade.md` ainda cita o provedor do site antigo (Cloudflare) e o fundador como controlador dos dados:
+  revisar quando o site novo for publicado.
+
+### Projetos de fãs
+- MordenRPG e Armada Nexus são descritos com o aviso "projeto de fãs, sem fins comerciais; conteúdo oficial do
+  Tormenta 20 pertence aos seus autores", como o próprio app ao vivo declara.
 - `site-sync` aponta `/solucoes/sites-sistemas` como rota ainda não publicada: só existirá com o site novo.
 
 ## 0.5.3 (correção 1) — 27/10/2026 (continuação com várias ferramentas: fim do HTTP 400)

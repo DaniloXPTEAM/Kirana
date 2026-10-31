@@ -59,11 +59,18 @@ conversar com a equipe.
 - **Gabi:** assistente Android com avatar 3D, comandos e respostas por voz, lembretes,
   clima, avisos e memória; inclui pesquisa de voz natural em português brasileiro.
 - **MordenRPG:** portal e comunidade de RPG de mesa, com recursos para jogadores e
-  narradores. Distinto do Armada Nexus RPG.
-- **Armada Nexus RPG:** mesa virtual com mapas de batalha, tokens, fichas, rolagem de
-  dados, controle de turnos e automação de regras.
+  narradores: compêndio do Tormenta 20 (raças, classes, equipamentos, magias, monstros),
+  Oficina de Heróis, homebrew e mesa online com campanhas e one-shots.
+- **Armada Nexus RPG:** mesa virtual de RPG completa, com dezenas de funções: mapas de
+  batalha, tokens, fog of war (névoa de guerra), rolagem de dados, fichas, modo tático
+  com combate e modo explorador, controle de turnos e automação de regras. A ficha do
+  MordenRPG é ligada diretamente à mesa (importa os mesmos dados) e a mesa cobre uso,
+  customização e arremesso de armas, poderes, magias e bestiário completos do
+  Tormenta 20.
 - **AI Image Studio:** geração de imagens por IA (personagens, cenários, concept art
   para games); junto com o Opportunity Creators, produz o conteúdo das personagens.
+- **Aviso sobre MordenRPG e Armada Nexus:** são projetos de fãs, sem fins comerciais; o
+  conteúdo oficial do Tormenta 20 pertence aos seus respectivos autores.
 - **Opportunity Creators:** personagens digitais, influenciadoras virtuais, vídeos,
   campanhas e conteúdo para redes sociais.
 - **RPG Comic Chronicles:** aplicativo web que monta storyboard a partir do roteiro,
