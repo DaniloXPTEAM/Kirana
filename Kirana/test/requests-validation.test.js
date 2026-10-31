@@ -27,7 +27,7 @@ test('loadRequirements lê o catálogo e não inventa requisitos', () => {
   const catalog = loadRequirements({ dir: SITE_DIR });
   assert.ok(catalog);
   assert.equal(catalog.siteId, 'opportunity-ai');
-  assert.ok(catalog.list().length >= 6, 'os 6 serviços do site devem estar cadastrados');
+  assert.ok(catalog.list().length >= 7, 'os 7 serviços do site devem estar cadastrados');
 
   const agentes = requirementsFor(catalog, 'agentes-ia');
   assert.equal(agentes.ok, true);

@@ -39,7 +39,8 @@
     "https://opportunity.ia.br",
     "https://www.opportunity.ia.br",
     "http://localhost:3000",
-    "http://127.0.0.1:3000"
+    "http://127.0.0.1:3000",
+    "https://daniloxpteam.github.io"
   ],
   "routes": {
     "allowlist": [
@@ -49,6 +50,7 @@
       "/solucoes/atendimento",
       "/solucoes/crm-vendas",
       "/solucoes/automacao",
+      "/solucoes/sites-sistemas",
       "/solucoes/relatorios",
       "/solucoes/voz",
       "/labs/",
@@ -74,7 +76,7 @@
       "id": "home",
       "path": "/",
       "title": "Opportunity AI — início",
-      "summary": "Apresentação da empresa, as seis frentes de trabalho e o fluxo de atendimento (contato, qualificação, CRM, pessoa assume).",
+      "summary": "Apresentação da empresa, as sete frentes de trabalho e o fluxo de atendimento (contato, qualificação, CRM, pessoa assume).",
       "aliases": [
         "inicio",
         "home",
@@ -86,7 +88,7 @@
       "id": "solucoes",
       "path": "/solucoes/",
       "title": "Soluções",
-      "summary": "Lista das seis soluções com problema e aplicação de cada uma.",
+      "summary": "Lista das sete soluções com problema e aplicação de cada uma.",
       "aliases": [
         "solucoes",
         "servicos",
@@ -142,6 +144,19 @@
       "serviceId": "automacao"
     },
     {
+      "id": "solucao-sites-sistemas",
+      "path": "/solucoes/sites-sistemas",
+      "title": "Sites e sistemas personalizados",
+      "summary": "Site institucional, catálogo, agendamento e sistemas internos sob medida.",
+      "aliases": [
+        "sites",
+        "sistemas",
+        "site institucional",
+        "sistema sob medida"
+      ],
+      "serviceId": "sites-sistemas"
+    },
+    {
       "id": "solucao-relatorios",
       "path": "/solucoes/relatorios",
       "title": "Relatórios inteligentes",
@@ -190,7 +205,7 @@
       "id": "labs-opportunity-crm",
       "path": "/labs/opportunity-crm",
       "title": "Opportunity CRM (Labs)",
-      "summary": "Gestão comercial com contatos, oportunidades, funil e automações — em conceito.",
+      "summary": "Gestão comercial com contatos, leads, oportunidades, funil e automações — projeto ativo.",
       "aliases": [
         "opportunity crm"
       ]

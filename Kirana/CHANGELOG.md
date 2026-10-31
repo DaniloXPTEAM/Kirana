@@ -1,5 +1,33 @@
 # Changelog — Kirana
 
+## Conhecimento do site atualizado — 31/10/2026 (site novo: projetos ativos, 7 frentes)
+
+O site da Opportunity AI foi atualizado (repositório `opportunity-site`) e a base de conhecimento da Kirana
+acompanha, para o agente não contradizer o site. Conferido contra as 23 páginas do `sitemap.xml` de
+opportunity.ia.br lidas ao vivo em 31/10/2026. Aplicado sobre a v0.5.5.
+
+### Alterado
+- **Estado dos projetos:** os 9 projetos do Labs passam a "Ativo" (`knowledge/labs.md`,
+  `knowledge/limites-e-faq.md`, `src/catalog/products.json`). "Ativo" = em andamento e mantido pela equipe; não é
+  preço, plano nem promessa de entrega. Catálogo de 4 para 9 projetos, com o endereço público do MordenRPG e do
+  Armada Nexus (projetos de fãs, sem fins comerciais).
+- **Nova frente "Sites e sistemas personalizados"** (7 frentes): documento, `site.json`, `requirements.json` e
+  sinônimos em `src/site/request-tools.js`.
+- **Documentos novos:** `estrutura-do-site.md` (seções do site novo, contatos e o que encaminhar ao WhatsApp ou
+  formulário) e `conceitos-afins.md` (conceitos de apoio, sem promessas).
+- **Formulário e FAQ:** `contato-e-privacidade.md` com as 9 áreas de interesse e o consentimento obrigatório;
+  perguntas sobre projetos ativos e sobre o WhatsApp (API oficial).
+- **Origens:** `https://daniloxpteam.github.io` em `allowedOrigins` do `site.json` (site no GitHub Pages).
+- **Situação formal removida (decisão do responsável):** `empresa.md`, `termos.md`, `privacidade.md` e
+  `limites-e-faq.md` deixam de afirmar "pré-seed", "ainda não possui CNPJ" e "produtos por iniciativa própria".
+  Perguntada sobre CNPJ, a Kirana diz que a informação não está publicada e encaminha para a equipe.
+- Testes ajustados (17 documentos, 7 serviços, estágio "Ativo"). Suíte: 534/534.
+
+### Observações
+- `privacidade.md` ainda cita o provedor do site antigo (Cloudflare) e o fundador como controlador dos dados:
+  revisar quando o site novo for publicado.
+- `site-sync` aponta `/solucoes/sites-sistemas` como rota ainda não publicada no site antigo.
+
 ## 0.5.4 — 29/10/2026 (número de versão coerente com a distribuição)
 
 Só numeração e documentação; **nenhuma mudança de comportamento** em relação à 0.5.3.

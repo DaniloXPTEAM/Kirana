@@ -26,9 +26,9 @@ const site = {
   pages: [],
 };
 
-test('a base do site existe, tem os 14 documentos e todos citam fonte e data', () => {
+test('a base do site existe, tem os 17 documentos e todos citam fonte e data', () => {
   const knowledge = loadKnowledge({ dir: KNOWLEDGE_DIR });
-  assert.equal(knowledge.docs.length, 14, 'documentos esperados: 14 (11 iniciais + soluções, privacidade e termos)');
+  assert.equal(knowledge.docs.length, 17, 'documentos esperados: 17 (11 iniciais + soluções, privacidade, termos, sites e sistemas, estrutura do site e conceitos)');
   assert.ok(knowledge.chunks.length >= 20, 'chunks suficientes para recuperação');
 
   for (const doc of knowledge.docs) {
@@ -39,12 +39,12 @@ test('a base do site existe, tem os 14 documentos e todos citam fonte e data', (
   assert.deepEqual(knowledge.warnings, []);
 });
 
-test('o catálogo de serviços é o real: 6 frentes com caminho do site', () => {
+test('o catálogo de serviços é o real: 7 frentes com caminho do site', () => {
   const knowledge = loadKnowledge({ dir: KNOWLEDGE_DIR });
   const services = knowledge.services();
   assert.deepEqual(
     services.map((service) => service.serviceId).sort(),
-    ['agentes-ia', 'atendimento', 'automacao', 'crm-vendas', 'relatorios', 'voz'],
+    ['agentes-ia', 'atendimento', 'automacao', 'crm-vendas', 'relatorios', 'sites-sistemas', 'voz'],
   );
   for (const service of services) {
     assert.match(service.path, /^\/solucoes\//, `${service.serviceId}: caminho real`);
@@ -72,9 +72,12 @@ test('a recuperação acha o trecho certo para perguntas reais de visitante', ()
     ['como entro em contato', 'contato'],
     ['posso enviar meus arquivos', 'servico-automacao'],
     // Páginas institucionais (adicionadas na verificação final da Fase 4).
-    ['vocês têm CNPJ?', 'termos'],
+    ['vocês têm CNPJ?', 'limites'],
     ['como vocês tratam meus dados', 'privacidade'],
-    ['quais são as seis frentes de trabalho', 'solucoes'],
+    ['quais são as sete frentes de trabalho', 'solucoes'],
+    ['vocês fazem site ou sistema sob medida?', 'servico-sites-sistemas'],
+    ['os projetos do labs estão ativos?', 'labs'],
+    ['quais são as seções do site', 'estrutura-do-site'],
     ['mensagem pelo formulário vira contrato?', 'termos'],
   ];
   for (const [query, expected] of cases) {
@@ -94,7 +97,7 @@ test('as páginas institucionais têm documento próprio e explicam sem inventar
     assert.ok(doc.body.length > 300, `${id}: conteúdo suficiente`);
   }
   // Fatos que a Kirana pode afirmar, porque estão publicados.
-  assert.match(knowledge.doc('termos').body, /não possui CNPJ/);
+  assert.doesNotMatch(knowledge.doc('termos').body, /possui CNPJ/, 'não afirma situação formal que o site não publica');
   assert.match(knowledge.doc('termos').body, /não criam contrato/);
   assert.match(knowledge.doc('privacidade').body, /Cloudflare/);
   assert.match(knowledge.doc('privacidade').body, /não usa cookies/);

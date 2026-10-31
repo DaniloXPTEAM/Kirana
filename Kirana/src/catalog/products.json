@@ -1,44 +1,154 @@
 {
-  "version": "2026.10.24",
-  "verifiedAt": "2026-10-24",
+  "version": "2026.10.31",
+  "verifiedAt": "2026-10-31",
   "fonte": "https://opportunity.ia.br/labs/",
-  "observacao": "Registra apenas o que o site publica (projetos do Opportunity Labs). Estágio = exatamente o rótulo do site. Não há produto com preço, licença ou plano comercial confirmado neste sistema.",
+  "observacao": "Registra apenas o que o site publica (projetos do Opportunity Labs). Estado = \"Ativo\" (em andamento e mantido pela equipe), igual ao selo do site; não indica preço, licença ou plano comercial confirmado neste sistema.",
   "products": [
     {
       "id": "opportunity-crm",
       "nome": "Opportunity CRM",
-      "estagio": "Conceito",
+      "estagio": "Ativo",
       "url": "https://opportunity.ia.br/labs/opportunity-crm",
       "descricao": "Gestão comercial inteligente com organização de contatos, oportunidades, funil de vendas e automações.",
       "categoria": "Gestão comercial e inteligência artificial",
-      "palavras_chave": ["crm", "comercial", "funil", "contatos", "oportunidades"]
+      "palavras_chave": [
+        "crm",
+        "comercial",
+        "funil",
+        "contatos",
+        "oportunidades"
+      ]
     },
     {
       "id": "cineforma",
       "nome": "CineForma",
-      "estagio": "Em desenvolvimento",
+      "estagio": "Ativo",
       "url": "https://opportunity.ia.br/labs/cineforma",
       "descricao": "Estúdio que transforma história e referências em roteiro, storyboard, vídeos e montagem final.",
       "categoria": "Criação digital e produção de vídeo com IA",
-      "palavras_chave": ["vídeo", "roteiro", "storyboard", "cinema", "história", "produção"]
+      "palavras_chave": [
+        "vídeo",
+        "roteiro",
+        "storyboard",
+        "cinema",
+        "história",
+        "produção"
+      ]
     },
     {
       "id": "kirana",
       "nome": "Kirana",
-      "estagio": "Em desenvolvimento",
+      "estagio": "Ativo",
       "url": "https://opportunity.ia.br/labs/kirana",
       "descricao": "Agentes autônomos personalizados que conhecem o ambiente digital do cliente, auxiliam usuários e realizam ações autorizadas por meio de integrações.",
       "categoria": "Agentes de IA e automação",
-      "palavras_chave": ["kirana", "agente", "autônomo", "integração", "navegação assistida"]
+      "palavras_chave": [
+        "kirana",
+        "agente",
+        "autônomo",
+        "integração",
+        "navegação assistida"
+      ]
     },
     {
       "id": "opportunity-creators",
       "nome": "Opportunity Creators",
-      "estagio": "Em desenvolvimento",
+      "estagio": "Ativo",
       "url": "https://opportunity.ia.br/labs/creators",
       "descricao": "Personagens digitais, influenciadoras e produção audiovisual com inteligência artificial.",
       "categoria": "Marketing digital e produção criativa com IA",
-      "palavras_chave": ["personagens", "influenciadora", "audiovisual", "marketing", "criadores"]
+      "palavras_chave": [
+        "personagens",
+        "influenciadora",
+        "audiovisual",
+        "marketing",
+        "criadores"
+      ]
+    },
+    {
+      "id": "gabi",
+      "nome": "Gabi",
+      "estagio": "Ativo",
+      "url": "https://opportunity.ia.br/labs/gabi",
+      "descricao": "Assistente pessoal para Android, com avatar 3D, interação por voz, lembretes, clima e avisos.",
+      "categoria": "Aplicativos e assistentes de voz",
+      "palavras_chave": [
+        "gabi",
+        "android",
+        "voz",
+        "assistente",
+        "avatar"
+      ]
+    },
+    {
+      "id": "mordenrpg",
+      "nome": "MordenRPG",
+      "estagio": "Ativo",
+      "url": "https://opportunity.ia.br/labs/mordenrpg",
+      "descricao": "Portal de RPG, comunidade e recursos digitais para jogadores e narradores de mesa: compêndio do Tormenta 20, Oficina de Heróis, homebrew e mesa online. Projeto de fãs, sem fins comerciais.",
+      "categoria": "Plataformas digitais e RPG",
+      "palavras_chave": [
+        "rpg",
+        "mordenrpg",
+        "comunidade",
+        "narrador",
+        "jogador"
+      ],
+      "acesso": "https://xpteamrpg.github.io/mesaonline/"
+    },
+    {
+      "id": "armada-nexus-rpg",
+      "nome": "Armada Nexus RPG",
+      "estagio": "Ativo",
+      "url": "https://opportunity.ia.br/labs/mesa-vtt",
+      "descricao": "Mesa virtual de RPG completa: mapas, tokens, fog of war, dados, fichas, modo tático com combate, modo explorador, armas, poderes, magias e bestiário do Tormenta 20; projeto independente, usável sozinho ou integrado ao portal MordenRPG. Projeto de fãs, sem fins comerciais.",
+      "categoria": "Games e sistemas interativos",
+      "palavras_chave": [
+        "armada nexus",
+        "bestiário",
+        "combate",
+        "explorador",
+        "fog of war",
+        "magias",
+        "mapas",
+        "mesa virtual",
+        "rpg",
+        "tokens",
+        "tormenta",
+        "vtt"
+      ],
+      "acesso": "https://xpteamrpg.github.io/mesaonline/mesa/"
+    },
+    {
+      "id": "ai-image-studio",
+      "nome": "AI Image Studio",
+      "estagio": "Ativo",
+      "url": "https://opportunity.ia.br/labs/image-studio",
+      "descricao": "Geração de imagens por IA para personagens, cenários e concept art de games, com gerador local LongCat.",
+      "categoria": "Inteligência artificial generativa",
+      "palavras_chave": [
+        "imagem",
+        "imagens",
+        "geração de imagens",
+        "concept art",
+        "longcat"
+      ]
+    },
+    {
+      "id": "rpg-comic-chronicles",
+      "nome": "RPG Comic Chronicles",
+      "estagio": "Ativo",
+      "url": "https://opportunity.ia.br/labs/rpg-comic-chronicles",
+      "descricao": "Transforma o roteiro de uma aventura de RPG, ou qualquer história, em revista em quadrinhos.",
+      "categoria": "Criação digital e narrativa com IA",
+      "palavras_chave": [
+        "quadrinhos",
+        "hq",
+        "revista",
+        "roteiro",
+        "storyboard",
+        "rpg"
+      ]
     }
   ]
 }
