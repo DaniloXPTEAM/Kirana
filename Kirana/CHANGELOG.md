@@ -20,6 +20,9 @@ vitrine do site (explica, localiza a seção certa, prepara o contato e encaminh
   Ordem de apelo comercial, como no site: Agente Adaptativo, Opportunity CRM, CineForma, Gabi, Opportunity Creators, AI Image Studio, MordenRPG,
   Armada Nexus RPG e RPG Comic Chronicles. Projetos em destaque: Agente Adaptativo, Opportunity CRM e CineForma.
 
+### Sem aviso de ilustração
+- O site deixa de exibir avisos de "ilustração gerada por IA"; o conhecimento da Kirana também (`termos.md` e `projetos-detalhes.md`).
+
 ### Personalidade
 - `src/prompts.js`: nova seção "Personalidade e tom": atenciosa, curiosa e tranquila; respeitosa e próxima, **nunca informal
   e nunca formal demais** (sem gíria nem "prezado"); retoma o que a pessoa disse; uma pergunta por vez; sem "Claro!" e

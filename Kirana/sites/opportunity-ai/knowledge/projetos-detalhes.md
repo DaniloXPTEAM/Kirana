@@ -108,9 +108,3 @@ Aplicativo web que transforma o roteiro de uma aventura de RPG, ou qualquer hist
 - Estilos de arte à escolha (HQ clássica, mangá, graphic novel); exportação em PDF.
 - Roteiro da missão, personagens e ambientes com imagens de referência.
 - Confere a consistência dos personagens no storyboard **antes** de gerar as cenas.
-
-Arte gerada por IA.
-
-## Sobre as imagens do site
-
-Imagens marcadas como "Ilustração gerada por IA" são ilustrações ou conceitos visuais, não capturas reais do produto. As demais são imagens do próprio projeto.

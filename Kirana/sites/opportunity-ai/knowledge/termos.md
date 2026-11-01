@@ -17,7 +17,7 @@ O site apresenta a **Opportunity AI** e o **Opportunity Labs**. O conteúdo tem 
 
 ## Projetos e estágio de desenvolvimento
 
-Os projetos do catálogo estão **ativos e em evolução**. A contratação de qualquer solução ou projeto é definida caso a caso, em conversa com a equipe: escopo, prazo e valor são combinados antes de qualquer compromisso. Imagens marcadas como "Ilustração gerada por IA" são ilustrações ou conceitos visuais, não capturas reais do produto.
+Os projetos do catálogo estão **ativos e em evolução**. A contratação de qualquer solução ou projeto é definida caso a caso, em conversa com a equipe: escopo, prazo e valor são combinados antes de qualquer compromisso.
 
 ## Propriedade intelectual
 
