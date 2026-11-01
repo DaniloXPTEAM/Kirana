@@ -1,5 +1,77 @@
 # Changelog — Kirana
 
+## Dossiê completo da Opportunity AI para a Kirana do site — 31/10/2026
+
+A Kirana local passa a conhecer, de ponta a ponta, o que o site novo publica, para atuar como atendente e
+vitrine do site (explica, localiza a seção certa, prepara o contato e encaminha à equipe).
+
+### Novo
+- **5 documentos** em `sites/opportunity-ai/knowledge`: `perfil.md` (dossiê da empresa e **resumo fixo do prompt**),
+  `projetos-detalhes.md` (os 9 projetos do Labs, um a um), `como-trabalhamos.md` (4 passos, parte técnica e
+  dúvidas comuns), `demonstracao.md` (Agente Adaptativo e os 6 cenários fictícios) e `guia-de-atendimento.md`
+  (tom, descoberta, para onde levar o visitante, objeções, contato e passagem para uma pessoa). Base: 22 documentos.
+- **Resumo fixo no prompt:** `buildKnowledgePrompt` inclui a seção "Resumo fixo do prompt" do `perfil.md`
+  (marcas, frentes, projetos, contato e limites) em todo turno; o resto continua pelas ferramentas.
+- **Catálogo** (`products.json`): cada projeto ganha `funcionalidades`; MordenRPG e Armada Nexus ganham
+  `acesso_publico` e o aviso de projeto de fãs.
+
+### Nome e ordem dos projetos
+- O projeto "Kirana" do catálogo passa a se chamar **Agente Adaptativo**; Kirana é a identidade principal dele, a atendente deste site.
+  Ordem de apelo comercial, como no site: Agente Adaptativo, Opportunity CRM, CineForma, Gabi, Opportunity Creators, AI Image Studio, MordenRPG,
+  Armada Nexus RPG e RPG Comic Chronicles. Projetos em destaque: Agente Adaptativo, Opportunity CRM e CineForma.
+
+### Sem aviso de ilustração
+- O site deixa de exibir avisos de "ilustração gerada por IA"; o conhecimento da Kirana também (`termos.md` e `projetos-detalhes.md`).
+
+### Personalidade
+- `src/prompts.js`: nova seção "Personalidade e tom": atenciosa, curiosa e tranquila; respeitosa e próxima, **nunca informal
+  e nunca formal demais** (sem gíria nem "prezado"); retoma o que a pessoa disse; uma pergunta por vez; sem "Claro!" e
+  "Posso ajudar em algo mais?" repetidos; sem emoji; honestidade acolhedora quando não sabe. O `guia-de-atendimento.md`
+  ganha o mesmo tom, com exemplos.
+
+### Corrigido
+- **Frases cortadas no chat:** os documentos estavam quebrados em ~80 colunas e o chat da Kirana transforma quebra de linha em
+  `<br />`; se o modelo repetisse o trecho, a frase aparecia cortada. Os 22 documentos foram reescritos com uma linha por
+  parágrafo/item e o carregador (`unwrapSoftBreaks`) passa a juntar essas quebras sempre, mesmo em arquivos futuros. Testes novos.
+- **Rota do CopilotKit v2 (`/api/copilot`) não enviava o bloco do site ao modelo:** a sessão era criada sem `siteId`,
+  então o bloco "Site em que você está atendendo" (conhecimento, perfil, regras de conduta e página atual) nunca entrava
+  no prompt nesse caminho; só as ferramentas funcionavam. Agora a sessão guarda o site e a página (validada) vindos do
+  estado compartilhado. Teste novo em `copilot-agui-endpoint.test.js`.
+- **Busca:** seção longa não é mais cortada em 1200 caracteres; vira vários trechos (antes, o fim de listas longas,
+  como os últimos projetos de `labs.md`, não era buscável). Stopwords: "pelo/pela/pelos/pelas/num/numa/tem/têm/ter".
+- **Conhecimento desatualizado:** `tecnologia-e-processo.md` dizia "seis frentes"; `privacidade.md`,
+  `contato-e-privacidade.md` e `termos.md` agora seguem o texto do site novo (política de 31/10/2026, sem citar o
+  provedor do site antigo; os Termos do site novo são curtos e os demais pontos ficam como referência do site anterior).
+- Testes: 22 documentos e novos casos de recuperação (projetos, processo, demonstração, perfil, guia).
+
+## Conhecimento do site atualizado — 31/10/2026 (site novo: projetos ativos, 7 frentes)
+
+O site da Opportunity AI foi atualizado (repositório `opportunity-site`) e a base de conhecimento da Kirana
+acompanha, para o agente não contradizer o site. Conferido contra as 23 páginas do `sitemap.xml` de
+opportunity.ia.br lidas ao vivo em 31/10/2026. Aplicado sobre a v0.5.5.
+
+### Alterado
+- **Estado dos projetos:** os 9 projetos do Labs passam a "Ativo" (`knowledge/labs.md`,
+  `knowledge/limites-e-faq.md`, `src/catalog/products.json`). "Ativo" = em andamento e mantido pela equipe; não é
+  preço, plano nem promessa de entrega. Catálogo de 4 para 9 projetos, com o endereço público do MordenRPG e do
+  Armada Nexus (projetos de fãs, sem fins comerciais).
+- **Nova frente "Sites e sistemas personalizados"** (7 frentes): documento, `site.json`, `requirements.json` e
+  sinônimos em `src/site/request-tools.js`.
+- **Documentos novos:** `estrutura-do-site.md` (seções do site novo, contatos e o que encaminhar ao WhatsApp ou
+  formulário) e `conceitos-afins.md` (conceitos de apoio, sem promessas).
+- **Formulário e FAQ:** `contato-e-privacidade.md` com as 9 áreas de interesse e o consentimento obrigatório;
+  perguntas sobre projetos ativos e sobre o WhatsApp (API oficial).
+- **Origens:** `https://daniloxpteam.github.io` em `allowedOrigins` do `site.json` (site no GitHub Pages).
+- **Situação formal removida (decisão do responsável):** `empresa.md`, `termos.md`, `privacidade.md` e
+  `limites-e-faq.md` deixam de afirmar "pré-seed", "ainda não possui CNPJ" e "produtos por iniciativa própria".
+  Perguntada sobre CNPJ, a Kirana diz que a informação não está publicada e encaminha para a equipe.
+- Testes ajustados (17 documentos, 7 serviços, estágio "Ativo"). Suíte: 534/534.
+
+### Observações
+- `privacidade.md` ainda cita o provedor do site antigo (Cloudflare) e o fundador como controlador dos dados:
+  revisar quando o site novo for publicado.
+- `site-sync` aponta `/solucoes/sites-sistemas` como rota ainda não publicada no site antigo.
+
 ## 0.5.4 — 29/10/2026 (número de versão coerente com a distribuição)
 
 Só numeração e documentação; **nenhuma mudança de comportamento** em relação à 0.5.3.

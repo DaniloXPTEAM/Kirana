@@ -138,6 +138,33 @@ test('ferramenta de frontend é anunciada com nome, argumentos e id único', asy
   }
 });
 
+test('o prompt de sistema leva o bloco do site (conhecimento, perfil e página) neste caminho', async () => {
+  const gateway = await startFakeGateway({ script: () => ({ text: 'Oi!' }) });
+  const kirana = await startKirana({ gatewayUrl: gateway.url });
+  try {
+    await runCopilot(
+      kirana.base,
+      envelope({
+        threadId: 't-site-prompt',
+        runId: 'r-site-prompt',
+        messages: [{ id: 'm1', role: 'user', content: 'Quais projetos vocês têm?' }],
+        tools: TOOLS,
+        state: { page: 'solucoes', path: '/solucoes/' },
+        forwardedProps: { siteId: 'opportunity-ai', origin: 'https://opportunity.ia.br' },
+      }),
+    );
+    const sistema = gateway.requests[0].messages.find((m) => m.role === 'system').content;
+    assert.match(sistema, /Site em que você está atendendo/);
+    assert.match(sistema, /Opportunity AI/);
+    assert.match(sistema, /Perfil da empresa/, 'resumo fixo do perfil vai em todo turno');
+    assert.match(sistema, /Armada Nexus RPG/);
+    assert.match(sistema, /Página atual do visitante: \*\*Soluções\*\*/, 'a página vem do estado compartilhado, validada');
+  } finally {
+    await kirana.close();
+    await gateway.close();
+  }
+});
+
 test('ferramenta fora do kit do site não é anunciada nem executada', async () => {
   const gateway = await startFakeGateway({
     script: ({ callIndex }) =>

@@ -1,7 +1,7 @@
 {
   "_comentario": "Requisitos por serviço. Regra: só entra aqui o que o site publica. O que a empresa ainda não cadastrou fica explicitamente marcado com disponivel:false — a Kirana informa a lacuna em vez de inventar exigência.",
   "siteId": "opportunity-ai",
-  "capturedAt": "2026-10-26",
+  "capturedAt": "2026-10-31",
   "fonteGeral": "https://opportunity.ia.br/contato",
   "limiteTamanhoArquivoMb": 5,
   "maximoArquivos": 5,
@@ -85,6 +85,26 @@
         "necessarios": false,
         "aceitos": ["pdf", "png", "jpg", "jpeg", "txt", "docx", "xlsx", "csv"],
         "observacao": "Anexo opcional (ex.: planilha de exemplo ou captura de tela do processo)."
+      }
+    },
+    {
+      "serviceId": "sites-sistemas",
+      "titulo": "Sites e sistemas personalizados",
+      "path": "/solucoes/sites-sistemas",
+      "requisitosPublicados": {
+        "disponivel": false,
+        "motivo": "A solução descreve o que pode ser desenvolvido (site, catálogo, agendamento, sistemas internos) mas não publica requisitos formais.",
+        "fonte": "https://opportunity.ia.br/solucoes/"
+      },
+      "camposDoFormulario": ["nome", "email", "whatsapp", "empresa", "interesse", "mensagem", "consent"],
+      "camposDeCaso": [
+        { "nome": "o_que_precisa", "rotulo": "O que o site ou sistema precisa fazer", "tipo": "mensagem", "obrigatorio": true, "origem": "operacional" },
+        { "nome": "sistemas_existentes", "rotulo": "Sistemas e canais que já usa (WhatsApp, pagamento, planilhas)", "tipo": "texto", "obrigatorio": false, "origem": "operacional" }
+      ],
+      "arquivos": {
+        "necessarios": false,
+        "aceitos": ["pdf", "png", "jpg", "jpeg", "txt", "docx", "xlsx", "csv"],
+        "observacao": "Anexo opcional (ex.: referências de layout, planilhas ou capturas do processo atual)."
       }
     },
     {

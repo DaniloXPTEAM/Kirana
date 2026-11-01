@@ -53,6 +53,10 @@ function resolveService(knowledge, raw) {
     relatorios: 'relatorios',
     voz: 'voz',
     android: 'voz',
+    sistema: 'sites-sistemas',
+    sistemas: 'sites-sistemas',
+    catalogo: 'sites-sistemas',
+    agendamento: 'sites-sistemas',
   };
   const key = Object.keys(synonyms).find((word) => wanted.includes(word));
   return key ? services.find((service) => service.serviceId === synonyms[key]) ?? null : null;

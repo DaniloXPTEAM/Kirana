@@ -31,7 +31,9 @@ const RAW_STOPWORDS =
   'a o as os um uma uns umas de do da dos das em no na nos nas por para com sem que se e ou ' +
   'ao aos à às é são ser está estão foi era como qual quais quando onde quem quanto quantos ' +
   'sobre entre mais menos muito pouco já não sim isso isto aquilo eu você vocês nós eles elas ' +
-  'me te lhe nos vos the of and to in is are for you we it';
+  'me te lhe nos vos the of and to in is are for you we it ' +
+  // contrações e verbos auxiliares comuns em pergunta ("pelo whatsapp", "vocês têm"): ruído, não assunto
+  'pelo pela pelos pelas num numa tem têm ter';
 
 function deaccent(text) {
   return String(text ?? '')
@@ -110,6 +112,54 @@ export function parseFrontMatter(raw) {
   return { meta, body: text.slice(match[0].length) };
 }
 
+/**
+ * Junta quebras de linha "moles" (texto Markdown quebrado em ~80 colunas) em uma linha por parágrafo ou item.
+ *
+ * Por quê: o chat da Kirana (`public/markdown.js`) transforma quebra de linha dentro do parágrafo em `<br />`.
+ * Se o modelo recebe o texto com a quebra no meio da frase e o repete, a resposta aparece cortada. Aqui o
+ * conhecimento sempre chega inteiro, qualquer que seja a largura em que o arquivo foi escrito.
+ * Não mexe em títulos, tabelas, citações, linhas em branco nem blocos de código.
+ */
+export function unwrapSoftBreaks(text) {
+  const out = [];
+  let inCode = false;
+  let kind = 'other'; // 'para' | 'list' | 'other' (tipo da última linha emitida)
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    const t = line.trim();
+    if (/^```/.test(t)) {
+      inCode = !inCode;
+      out.push(line);
+      kind = 'other';
+      continue;
+    }
+    if (inCode) {
+      out.push(line);
+      continue;
+    }
+    const isList = /^([-*+]|\d+[.)])\s/.test(t);
+    const isBlock = !t || /^#{1,6}\s/.test(t) || t.startsWith('|') || t.startsWith('>') || /^(-{3,}|\*{3,})$/.test(t);
+    if (isBlock) {
+      out.push(line);
+      kind = 'other';
+      continue;
+    }
+    if (isList) {
+      out.push(line);
+      kind = 'list';
+      continue;
+    }
+    const indented = /^\s/.test(line);
+    const continua = (kind === 'para' && out.length) || (kind === 'list' && indented && out.length);
+    if (continua) {
+      out[out.length - 1] = `${out[out.length - 1].replace(/\s+$/, '')} ${t}`;
+    } else {
+      out.push(line);
+      kind = 'para';
+    }
+  }
+  return out.join('\n');
+}
+
 /** Quebra o corpo em trechos por cabeçalho (o que a busca devolve). */
 export function chunkBody(body, { maxChars = 1200 } = {}) {
   const blocks = [];
@@ -123,9 +173,25 @@ export function chunkBody(body, { maxChars = 1200 } = {}) {
     current.lines.push(line);
   }
   if (current.lines.join('').trim()) blocks.push(current);
-  return blocks.map((block) => {
-    const text = block.lines.join('\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, maxChars);
-    return { heading: block.heading, text };
+  // Seção maior que o limite vira VÁRIOS trechos (cada um com o mesmo título), em vez de ser cortada:
+  // antes, tudo que passava de maxChars sumia da busca (ex.: os últimos projetos de uma lista longa).
+  return blocks.flatMap((block) => {
+    const text = block.lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    if (text.length <= maxChars) return [{ heading: block.heading, text }];
+    const pieces = [];
+    let atual = '';
+    for (const linha of text.split('\n')) {
+      const candidato = atual ? `${atual}\n${linha}` : linha;
+      if (candidato.length > maxChars && atual) {
+        pieces.push(atual.trim());
+        atual = linha;
+      } else {
+        atual = candidato;
+      }
+    }
+    if (atual.trim()) pieces.push(atual.trim());
+    // uma única linha gigante ainda precisa caber
+    return pieces.map((piece) => ({ heading: block.heading, text: piece.slice(0, maxChars) }));
   });
 }
 
@@ -179,7 +245,9 @@ export function loadKnowledge({ dir, logger } = {}) {
       const file = path.join(dir, entry.name);
       try {
         const stat = fs.statSync(file);
-        const { meta, body } = parseFrontMatter(fs.readFileSync(file, 'utf8'));
+        const parsed = parseFrontMatter(fs.readFileSync(file, 'utf8'));
+        const meta = parsed.meta;
+        const body = unwrapSoftBreaks(parsed.body);
         const id = meta.id || entry.name.replace(/\.md$/, '');
         const title = meta.title || id;
         const chunks = chunkBody(body).map((chunk, position) => ({
@@ -317,5 +385,28 @@ export function buildKnowledgePrompt(knowledge, site, { maxServices = 8 } = {}) 
   if (limites) {
     lines.push('', 'Limites conhecidos: sem preços publicados, sem prazos publicados, sem casos de clientes publicados.');
   }
+  // Perfil fixo: o essencial da empresa (marcas, frentes, projetos, contato, limites) vai em TODO
+  // turno, para a conversa não depender de a busca acertar o trecho. O resto continua nas ferramentas.
+  const perfil = secaoDoDocumento(knowledge.doc('perfil'), 'Resumo fixo do prompt');
+  if (perfil) {
+    lines.push('', '## Perfil da empresa (resumo fixo; detalhes pelas ferramentas)', '', perfil);
+  }
   return lines.join('\n');
+}
+
+/**
+ * Texto de uma seção `## Título` de um documento, até o próximo `## ` (as subseções `###` ficam
+ * dentro). Usado para o resumo fixo do prompt; devolve '' se a seção não existir.
+ */
+export function secaoDoDocumento(doc, titulo, { maxChars = 2600 } = {}) {
+  if (!doc?.body) return '';
+  const linhas = doc.body.split(/\r?\n/);
+  const inicio = linhas.findIndex((linha) => linha.trim().toLowerCase() === `## ${titulo}`.toLowerCase());
+  if (inicio < 0) return '';
+  const corpo = [];
+  for (const linha of linhas.slice(inicio + 1)) {
+    if (/^##\s/.test(linha)) break;
+    corpo.push(linha);
+  }
+  return corpo.join('\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, maxChars);
 }

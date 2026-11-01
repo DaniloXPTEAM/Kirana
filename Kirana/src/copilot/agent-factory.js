@@ -62,7 +62,27 @@ export function createKiranaAgent({ agent, sessions, siteKit, logger }) {
       }
 
       const sessionId = siteKit ? siteKit.sessionIdFor(scopedSite, input.threadId) : null;
-      const session = (sessionId && sessions.get(sessionId)) || sessions.create({ id: sessionId || undefined, title: text.slice(0, 60) });
+      const session =
+        (sessionId && sessions.get(sessionId)) ||
+        sessions.create({ id: sessionId || undefined, title: text.slice(0, 60), siteId: site?.id });
+
+      // O site e a página vêm do navegador, mas só entram no prompt depois de validados por `currentContext`.
+      // Sem isto o bloco "Site em que você está atendendo" (conhecimento, perfil, regras de conduta) nunca
+      // chegava ao modelo neste caminho: a sessão ficava sem `siteId`.
+      if (site?.id) {
+        const estado = sanitizeSharedState(input?.state);
+        const caminho = typeof estado.path === 'string' ? estado.path.slice(0, 200) : '';
+        const pagina = typeof estado.page === 'string' ? estado.page.slice(0, 60) : '';
+        const anterior = session.siteState ?? {};
+        const mudou =
+          session.siteId !== site.id ||
+          ((caminho || pagina) && (anterior.path !== caminho || anterior.pageId !== pagina));
+        if (mudou) {
+          session.siteId = site.id;
+          if (caminho || pagina) session.siteState = { path: caminho, pageId: pagina };
+          sessions.save(session);
+        }
+      }
 
       const externalTools = siteKit ? siteKit.buildExternalTools(scopedSite, input?.tools ?? []) : [];
       const contextNote = buildContextNote(input, site);

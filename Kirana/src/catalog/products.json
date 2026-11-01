@@ -1,44 +1,223 @@
 {
-  "version": "2026.10.24",
-  "verifiedAt": "2026-10-24",
+  "version": "2026.10.31",
+  "verifiedAt": "2026-10-31",
   "fonte": "https://opportunity.ia.br/labs/",
-  "observacao": "Registra apenas o que o site publica (projetos do Opportunity Labs). Estágio = exatamente o rótulo do site. Não há produto com preço, licença ou plano comercial confirmado neste sistema.",
+  "observacao": "Registra apenas o que o site publica (projetos do Opportunity Labs). Estado = \"Ativo\" (em andamento e mantido pela equipe), igual ao selo do site; não indica preço, licença ou plano comercial confirmado neste sistema. \"funcionalidades\" é o escopo que o site descreve; o que está em uso em cada projeto é confirmado na conversa com a equipe.",
   "products": [
     {
       "id": "opportunity-crm",
       "nome": "Opportunity CRM",
-      "estagio": "Conceito",
+      "estagio": "Ativo",
       "url": "https://opportunity.ia.br/labs/opportunity-crm",
       "descricao": "Gestão comercial inteligente com organização de contatos, oportunidades, funil de vendas e automações.",
       "categoria": "Gestão comercial e inteligência artificial",
-      "palavras_chave": ["crm", "comercial", "funil", "contatos", "oportunidades"]
+      "palavras_chave": [
+        "crm",
+        "comercial",
+        "funil",
+        "contatos",
+        "oportunidades"
+      ],
+      "funcionalidades": [
+        "Funil visual em kanban com estágios personalizáveis",
+        "Cadastro de clientes e gestão de leads; tarefas e lembretes comerciais",
+        "Histórico centralizado de conversas e transações; unificação das conversas do WhatsApp",
+        "Follow-up automatizado pós-atendimento (24h e 72h, como o site descreve) e qualificação de oportunidades por IA",
+        "Métricas de conversão e de tempo de resposta",
+        "Integração com agentes de IA: planejada"
+      ]
     },
     {
       "id": "cineforma",
       "nome": "CineForma",
-      "estagio": "Em desenvolvimento",
+      "estagio": "Ativo",
       "url": "https://opportunity.ia.br/labs/cineforma",
       "descricao": "Estúdio que transforma história e referências em roteiro, storyboard, vídeos e montagem final.",
       "categoria": "Criação digital e produção de vídeo com IA",
-      "palavras_chave": ["vídeo", "roteiro", "storyboard", "cinema", "história", "produção"]
+      "palavras_chave": [
+        "vídeo",
+        "roteiro",
+        "storyboard",
+        "cinema",
+        "história",
+        "produção"
+      ],
+      "funcionalidades": [
+        "Roteiros estruturados em formato padrão da indústria",
+        "Storyboard com consistência de personagens",
+        "Planos de cena e animações preliminares",
+        "Geração de vídeos por provedores (Google Flow no navegador ou API do Google)",
+        "Supervisão de continuidade e de qualidade antes da montagem final"
+      ]
     },
     {
       "id": "kirana",
-      "nome": "Kirana",
-      "estagio": "Em desenvolvimento",
+      "nome": "Agente Adaptativo",
+      "estagio": "Ativo",
       "url": "https://opportunity.ia.br/labs/kirana",
-      "descricao": "Agentes autônomos personalizados que conhecem o ambiente digital do cliente, auxiliam usuários e realizam ações autorizadas por meio de integrações.",
+      "descricao": "Agente adaptativo (neste site, a Kirana): agentes autônomos personalizados que conhecem o ambiente digital do cliente, auxiliam usuários e realizam ações autorizadas por meio de integrações.",
       "categoria": "Agentes de IA e automação",
-      "palavras_chave": ["kirana", "agente", "autônomo", "integração", "navegação assistida"]
+      "palavras_chave": [
+        "agente adaptativo",
+        "kirana",
+        "agente",
+        "autônomo",
+        "integração",
+        "navegação assistida"
+      ],
+      "funcionalidades": [
+        "Entende intenções em português natural",
+        "Ações na tela: navegação guiada, abrir catálogo, destacar",
+        "Identidade visual e tom de voz adaptáveis (Kirana, Rafael, Ruby e novas personas)",
+        "Integra com sites, WhatsApp, Telegram, aplicativos, sistemas e jogos",
+        "Ações sensíveis exigem autorização; não afirma ter feito algo sem confirmação do sistema"
+      ]
     },
     {
       "id": "opportunity-creators",
       "nome": "Opportunity Creators",
-      "estagio": "Em desenvolvimento",
+      "estagio": "Ativo",
       "url": "https://opportunity.ia.br/labs/creators",
       "descricao": "Personagens digitais, influenciadoras e produção audiovisual com inteligência artificial.",
       "categoria": "Marketing digital e produção criativa com IA",
-      "palavras_chave": ["personagens", "influenciadora", "audiovisual", "marketing", "criadores"]
+      "palavras_chave": [
+        "personagens",
+        "influenciadora",
+        "audiovisual",
+        "marketing",
+        "criadores"
+      ],
+      "funcionalidades": [
+        "Consistência fotográfica entre tomadas",
+        "Biografia, tom de voz e diretrizes de marca",
+        "Imagens, roteiros e vídeos; conteúdo para TikTok e Instagram",
+        "Conteúdo das personagens produzido no AI Image Studio",
+        "Integração futura com voz sintetizada e animação labial"
+      ]
+    },
+    {
+      "id": "gabi",
+      "nome": "Gabi",
+      "estagio": "Ativo",
+      "url": "https://opportunity.ia.br/labs/gabi",
+      "descricao": "Assistente pessoal para Android, com avatar 3D, interação por voz, lembretes, clima e avisos.",
+      "categoria": "Aplicativos e assistentes de voz",
+      "palavras_chave": [
+        "gabi",
+        "android",
+        "voz",
+        "assistente",
+        "avatar"
+      ],
+      "funcionalidades": [
+        "Interação por voz natural, sem digitação",
+        "Avatar 3D sincronizado com a fala",
+        "Clima, previsão, lembretes e alarmes; notificações, avisos e memória",
+        "Área interativa Quarto da Gabi",
+        "Pesquisa de voz natural em português do Brasil e processamento local com baixa latência",
+        "Aplicativo Android nativo (APK)"
+      ]
+    },
+    {
+      "id": "mordenrpg",
+      "nome": "MordenRPG",
+      "estagio": "Ativo",
+      "url": "https://opportunity.ia.br/labs/mordenrpg",
+      "descricao": "Portal de RPG, comunidade e recursos digitais para jogadores e narradores de mesa: compêndio do Tormenta 20, Oficina de Heróis, homebrew e mesa online. Projeto de fãs, sem fins comerciais.",
+      "categoria": "Plataformas digitais e RPG",
+      "palavras_chave": [
+        "rpg",
+        "mordenrpg",
+        "comunidade",
+        "narrador",
+        "jogador"
+      ],
+      "acesso": "https://xpteamrpg.github.io/mesaonline/",
+      "funcionalidades": [
+        "Compêndio do Tormenta 20: raças, classes, equipamentos, magias e monstros",
+        "Oficina de Heróis com homebrew e criador de magias",
+        "Fichas digitais com cálculo automático; geradores de NPCs, ganchos e encontros",
+        "Mesa online com campanhas, one-shots e mesas privativas por código ou link"
+      ],
+      "acesso_publico": "https://xpteamrpg.github.io/mesaonline/",
+      "aviso": "Projeto de fãs, sem fins comerciais. O conteúdo oficial do Tormenta 20 pertence aos seus autores."
+    },
+    {
+      "id": "armada-nexus-rpg",
+      "nome": "Armada Nexus RPG",
+      "estagio": "Ativo",
+      "url": "https://opportunity.ia.br/labs/mesa-vtt",
+      "descricao": "Mesa virtual de RPG completa: mapas, tokens, fog of war, dados, fichas, modo tático com combate, modo explorador, armas, poderes, magias e bestiário do Tormenta 20; projeto independente, usável sozinho ou integrado ao portal MordenRPG. Projeto de fãs, sem fins comerciais.",
+      "categoria": "Games e sistemas interativos",
+      "palavras_chave": [
+        "armada nexus",
+        "bestiário",
+        "combate",
+        "explorador",
+        "fog of war",
+        "magias",
+        "mapas",
+        "mesa virtual",
+        "rpg",
+        "tokens",
+        "tormenta",
+        "vtt"
+      ],
+      "acesso": "https://xpteamrpg.github.io/mesaonline/mesa/",
+      "funcionalidades": [
+        "Grid tático (quadrado, hexágono ou sem grid), tokens com barras de vida, fog of war",
+        "Rolador de dados 3D com histórico; turnos, iniciativa e efeitos",
+        "Modo tático com combate e modo explorador; painel do mestre; campanhas oficiais para clonar e editar",
+        "Armas (uso, customização e arremesso), poderes, magias e bestiário do Tormenta 20",
+        "Independente: funciona sozinho ou integrado ao MordenRPG, com a ficha ligada à mesa"
+      ],
+      "acesso_publico": "https://xpteamrpg.github.io/mesaonline/mesa/",
+      "aviso": "Projeto de fãs, sem fins comerciais. O conteúdo oficial do Tormenta 20 pertence aos seus autores."
+    },
+    {
+      "id": "ai-image-studio",
+      "nome": "AI Image Studio",
+      "estagio": "Ativo",
+      "url": "https://opportunity.ia.br/labs/image-studio",
+      "descricao": "Geração de imagens por IA para personagens, cenários e concept art de games, com gerador local LongCat.",
+      "categoria": "Inteligência artificial generativa",
+      "palavras_chave": [
+        "imagem",
+        "imagens",
+        "geração de imagens",
+        "concept art",
+        "longcat"
+      ],
+      "funcionalidades": [
+        "Testes de consistência facial e anatômica de personagens",
+        "Variação automática de poses, roupas e iluminação",
+        "Benchmark de velocidade, resolução e custo; escolha de modelos conforme disponibilidade",
+        "Gerador local (LongCat), que roda no próprio computador",
+        "Concept art para games, com pré-visualização e organização das imagens"
+      ]
+    },
+    {
+      "id": "rpg-comic-chronicles",
+      "nome": "RPG Comic Chronicles",
+      "estagio": "Ativo",
+      "url": "https://opportunity.ia.br/labs/rpg-comic-chronicles",
+      "descricao": "Transforma o roteiro de uma aventura de RPG, ou qualquer história, em revista em quadrinhos.",
+      "categoria": "Criação digital e narrativa com IA",
+      "palavras_chave": [
+        "quadrinhos",
+        "hq",
+        "revista",
+        "roteiro",
+        "storyboard",
+        "rpg"
+      ],
+      "funcionalidades": [
+        "Divide a história em cenas e requadros; balões, onomatopeias e recordatórios",
+        "Estilos de arte à escolha (HQ clássica, mangá, graphic novel)",
+        "Exportação em PDF",
+        "Roteiro da missão, personagens e ambientes com imagens de referência",
+        "Confere a consistência dos personagens no storyboard antes de gerar as cenas"
+      ]
     }
   ]
 }
