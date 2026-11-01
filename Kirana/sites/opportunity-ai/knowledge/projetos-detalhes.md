@@ -12,7 +12,7 @@ Os nove projetos estão **ativos** (em andamento e mantidos pela equipe). As lis
 
 ## Como os projetos se relacionam
 
-- A linha de **agentes de IA personalizados** para empresas é desenvolvida na plataforma **Kirana**.
+- A linha de **agentes de IA personalizados** para empresas é desenvolvida no **Agente Adaptativo** (neste site, ele atende como Kirana).
 - Os **agentes de voz e Android** têm como exemplo o projeto **Gabi**.
 - O **Armada Nexus RPG** funciona sozinho ou integrado ao portal **MordenRPG** (a ficha liga direto à mesa).
 - As personagens do **Opportunity Creators** são produzidas no **AI Image Studio**, a partir da imagem do produto e da referência.
@@ -38,9 +38,9 @@ Estúdio que transforma premissas, histórias e referências em roteiro, storybo
 - Geração de vídeos por provedores (Google Flow no navegador ou API do Google).
 - Supervisão de continuidade e de qualidade antes da montagem final.
 
-## Kirana: funcionalidades e escopo (agentes interativos e automação)
+## Agente Adaptativo: funcionalidades e escopo (agentes interativos e automação)
 
-O motor de agentes inteligentes da Opportunity AI. Ela **não é um mascote**: conecta-se à base de conhecimento do negócio, responde dúvidas, navega pela interface, filtra produtos, agenda horários e encaminha para uma pessoa quando necessário.
+O motor de agentes inteligentes da Opportunity AI: um mesmo agente que assume diferentes identidades, personalidades e funções. Kirana é a identidade principal, a atendente deste site, e **não é um mascote**: ele conecta-se à base de conhecimento do negócio, responde dúvidas, navega pela interface, filtra produtos, agenda horários e encaminha para uma pessoa quando necessário.
 
 - Entende intenções em português natural; ações na tela (navegação guiada, abrir catálogo, destacar).
 - Identidade visual e tom de voz adaptáveis ao segmento; identidades como Kirana, Rafael, Ruby e novas personas.

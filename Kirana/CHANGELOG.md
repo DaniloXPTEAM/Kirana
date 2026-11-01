@@ -15,6 +15,11 @@ vitrine do site (explica, localiza a seção certa, prepara o contato e encaminh
 - **Catálogo** (`products.json`): cada projeto ganha `funcionalidades`; MordenRPG e Armada Nexus ganham
   `acesso_publico` e o aviso de projeto de fãs.
 
+### Nome e ordem dos projetos
+- O projeto "Kirana" do catálogo passa a se chamar **Agente Adaptativo**; Kirana é a identidade principal dele, a atendente deste site.
+  Ordem de apelo comercial, como no site: Agente Adaptativo, Opportunity CRM, CineForma, Gabi, Opportunity Creators, AI Image Studio, MordenRPG,
+  Armada Nexus RPG e RPG Comic Chronicles. Projetos em destaque: Agente Adaptativo, Opportunity CRM e CineForma.
+
 ### Personalidade
 - `src/prompts.js`: nova seção "Personalidade e tom": atenciosa, curiosa e tranquila; respeitosa e próxima, **nunca informal
   e nunca formal demais** (sem gíria nem "prezado"); retoma o que a pessoa disse; uma pergunta por vez; sem "Claro!" e

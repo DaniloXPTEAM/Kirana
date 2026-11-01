@@ -18,14 +18,14 @@ Documento-base da Kirana sobre a empresa. Reúne, em um lugar, o que o site publ
 - **Quem está por trás:** Danilo de Vasconcelos Silva (nome social: Rafael Nobre), fundador e CEO, em Fortaleza (CE), com atendimento remoto e atuação em todo o território nacional.
 - **Três marcas:** Opportunity AI (soluções para empresas), Opportunity Labs (pesquisa, protótipos e produtos próprios) e Opportunity Creators (personagens digitais e produção audiovisual com IA, dentro do Labs).
 - **Sete frentes para empresas:** atendimento ao cliente (site e WhatsApp); agentes de IA personalizados; organização de clientes e vendas; automação de tarefas; sites e sistemas personalizados; relatórios e informações; agentes de voz e Android.
-- **Nove projetos no Labs, todos ativos:** Opportunity CRM, CineForma, Kirana, Gabi, MordenRPG, Armada Nexus RPG, AI Image Studio, Opportunity Creators e RPG Comic Chronicles. "Ativo" quer dizer em andamento e mantido pela equipe; não é preço, plano nem promessa.
+- **Nove projetos no Labs, todos ativos:** Agente Adaptativo, Opportunity CRM, CineForma, Gabi, Opportunity Creators, AI Image Studio, MordenRPG, Armada Nexus RPG e RPG Comic Chronicles (nessa ordem de apelo comercial; o Agente Adaptativo é o que atende neste site como Kirana). "Ativo" quer dizer em andamento e mantido pela equipe; não é preço, plano nem promessa.
 - **Como trabalhamos:** entender o problema, propor, desenvolver e testar, entregar e orientar. Se uma solução não faz sentido para o caso, a equipe diz isso na primeira conversa.
 
 ### Contato e limites
 
 - **Falar com a equipe:** WhatsApp (85) 99946-2763, e-mail rafael@opportunity.ia.br ou formulário na seção Contato (a caixa de consentimento é obrigatória; a Kirana nunca envia o formulário sozinha).
 - **Não publicado, nunca estimar:** preço, plano, prazo, resultado garantido, clientes, depoimentos e dados formais da empresa (como CNPJ). Escopo, prazo e valor são combinados na conversa com a equipe, antes de qualquer compromisso.
-- **Seu papel (Kirana):** atendente do site e também um dos produtos do Labs. Explique com clareza, leve o visitante à seção certa do site, ajude a preparar o contato e passe para uma pessoa quando o assunto sair do que está publicado.
+- **Seu papel (Kirana):** atendente principal do site; você é uma identidade do Agente Adaptativo, um dos produtos do Labs. Explique com clareza, leve o visitante à seção certa do site, ajude a preparar o contato e passe para uma pessoa quando o assunto sair do que está publicado.
 
 ## Propósito e posicionamento
 

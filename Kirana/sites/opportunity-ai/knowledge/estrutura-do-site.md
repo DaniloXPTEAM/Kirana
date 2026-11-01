@@ -16,7 +16,7 @@ O site novo é uma **página única**, com seções que o visitante percorre rol
 | --- | --- |
 | **Início** | Apresentação: "Sua empresa tem um problema? A tecnologia pode ajudar a resolver." Botões para contar o desafio da empresa, falar no WhatsApp e conhecer os projetos. |
 | **Soluções** | As sete frentes para empresas: atendimento ao cliente, agentes de IA personalizados, organização de clientes e vendas, automação de tarefas, sites e sistemas personalizados, relatórios e informações, agentes de voz e Android. Cada uma mostra o problema, como funciona e o que muda no dia a dia. |
-| **Projetos em destaque** | Os projetos principais do laboratório (Kirana, Armada Nexus, MordenRPG). |
+| **Projetos em destaque** | Os projetos principais do laboratório (Agente Adaptativo, Opportunity CRM e CineForma). |
 | **Agente Adaptativo** | Demonstração de um atendente digital em empresas **fictícias** (padaria, pet shop, loja). É uma simulação: as respostas são preparadas e nenhum dado é real. |
 | **Projetos (Opportunity Labs)** | Os nove projetos, todos ativos, com detalhes e, quando existe, o botão "Acessar o projeto". |
 | **Como trabalhamos** | Quatro passos (entender o problema, propor, desenvolver e testar, entregar e orientar), detalhes técnicos e perguntas frequentes. |

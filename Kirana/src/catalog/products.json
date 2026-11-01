@@ -52,12 +52,13 @@
     },
     {
       "id": "kirana",
-      "nome": "Kirana",
+      "nome": "Agente Adaptativo",
       "estagio": "Ativo",
       "url": "https://opportunity.ia.br/labs/kirana",
-      "descricao": "Agentes autônomos personalizados que conhecem o ambiente digital do cliente, auxiliam usuários e realizam ações autorizadas por meio de integrações.",
+      "descricao": "Agente adaptativo (neste site, a Kirana): agentes autônomos personalizados que conhecem o ambiente digital do cliente, auxiliam usuários e realizam ações autorizadas por meio de integrações.",
       "categoria": "Agentes de IA e automação",
       "palavras_chave": [
+        "agente adaptativo",
         "kirana",
         "agente",
         "autônomo",

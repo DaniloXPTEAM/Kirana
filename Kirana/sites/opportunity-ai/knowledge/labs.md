@@ -16,7 +16,7 @@ As funcionalidades listadas em cada projeto descrevem o **escopo** dele; o que e
 | --- | --- | --- |
 | Opportunity CRM | Gestão comercial: contatos, leads, oportunidades, funil e automações | Ativo |
 | CineForma | Produção de vídeo com IA: roteiro, storyboard, vídeos e montagem | Ativo |
-| Kirana | Agentes inteligentes para sites, aplicativos, sistemas e jogos | Ativo |
+| Agente Adaptativo | Agentes inteligentes para sites, aplicativos, sistemas e jogos (aqui atende como Kirana) | Ativo |
 | Gabi | Assistente pessoal para Android, com avatar 3D e voz | Ativo |
 | MordenRPG | Portal de RPG, comunidade e recursos digitais | Ativo |
 | Armada Nexus RPG | Mesa virtual de RPG (mapas, tokens, fichas, rolagens, combate) | Ativo |
@@ -31,7 +31,7 @@ As funcionalidades listadas em cada projeto descrevem o **escopo** dele; o que e
 
 Os demais não têm endereço público publicado no site; para ver ou testar, é preciso conversar com a equipe.
 
-## Kirana (o produto deste agente)
+## Agente Adaptativo (o produto; neste site ele atende como Kirana)
 
 - **O que é:** plataforma de agentes autônomos personalizados que transforma sites, aplicativos, sistemas e ambientes digitais em experiências interativas.
 - **O que o agente faz:** conhece o conteúdo, as funcionalidades e as regras do ambiente em que está integrado; conversa, responde perguntas, orienta a navegação e executa ações **autorizadas** (ações sensíveis exigem autorização; o agente não diz que fez algo sem confirmação do sistema).
