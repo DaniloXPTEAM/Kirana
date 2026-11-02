@@ -1,6 +1,6 @@
-# TamaAgent
+# TamaAgent v0.1.0
 
-O **TamaAgent** é o agente do app **Tama IA**. Nasceu da Kirana (pasta `Kirana/` do mesmo repositório, que continua intacta) e agora fala com um **OmniRoute** em vez do Gateway do ChatGPT. **O Gateway antigo (`Gateway/`) não é usado.**
+O **TamaAgent** é o agente do app **Tama IA**. Nasceu da Kirana v0.5.5 (pasta `Kirana/` do mesmo repositório, que continua intacta) e agora fala com um **OmniRoute** em vez do Gateway do ChatGPT. **O Gateway antigo (`Gateway/`) não é usado.**
 
 ```
 celular (Tama IA) ──► TamaAgent (porta 3000, ponte /api/gateway/*) ──► OmniRoute (porta 20128) ──► modelos

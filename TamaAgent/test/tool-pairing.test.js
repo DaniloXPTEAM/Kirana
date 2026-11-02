@@ -249,5 +249,5 @@ test('contrato: a checagem de emparelhamento é opt-in (formato não muda para o
 test('logs mostram a versão do package.json', async () => {
   const pkg = JSON.parse(await (await import('node:fs/promises')).readFile(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(loadConfig({}).version, pkg.version);
-  assert.equal(loadConfig({}).version, '0.5.5');
+  assert.equal(loadConfig({}).version, '0.1.0');
 });

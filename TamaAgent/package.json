@@ -1,6 +1,6 @@
 {
   "name": "tamaagent",
-  "version": "0.5.5",
+  "version": "0.1.0",
   "private": true,
   "description": "TamaAgent — agente do Tama IA (derivado da Kirana), com ponte para o app Android e provedor OpenAI-compatível (OmniRoute)",
   "type": "module",
