@@ -1,0 +1,24 @@
+# credenciais
+.env
+.env.*
+!.env.example
+!deploy/.env.production.example
+
+# dados locais (sessões, memória, interesses comerciais)
+data/
+
+# logs
+*.log
+logs/
+
+# dependências e artefatos
+node_modules/
+coverage/
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# Relatórios gerados por homologar.bat / preflight (não versionar)
+homologacao/

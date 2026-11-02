@@ -1,0 +1,67 @@
+# Kirana em produção — Caminho A do docs/PRODUCAO.md.
+#
+#   visitante → Caddy (HTTPS) → kirana:3000 → (loopback do host) Gateway 1455
+#
+# O Gateway NÃO está neste compose: ele é loopback-only e continua no PC do dono.
+# `extra_hosts` faz o container enxergar o Gateway do host como `gateway.local`
+# quando os dois estão na mesma máquina. Se o Gateway estiver em outro PC da
+# mesma rede privada (Tailscale/WireGuard), troque KIRANA_GATEWAY_URL.
+#
+# Subir:   docker compose -f deploy/docker-compose.yml --env-file deploy/.env.production up -d
+# Logs:    docker compose -f deploy/docker-compose.yml logs -f kirana
+# Parar:   docker compose -f deploy/docker-compose.yml down
+services:
+  kirana:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: kirana:0.5.2
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      KIRANA_HOST: 0.0.0.0
+      KIRANA_PORT: "3000"
+      KIRANA_DATA_DIR: /data
+    volumes:
+      - kirana-data:/data
+    # Porta NÃO publicada no host: só o Caddy fala com ela.
+    expose:
+      - "3000"
+    # Gateway no MESMO host, em loopback. `host-gateway` resolve o host.
+    extra_hosts:
+      - "gateway.local:host-gateway"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      kirana:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      # Troque pelo seu domínio real (também no Caddyfile).
+      KIRANA_DOMAIN: ${KIRANA_DOMAIN:-kirana.example.com}
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  kirana-data:
+  caddy-data:
+  caddy-config:

@@ -1,0 +1,24 @@
+{
+  "id": "demo-parceiro",
+  "name": "Parceiro Demo (segundo cliente)",
+  "persona": "Kirana",
+  "greeting": "Olá! Posso ajudar com as informações deste site.",
+  "identity": { "company": "Parceiro Demo", "note": "Exemplo de segundo cliente do kit; existe para provar o isolamento." },
+  "features": { "tools": true, "sharedState": true, "generativeUi": true, "hitl": true },
+  "stateKeys": ["page", "section"],
+  "generativeComponents": ["serviceCard"],
+  "allowedOrigins": [],
+  "tools": [
+    {
+      "name": "navigateToPage",
+      "description": "Navega para uma seção deste site.",
+      "category": "navigation",
+      "parameters": {
+        "type": "object",
+        "properties": { "page": { "type": "string", "enum": ["inicio", "solucoes", "contato"] } },
+        "required": ["page"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

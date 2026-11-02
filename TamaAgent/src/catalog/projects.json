@@ -1,0 +1,40 @@
+{
+  "version": "2026.10.24",
+  "simulado": true,
+  "observacao": "DADOS SIMULADOS. Nenhum destes projetos é real. Usado apenas para demonstrar o ciclo de ferramenta de leitura na Fase 1. Qualquer integração real deve substituir esta fonte.",
+  "projects": [
+    {
+      "id": "PRJ-001",
+      "nome": "Implantação de atendimento digital",
+      "cliente_referencia": "Cliente demonstração A",
+      "status": "Em andamento",
+      "etapa_atual": "Homologação do fluxo de triagem",
+      "etapas_concluidas": ["Diagnóstico", "Desenho da solução", "Protótipo"],
+      "atualizado_em": "2026-10-20",
+      "proximo_marco": "Teste com usuários reais",
+      "responsavel": "Equipe de projetos (simulado)"
+    },
+    {
+      "id": "PRJ-002",
+      "nome": "Automação de relatórios comerciais",
+      "cliente_referencia": "Cliente demonstração B",
+      "status": "Em andamento",
+      "etapa_atual": "Coleta e tratamento de dados",
+      "etapas_concluidas": ["Diagnóstico", "Desenho da solução"],
+      "atualizado_em": "2026-10-16",
+      "proximo_marco": "Primeira versão do resumo executivo",
+      "responsavel": "Equipe de projetos (simulado)"
+    },
+    {
+      "id": "PRJ-003",
+      "nome": "Agente interno de consulta a políticas",
+      "cliente_referencia": "Cliente demonstração C",
+      "status": "Concluído",
+      "etapa_atual": "Operação assistida",
+      "etapas_concluidas": ["Diagnóstico", "Desenho da solução", "Protótipo", "Testes", "Entrega"],
+      "atualizado_em": "2026-09-30",
+      "proximo_marco": "Revisão de escopo em 90 dias",
+      "responsavel": "Equipe de projetos (simulado)"
+    }
+  ]
+}

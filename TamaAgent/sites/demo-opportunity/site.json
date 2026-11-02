@@ -1,0 +1,85 @@
+{
+  "id": "demo-opportunity",
+  "name": "Opportunity AI (demonstração local)",
+  "persona": "Kirana",
+  "greeting": "Posso navegar pelo site, abrir o formulário de contato e preencher com você.",
+  "identity": { "company": "Opportunity AI", "note": "Ambiente local de demonstração; não é o site publicado." },
+  "visual": { "accent": "#1f6feb", "position": "right" },
+  "features": { "tools": true, "sharedState": true, "generativeUi": true, "hitl": true },
+  "stateKeys": ["page", "section", "service", "formStep", "lastAction"],
+  "generativeComponents": ["serviceCard", "contactSummary", "pricingNotice"],
+  "allowedOrigins": [],
+  "tools": [
+    {
+      "name": "navigateToPage",
+      "description": "Navega para uma página do site. Páginas: inicio, solucoes, labs, contato.",
+      "category": "navigation",
+      "parameters": {
+        "type": "object",
+        "properties": { "page": { "type": "string", "enum": ["inicio", "solucoes", "labs", "contato"] } },
+        "required": ["page"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "openContactForm",
+      "description": "Abre o formulário de contato e foca o primeiro campo.",
+      "category": "navigation",
+      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    },
+    {
+      "name": "selectService",
+      "description": "Destaca um serviço na página de soluções. Serviços: agentes, atendimento, crm, workflows, relatorios, voz-android.",
+      "category": "action",
+      "parameters": {
+        "type": "object",
+        "properties": { "serviceId": { "type": "string", "enum": ["agentes", "atendimento", "crm", "workflows", "relatorios", "voz-android"] } },
+        "required": ["serviceId"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "showPricing",
+      "description": "Mostra o aviso de preços publicados pela Opportunity AI.",
+      "category": "generative-ui",
+      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    },
+    {
+      "name": "fillContactForm",
+      "description": "Preenche os campos do formulário de contato. Não envia nada.",
+      "category": "form",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "nome": { "type": "string", "minLength": 2, "maxLength": 120 },
+          "email": { "type": "string", "maxLength": 160 },
+          "whatsapp": { "type": "string", "maxLength": 40 },
+          "empresa": { "type": "string", "maxLength": 120 },
+          "interesse": {
+            "type": "string",
+            "enum": [
+              "Agentes de IA personalizados",
+              "Atendimento digital e WhatsApp",
+              "CRM e automação de vendas",
+              "Workflows e automação",
+              "Relatórios inteligentes",
+              "Agentes de voz e Android",
+              "Opportunity Labs e parcerias",
+              "Outro assunto"
+            ]
+          },
+          "mensagem": { "type": "string", "maxLength": 2000 }
+        },
+        "required": ["nome", "email", "interesse", "mensagem"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "submitContactRequest",
+      "description": "Envia o formulário de contato. Ação sensível: exige confirmação do visitante com os dados visíveis.",
+      "category": "sensitive",
+      "requiresConfirmation": true,
+      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  ]
+}

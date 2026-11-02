@@ -1,0 +1,110 @@
+<style>
+  .preview-banner {
+    position: fixed; z-index: 80; left: 50%; bottom: 16px; transform: translateX(-50%);
+    background: #12162a; color: #fff; font: 600 12px/1.4 "Segoe UI", system-ui, sans-serif;
+    padding: 9px 16px; border-radius: 999px; box-shadow: 0 10px 24px rgba(18, 22, 42, .28);
+    opacity: .94; white-space: nowrap;
+  }
+  @media (max-width: 640px) { .preview-banner { white-space: normal; text-align: center; width: calc(100vw - 32px); } }
+</style>
+<script>
+  (function () {
+    const chat = document.getElementById('chat');
+    const welcome = document.getElementById('welcome');
+    if (welcome) welcome.remove();
+
+    const history = [
+      { title: 'Atendimento no WhatsApp', active: true, pending: true },
+      { title: 'Status do projeto PRJ-001' },
+      { title: 'Como funciona o Opportunity CRM' },
+      { title: 'Sobre agentes de voz' },
+    ];
+    const list = document.getElementById('history');
+    list.innerHTML = history
+      .map(
+        (item) =>
+          '<li><button class="history-item" type="button" aria-current="' + (item.active ? 'true' : 'false') + '">' +
+          '<span class="title">' + item.title + '</span>' +
+          (item.pending ? '<span class="dot-pending"></span>' : '') +
+          '<span class="del"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>' +
+          '</button></li>',
+      )
+      .join('');
+    document.getElementById('history-empty').hidden = true;
+
+    const tools = [
+      ['leitura', 'Consultar serviços'],
+      ['leitura', 'Consultar produtos'],
+      ['leitura', 'Consultar status de projeto'],
+      ['leitura', 'Consultar memória'],
+      ['escrita', 'Registrar interesse comercial'],
+      ['escrita', 'Guardar informação autorizada'],
+    ];
+    document.getElementById('tool-list').innerHTML = tools
+      .map(
+        (pair) =>
+          '<li><span class="kind ' + (pair[0] === 'escrita' ? 'write' : 'read') + '">' + pair[0] + '</span><span>' + pair[1] + '</span></li>',
+      )
+      .join('');
+
+    document.getElementById('status-dot').className = 'dot ok';
+    document.getElementById('status-text').textContent = 'Gateway conectado (exemplo)';
+    document.getElementById('model-pill').textContent = 'gpt-6-luna';
+    document.getElementById('session-title').textContent = 'Atendimento no WhatsApp';
+    document.getElementById('memory-count').textContent = '2';
+    document.getElementById('composer-status').hidden = true;
+    document.getElementById('composer-input').value = '';
+
+    function avatar(text) {
+      return '<div class="msg-avatar" aria-hidden="true">' + text + '</div>';
+    }
+    function userMsg(text) {
+      return '<article class="msg user">' + avatar('Você') +
+        '<div class="msg-body"><div class="bubble"><p>' + text + '</p></div></div></article>';
+    }
+    function botMsg(html, meta) {
+      return '<article class="msg assistant">' + avatar('K') +
+        '<div class="msg-body"><div class="bubble">' + html + '</div>' +
+        '<div class="msg-meta">' + (meta || '') + '</div></div></article>';
+    }
+
+    const transcript = [
+      userMsg('Oi! Preciso responder as mesmas dúvidas no WhatsApp todos os dias, fora do horário. Vocês ajudam com isso?'),
+      botMsg(
+        '<p>Oi! Ajudamos sim — esse é justamente o cenário de <strong>Atendimento digital e WhatsApp</strong>.</p>' +
+        '<p>Na prática, a Opportunity AI monta uma triagem que responde dúvidas comuns, organiza os interessados e passa para uma pessoa quando necessário. O escopo é definido caso a caso, a partir do seu processo.</p>' +
+        '<p>Quer que eu detalhe como seria no seu caso ou prefere que eu registre um pedido de contato com a equipe?</p>',
+        '<span class="pill tool-ok">Consultar serviços · ok</span><span class="pill">gpt-6-luna</span>' +
+        '<span class="pill">412 ms até 1º token</span><span class="pill">2,1 s total</span>',
+      ),
+      userMsg('Quero falar com a equipe. Meu nome é Ana, da Clínica Vida, e o melhor contato é ana@clinicavida.com.br'),
+      botMsg(
+        '<p>Perfeito, Ana. Preparei o registro do seu interesse:</p>' +
+        '<p><strong>Ana · Clínica Vida</strong> — e-mail ana@clinicavida.com.br, tema: atendimento no WhatsApp.</p>' +
+        '<p>Nada é gravado antes da sua confirmação — é só confirmar abaixo.</p>',
+        '<span class="pill tool-warn">Registrar interesse · aguardando</span><span class="pill">gpt-6-luna</span>',
+      ),
+    ];
+    chat.innerHTML = transcript.join('');
+
+    const card = document.createElement('article');
+    card.className = 'msg assistant';
+    card.innerHTML =
+      '<div class="msg-avatar" aria-hidden="true">K</div>' +
+      '<div class="msg-body">' +
+      '<div class="confirm-card">' +
+      '<h3>Confirmação necessária</h3>' +
+      '<p class="summary">Registrar interesse comercial de Ana (Clínica Vida). Contato: e-mail ana@clinicavida.com.br. Interesse: Atendimento digital no WhatsApp.</p>' +
+      '<p class="note">Nada é gravado nem enviado antes da sua confirmação.</p>' +
+      '<div class="confirm-actions">' +
+      '<button class="btn btn-primary" type="button" disabled>Sim, confirmar</button>' +
+      '<button class="btn btn-ghost" type="button" disabled>Não, cancelar</button>' +
+      '</div></div></div>';
+    chat.appendChild(card);
+
+    const banner = document.createElement('div');
+    banner.className = 'preview-banner';
+    banner.textContent = 'Prévia estática da interface · a aplicação real roda com npm start';
+    document.body.appendChild(banner);
+  })();
+</script>

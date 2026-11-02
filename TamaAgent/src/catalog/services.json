@@ -1,0 +1,56 @@
+{
+  "version": "2026.10.24",
+  "verifiedAt": "2026-10-24",
+  "fonte": "https://opportunity.ia.br/solucoes/",
+  "observacao": "Seis frentes de trabalho publicadas no site oficial. O escopo de cada projeto é definido caso a caso. Não há preços públicos confirmados.",
+  "services": [
+    {
+      "id": "agentes-ia",
+      "nome": "Agentes de IA personalizados",
+      "url": "https://opportunity.ia.br/solucoes/agentes-ia",
+      "problema": "Tarefas que dependem de interpretar pedidos em linguagem natural consomem tempo da equipe.",
+      "aplicacao": "Triagem de pedidos, consulta a informações internas e apoio a rotinas administrativas.",
+      "palavras_chave": ["agente", "assistente", "chatbot", "triagem", "atendimento interno", "linguagem natural", "ia"]
+    },
+    {
+      "id": "atendimento",
+      "nome": "Atendimento digital e WhatsApp",
+      "url": "https://opportunity.ia.br/solucoes/atendimento",
+      "problema": "O atendimento por mensagem acumula perguntas repetidas e demora a responder fora do horário.",
+      "aplicacao": "Respostas a dúvidas comuns, triagem de interessados e passagem para uma pessoa.",
+      "palavras_chave": ["whatsapp", "atendimento", "mensagem", "suporte", "triagem", "fora do horário", "chat"]
+    },
+    {
+      "id": "crm-vendas",
+      "nome": "CRM e automação de vendas",
+      "url": "https://opportunity.ia.br/solucoes/crm-vendas",
+      "problema": "Oportunidades se perdem quando o acompanhamento depende de memória, planilhas e conversas soltas.",
+      "aplicacao": "Organização do funil comercial e lembretes de retorno.",
+      "palavras_chave": ["crm", "vendas", "funil", "pipeline", "oportunidade", "lead", "comercial", "follow-up"]
+    },
+    {
+      "id": "automacao",
+      "nome": "Workflows e automação",
+      "url": "https://opportunity.ia.br/solucoes/automacao",
+      "problema": "Tarefas repetitivas entre sistemas tomam horas e favorecem erros.",
+      "aplicacao": "Coleta e tratamento de dados, organização de arquivos e integração de ferramentas.",
+      "palavras_chave": ["automação", "workflow", "processo", "integração", "planilha", "arquivo", "rotina", "rpa"]
+    },
+    {
+      "id": "relatorios",
+      "nome": "Relatórios inteligentes",
+      "url": "https://opportunity.ia.br/solucoes/relatorios",
+      "problema": "Montar relatórios e apresentações consome dias e depende de reunir dados espalhados.",
+      "aplicacao": "Resumos executivos, análise de indicadores e rascunhos de apresentações.",
+      "palavras_chave": ["relatório", "dashboard", "indicador", "kpi", "apresentação", "resumo", "dados", "bi"]
+    },
+    {
+      "id": "voz",
+      "nome": "Agentes de voz e Android",
+      "url": "https://opportunity.ia.br/solucoes/voz",
+      "problema": "Interagir por voz ainda é pouco natural em muitas soluções.",
+      "aplicacao": "Pesquisa e prototipagem de assistentes de voz para Android e web.",
+      "palavras_chave": ["voz", "áudio", "android", "aplicativo", "app", "assistente de voz", "telefone"]
+    }
+  ]
+}
